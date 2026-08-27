@@ -129,6 +129,14 @@ export async function createNombaCheckoutOrder(params: {
   }
   const checkoutLink = String(json?.data?.checkoutLink || "");
   const orderReference = String(json?.data?.orderReference || "");
-  if (!checkoutLink) return { ok: false, error: "Nomba returned no checkout link" };
+  if (!checkoutLink) {
+    const dataMsg = String(json?.data?.message || json?.data?.description || "").trim();
+    return {
+      ok: false,
+      error: dataMsg || "Nomba returned no checkout link",
+      status,
+      raw: json,
+    };
+  }
   return { ok: true, checkoutLink, orderReference };
 }

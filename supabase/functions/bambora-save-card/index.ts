@@ -116,6 +116,10 @@ Deno.serve(async (req) => {
         amount: chargeAmount,
         currency,
         orderNumber,
+        customer: {
+          name,
+          email: email || undefined,
+        },
       });
       const approved = isBamboraPaymentApproved(charged.json);
       const txnId = bamboraTxnId(charged.json);

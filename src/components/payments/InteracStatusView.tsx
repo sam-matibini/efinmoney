@@ -1,9 +1,11 @@
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { CheckCircle2, Copy, Loader2 } from "lucide-react";
+import { CheckCircle2, Copy, Loader2, ShieldCheck } from "lucide-react";
 import { CHECKOUT_STRINGS, type Lang } from "@/components/payments/checkoutStrings";
 import type { InteracIntent } from "@/components/payments/InteracCheckout";
 import { LOOP_CAD_EFT, type LoopCadEft } from "@/lib/loopCad";
+import { FINCRA_CAD_INTERAC_ALIAS } from "@/lib/fincraCad";
+import { cn } from "@/lib/utils";
 
 export type InteracRailVariant = "flovide" | "loop" | "fincra";
 
@@ -15,10 +17,13 @@ interface Props {
   purpose: "topup" | "transfer" | "merchant_collection";
   done: boolean;
   variant?: InteracRailVariant;
+  /** Cancel this request and return to the amount form. */
+  onChangeAmount?: () => void;
+  changingAmount?: boolean;
 }
 
 /**
- * Compact Autodeposit instructions: amount, alias, reference.
+ * Autodeposit wait screen: amount, alias, reference + auto-confirm messaging.
  */
 export default function InteracStatusView({
   intent,
@@ -28,6 +33,8 @@ export default function InteracStatusView({
   purpose,
   done,
   variant = "loop",
+  onChangeAmount,
+  changingAmount = false,
 }: Props) {
   const t = CHECKOUT_STRINGS[lang];
   const reference = intent.public_id || intent.reference;
@@ -36,12 +43,8 @@ export default function InteracStatusView({
   const isFlovide = variant === "flovide";
   const isFincra = variant === "fincra";
   const showEft = !isFlovide && !isFincra;
-  const sendTo = alias || (isFlovide ? "efin@flovide.com" : null);
-
-  const tip =
-    lang === "fr"
-      ? "Mettez la référence dans le message Interac. Pas de question de sécurité."
-      : "Put the reference in the Interac message. No security question.";
+  const sendTo = alias || (isFincra ? FINCRA_CAD_INTERAC_ALIAS : isFlovide ? "efin@flovide.com" : null);
+  const fr = lang === "fr";
 
   const detailsText = [
     `Amount: ${amountLabel}`,
@@ -60,43 +63,110 @@ export default function InteracStatusView({
     .filter((line) => line !== null)
     .join("\n");
 
+  const copyText = async (value: string, ok: string) => {
+    await navigator.clipboard.writeText(value);
+    toast.success(ok);
+  };
+
   const copyDetails = async () => {
     await navigator.clipboard.writeText(detailsText);
-    toast.success(lang === "fr" ? "Détails copiés" : "Payment details copied");
+    toast.success(fr ? "Détails copiés" : "Payment details copied");
   };
 
   if (done) {
     return (
-      <div className="space-y-2 py-6 text-center">
-        <CheckCircle2 className="mx-auto h-10 w-10 text-primary" />
-        <p className="font-medium">
-          {amountLabel} — {t.received}
-        </p>
-        {purpose === "transfer" && (
-          <p className="text-sm text-muted-foreground">
-            {lang === "fr" ? "Votre transfert est en route." : "Your transfer is on its way."}
+      <div className="space-y-3 py-8 text-center">
+        <CheckCircle2 className="mx-auto h-12 w-12 text-emerald-600" />
+        <div className="space-y-1">
+          <p className="text-lg font-semibold tracking-tight">
+            {amountLabel} — {t.received}
           </p>
-        )}
+          <p className="text-sm text-muted-foreground">
+            {purpose === "transfer"
+              ? fr
+                ? "Votre transfert est en cours d'envoi."
+                : "Your transfer is being sent now."
+              : fr
+                ? "Votre portefeuille CAD est crédité."
+                : "Your CAD wallet is credited."}
+          </p>
+        </div>
       </div>
     );
   }
 
+  const steps = fr
+    ? [
+        `Ouvrez votre app bancaire et démarrez un Virement Interac.`,
+        `Envoyez exactement ${amountLabel} à l'adresse ci-dessous.`,
+        `Collez la référence dans le message. Aucune question de sécurité.`,
+      ]
+    : [
+        `Open your banking app and start an Interac e-Transfer.`,
+        `Send exactly ${amountLabel} to the address below.`,
+        `Paste the reference in the message field. No security question.`,
+      ];
+
   return (
-    <div className="w-full min-w-0 space-y-4">
-      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-        <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
-        <span>
-          {lang === "fr"
-            ? "En attente de votre Virement Interac…"
-            : "Waiting for your Interac e-Transfer…"}
-        </span>
+    <div className="w-full min-w-0 space-y-5">
+      <div className="flex items-start gap-3 rounded-lg border border-emerald-200/80 bg-emerald-50/80 px-3 py-2.5">
+        <Loader2 className="mt-0.5 h-4 w-4 shrink-0 animate-spin text-emerald-700" />
+        <div className="min-w-0 space-y-0.5">
+          <p className="text-sm font-medium text-emerald-900">
+            {fr ? "En attente de votre Virement Interac…" : "Waiting for your Interac e-Transfer…"}
+          </p>
+          <p className="text-[12px] leading-relaxed text-emerald-800/90">
+            {isFincra
+              ? fr
+                ? "Dès que le dépôt arrive, nous créditons votre portefeuille automatiquement — rien à confirmer ici."
+                : "When the deposit lands, we credit your wallet automatically — nothing to confirm here."
+              : fr
+                ? "Nous surveillons votre dépôt et créditons automatiquement."
+                : "We're watching for your deposit and will credit automatically."}
+          </p>
+        </div>
       </div>
 
-      <div className="w-full min-w-0 space-y-3 rounded-lg border p-4 text-sm">
-        <Detail label={t.amountDue} value={amountLabel} />
-        {sendTo ? <Detail label={t.sendTo} value={sendTo} /> : null}
-        <Detail label={t.reference} value={reference} />
-        <p className="pt-1 text-[11px] leading-relaxed text-muted-foreground">{tip}</p>
+      <ol className="space-y-2 text-[13px] leading-snug text-muted-foreground">
+        {steps.map((step, i) => (
+          <li key={step} className="flex gap-2.5">
+            <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-foreground text-[11px] font-semibold text-background">
+              {i + 1}
+            </span>
+            <span className="pt-0.5 text-foreground/90">{step}</span>
+          </li>
+        ))}
+      </ol>
+
+      <div className="w-full min-w-0 space-y-1 overflow-hidden rounded-lg border">
+        <CopyRow
+          label={t.amountDue}
+          value={amountLabel}
+          onCopy={() =>
+            void copyText(
+              Number(intent.amount).toFixed(2),
+              fr ? "Montant copié" : "Amount copied",
+            )
+          }
+        />
+        {sendTo ? (
+          <CopyRow
+            label={t.sendTo}
+            value={sendTo}
+            emphasize
+            onCopy={() =>
+              void copyText(sendTo, fr ? "Adresse copiée" : "Send-to address copied")
+            }
+          />
+        ) : null}
+        <CopyRow
+          label={t.reference}
+          value={reference}
+          emphasize
+          onCopy={() =>
+            void copyText(reference, fr ? "Référence copiée" : "Reference copied")
+          }
+        />
       </div>
 
       {showEft && (
@@ -112,11 +182,82 @@ export default function InteracStatusView({
         <Copy className="mr-2 h-4 w-4" />
         {t.paymentDetails}
       </Button>
+
+      {onChangeAmount && (
+        <div className="space-y-2">
+          <Button
+            type="button"
+            variant="outline"
+            className="w-full"
+            disabled={changingAmount}
+            onClick={() => onChangeAmount()}
+          >
+            {changingAmount ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : null}
+            {fr ? "Annuler et changer le montant" : "Cancel and change amount"}
+          </Button>
+          <p className="text-center text-[11px] text-muted-foreground">
+            {fr
+              ? "Cela annule cette demande. N'envoyez plus ce montant avec cette référence."
+              : "This cancels this request. Don't send this amount with this reference."}
+          </p>
+        </div>
+      )}
+
+      <p className="flex items-center justify-center gap-1.5 text-[11px] text-muted-foreground">
+        <ShieldCheck className="h-3.5 w-3.5" />
+        {fr
+          ? "Autodeposit · confirmation automatique"
+          : "Autodeposit · automatic confirmation"}
+      </p>
     </div>
   );
 }
 
-/** Stacked label/value so long references never collapse the column. */
+function CopyRow({
+  label,
+  value,
+  emphasize,
+  onCopy,
+}: {
+  label: string;
+  value: string;
+  emphasize?: boolean;
+  onCopy: () => void;
+}) {
+  return (
+    <div
+      className={cn(
+        "flex items-start justify-between gap-3 border-b px-3.5 py-3 last:border-b-0",
+        emphasize && "bg-muted/40",
+      )}
+    >
+      <div className="min-w-0 space-y-0.5">
+        <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{label}</p>
+        <p
+          className={cn(
+            "break-words font-medium text-foreground [overflow-wrap:anywhere]",
+            emphasize && "font-semibold",
+          )}
+        >
+          {value}
+        </p>
+      </div>
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon"
+        className="h-8 w-8 shrink-0 text-muted-foreground hover:text-foreground"
+        onClick={onCopy}
+        aria-label={`Copy ${label}`}
+      >
+        <Copy className="h-3.5 w-3.5" />
+      </Button>
+    </div>
+  );
+}
+
 function Detail({ label, value }: { label: string; value: string }) {
   return (
     <div className="min-w-0 space-y-0.5">

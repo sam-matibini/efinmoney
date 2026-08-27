@@ -238,6 +238,28 @@ export async function bamboraSaveBankToProfile(customerCode: string, bank: {
   });
 }
 
+export type BamboraPaymentCustomer = {
+  name?: string;
+  email?: string;
+  country?: string;
+  /** Bambora language code: eng | fre */
+  language?: string;
+};
+
+/** Required on /v1/payments — maps to Bambora customerLanguage validation. */
+function bamboraPaymentCustomerPayload(
+  input: BamboraPaymentCustomer & { currency: string },
+): { language: string; billing: Record<string, string> } {
+  const language = (input.language || "eng").slice(0, 3);
+  const name = (input.name || "Cardholder").slice(0, 64);
+  const country = (input.country || (input.currency === "USD" ? "US" : "CA"))
+    .toUpperCase()
+    .slice(0, 2);
+  const billing: Record<string, string> = { name, country };
+  if (input.email) billing.email_address = input.email.slice(0, 128);
+  return { language, billing };
+}
+
 export async function bamboraChargeToken(input: {
   token: string;
   name: string;
@@ -245,8 +267,14 @@ export async function bamboraChargeToken(input: {
   currency: string;
   orderNumber: string;
   complete?: boolean;
+  customer?: BamboraPaymentCustomer;
 }) {
   const amountStr = input.amount.toFixed(2);
+  const customer = bamboraPaymentCustomerPayload({
+    currency: input.currency,
+    name: input.name,
+    ...input.customer,
+  });
   return bamboraFetch("/v1/payments", {
     method: "POST",
     body: JSON.stringify({
@@ -254,6 +282,8 @@ export async function bamboraChargeToken(input: {
       currency: input.currency.toUpperCase(),
       payment_method: "token",
       order_number: input.orderNumber,
+      language: customer.language,
+      billing: customer.billing,
       token: {
         name: input.name.slice(0, 64),
         code: input.token,
@@ -272,8 +302,13 @@ export async function bamboraChargeProfile(input: {
   currency: string;
   orderNumber: string;
   complete?: boolean;
+  customer?: BamboraPaymentCustomer;
 }) {
   const amountStr = input.amount.toFixed(2);
+  const customer = bamboraPaymentCustomerPayload({
+    currency: input.currency,
+    ...input.customer,
+  });
   return bamboraFetch("/v1/payments", {
     method: "POST",
     body: JSON.stringify({
@@ -281,6 +316,8 @@ export async function bamboraChargeProfile(input: {
       currency: input.currency.toUpperCase(),
       payment_method: "payment_profile",
       order_number: input.orderNumber,
+      language: customer.language,
+      billing: customer.billing,
       payment_profile: {
         customer_code: input.customerCode,
         card_id: input.cardId,

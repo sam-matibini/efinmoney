@@ -87,11 +87,12 @@ export default function NombaTopUpCard({ walletId, walletCurrency, onComplete, i
 
     void poll();
     return () => { cancelled = true; };
-  }, [onComplete, isCadViaUsd]);
+  }, [onComplete]);
 
   const parsedAmount = Number(amount);
   const quote = useMemo(() => {
     if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) return null;
+    // Nomba rejects currency=CAD — charge USD, credit CAD wallet.
     if (isCadViaUsd) return quoteCadNombaTopup(parsedAmount, fxRates);
     return quoteDirectNombaTopup(parsedAmount, currency);
   }, [parsedAmount, isCadViaUsd, fxRates, currency]);
@@ -196,7 +197,7 @@ export default function NombaTopUpCard({ walletId, walletCurrency, onComplete, i
               <span className="text-muted-foreground">Processing fee</span>
               <span className="font-medium tabular-nums">{formatCredited(quote.feeAmount, quote.creditCurrency)}</span>
             </div>
-            {isCadViaUsd && quote.fxRate && (
+            {isCadViaUsd && quote.fxRate ? (
               <>
                 <div className="flex justify-between gap-2">
                   <span className="text-muted-foreground">Checkout total (approx.)</span>
@@ -206,6 +207,11 @@ export default function NombaTopUpCard({ walletId, walletCurrency, onComplete, i
                   Rate: 1 CAD ≈ {quote.fxRate.toFixed(4)} USD · You pay USD at checkout; your CAD wallet is credited after confirmation.
                 </p>
               </>
+            ) : (
+              <div className="flex justify-between gap-2">
+                <span className="text-muted-foreground">You pay</span>
+                <span className="font-semibold tabular-nums">{formatCredited(quote.checkoutAmount, quote.checkoutCurrency)}</span>
+              </div>
             )}
           </div>
         )}

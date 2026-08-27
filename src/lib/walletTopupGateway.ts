@@ -19,14 +19,20 @@ export const SWYCHR_TOPUP_CURRENCIES = ["XAF", "KES", "XOF", "UGX"];
 /** All Nomba pay-in currencies (including Coming soon international). */
 export const NOMBA_PAY_CURRENCIES = [...NOMBA_NIGERIA_CURRENCIES, ...NOMBA_INTERNATIONAL_CURRENCIES, ...NOMBA_CAD_VIA_USD_CURRENCIES];
 
-/** Live Nomba collect today — retired (was Lenhub /api/efin). */
-export function isNombaTopupLive(_currency: string): boolean {
-  return false;
+/**
+ * Live Nomba collect via official api.nomba.com Checkout.
+ * - CAD: charges USD, credits CAD wallet (Nomba rejects currency=CAD)
+ * - NGN: same-currency Checkout
+ */
+export function isNombaTopupLive(currency: string): boolean {
+  const c = currency.toUpperCase();
+  return c === "CAD" || c === "NGN";
 }
 
 /** Show Express card for these wallets but greyed as Coming soon. */
 export function isNombaTopupComingSoon(currency: string): boolean {
   const c = currency.toUpperCase();
+  if (isNombaTopupLive(c)) return false;
   return NOMBA_INTERNATIONAL_CURRENCIES.includes(c) || NOMBA_CAD_VIA_USD_CURRENCIES.includes(c);
 }
 /**
@@ -199,8 +205,7 @@ export function routeWalletTopupGateway(
   // Ghana MoMo collect is Fincra / Flutterwave (Lenhub Ghana Pay retired)
   if (GHANA_PAY_CURRENCIES.includes(c) && isFincraTopupCurrency(c)) return "fincra";
   if (GHANA_PAY_CURRENCIES.includes(c)) return "flutterwave";
-  // NGN fallback: Fincra (Lenhub/Nomba hosted checkout retired)
-  if (c === "NGN") return "fincra";
+  // CAD + NGN primary collect: Nomba Checkout (unless user explicitly picked another rail)
   if (
     isNombaTopupLive(c) &&
     !preferPaytota &&
@@ -208,7 +213,9 @@ export function routeWalletTopupGateway(
     !preferFincra &&
     !preferFlutterwave &&
     !preferLenhubFlutter &&
-    !preferDodo
+    !preferDodo &&
+    !preferSquare &&
+    !preferPaypal
   ) {
     return "nomba_pay";
   }
@@ -337,8 +344,9 @@ export function gatewayProviderLabel(gateway: WalletTopupGateway): string | null
 
 /**
  * Auto-pick top-up rail (customer never chooses).
- * Western: Square card first (PayPal only if Square checkout fails to open).
- * Africa/NGN: Fincra first where it collects.
+ * CAD + NGN: Nomba Checkout first.
+ * Other western: Square card first (PayPal only if Square checkout fails to open).
+ * Other Africa: Fincra first where it collects.
  */
 export function pickBestIntlTopupMethod(
   currency: string,
@@ -350,10 +358,10 @@ export function pickBestIntlTopupMethod(
   const pool = live.length > 0 ? live : available;
 
   let priority: IntlTopupMethod[];
-  if (c === "CAD" || c === "USD" || c === "GBP" || c === "EUR") {
+  if (c === "CAD" || c === "NGN") {
+    priority = ["nomba", "interac", "wise", "fincra", "flutterwave", "square", "paypal", "paytota", "dodo"];
+  } else if (c === "USD" || c === "GBP" || c === "EUR") {
     priority = ["square", "paypal", "interac", "wise", "paytota", "dodo", "nomba", "flutterwave", "fincra"];
-  } else if (c === "NGN") {
-    priority = ["fincra", "flutterwave", "nomba", "wise"];
   } else {
     priority = ["fincra", "flutterwave", "nomba", "paytota", "square", "dodo", "paypal", "interac", "wise"];
   }

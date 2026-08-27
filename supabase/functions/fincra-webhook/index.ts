@@ -149,7 +149,7 @@ Deno.serve(async (req) => {
         const openStatuses = ["pending", "awaiting_payment"];
         const { data: candidates } = await supabase
           .from("fincra_cad_interac_intents")
-          .select("id, user_id, wallet_id, amount, reference, public_id, status")
+          .select("id, user_id, wallet_id, amount, reference, public_id, status, purpose, transfer_id")
           .in("status", openStatuses)
           .eq("currency_code", "CAD")
           .gt("expires_at", nowIso)
@@ -184,6 +184,27 @@ Deno.serve(async (req) => {
               provider_reference: providerRef || null,
               credited_at: nowIso,
             }).eq("id", match.id).in("status", openStatuses);
+
+            if (match.purpose === "transfer" && match.transfer_id) {
+              try {
+                const base = Deno.env.get("SUPABASE_URL")!;
+                const service = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+                await fetch(`${base}/functions/v1/execute-transfer`, {
+                  method: "POST",
+                  headers: {
+                    Authorization: `Bearer ${service}`,
+                    "Content-Type": "application/json",
+                    apikey: Deno.env.get("SUPABASE_ANON_KEY") || "",
+                  },
+                  body: JSON.stringify({
+                    transfer_id: match.transfer_id,
+                    internal_secret: Deno.env.get("INTERNAL_FUNCTION_SECRET") || service,
+                  }),
+                });
+              } catch (releaseErr) {
+                console.warn("fincra-webhook: transfer release failed", releaseErr);
+              }
+            }
           } catch (creditErr) {
             console.error("fincra-webhook CAD Interac credit failed", creditErr);
           }

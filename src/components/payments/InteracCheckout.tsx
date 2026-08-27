@@ -9,6 +9,7 @@ import InteracPayerForm, { emptyPayerForm, type PayerForm } from "@/components/p
 import InteracStatusView from "@/components/payments/InteracStatusView";
 import { CHECKOUT_STRINGS, type Lang } from "@/components/payments/checkoutStrings";
 import { productFeatures } from "@/lib/productFeatures";
+import { FINCRA_CAD_INTERAC_ALIAS } from "@/lib/fincraCad";
 
 const FLOVIDE_FN = "flovide-cad-interac";
 /** Loop Bank CAD Interac Autodeposit. */
@@ -67,6 +68,8 @@ interface Props {
   lang?: Lang;
   onComplete?: () => void;
   onIntentCreated?: (intent: InteracIntent) => void;
+  /** Fired when the user cancels an open request to change amount. */
+  onIntentCleared?: () => void;
 }
 
 /** Terminal-success statuses (`completed` kept for intents created before the lifecycle change). */
@@ -97,7 +100,7 @@ const payerSchemaFull = payerSchema.extend({
 });
 
 /**
- * CAD Interac checkout: prefer Flovide Autodeposit (efin@flovide.com), then Fincra, then Loop.
+ * CAD Interac checkout: prefer Fincra Autodeposit (@fincra.ca), then Flovide, then Loop.
  * Deposits credit the wallet and (for `purpose: "transfer"`) release the linked payout.
  */
 export default function InteracCheckout({
@@ -110,6 +113,7 @@ export default function InteracCheckout({
   lang = "en",
   onComplete,
   onIntentCreated,
+  onIntentCleared,
 }: Props) {
   const t = CHECKOUT_STRINGS[lang];
   const amountLocked = typeof fixedAmount === "number" && fixedAmount > 0;
@@ -125,15 +129,16 @@ export default function InteracCheckout({
   const [eft, setEft] = useState<{ bankNumber: string; transitNumber: string; accountNumber: string } | null>(null);
   const [configured, setConfigured] = useState(true);
   const [railFn, setRailFn] = useState(
-    (productFeatures.flovide || productFeatures.flovideInterac)
-      ? FLOVIDE_FN
-      : productFeatures.fincraInterac
+    productFeatures.fincraInterac
       ? FINCRA_FN
+      : (productFeatures.flovide || productFeatures.flovideInterac)
+      ? FLOVIDE_FN
       : WISE_FN,
   );
   const [intent, setIntent] = useState<InteracIntent | null>(null);
   const [bootstrapped, setBootstrapped] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [cancelling, setCancelling] = useState(false);
 
 
   const amountLabel = `CAD ${(Number(amount) || 0).toFixed(2)}`;
@@ -186,8 +191,16 @@ export default function InteracCheckout({
         let json: Record<string, unknown> | null = null;
         let fn = WISE_FN;
 
-        // Prefer Flovide Autodeposit (efin@flovide.com) when keys + alias are live.
-        if (productFeatures.flovide || productFeatures.flovideInterac) {
+        // Prefer Fincra Autodeposit (support.cad.live-015@fincra.ca) when ready.
+        if (productFeatures.fincraInterac) {
+          json = await tryFn(FINCRA_FN);
+          if (json && json.configured !== false && json.alias) {
+            fn = FINCRA_FN;
+          } else {
+            json = null;
+          }
+        }
+        if (!json && (productFeatures.flovide || productFeatures.flovideInterac)) {
           json = await tryFn(FLOVIDE_FN);
           if (json && json.configured !== false && (json.alias || json.mode === "autodeposit")) {
             fn = FLOVIDE_FN;
@@ -197,15 +210,16 @@ export default function InteracCheckout({
             json = null;
           }
         }
-        if (!json && productFeatures.fincraInterac) {
-          json = await tryFn(FINCRA_FN);
-          if (json && json.configured !== false) fn = FINCRA_FN;
-          else json = null;
-        }
         if (!json) {
           json = await tryFn(WISE_FN);
           if (json && json.configured !== false) fn = WISE_FN;
-          else if (productFeatures.flovide || productFeatures.flovideInterac) {
+          else if (productFeatures.fincraInterac) {
+            const fincra = await tryFn(FINCRA_FN);
+            if (fincra && fincra.configured !== false) {
+              json = fincra;
+              fn = FINCRA_FN;
+            }
+          } else if (productFeatures.flovide || productFeatures.flovideInterac) {
             const flovide = await tryFn(FLOVIDE_FN);
             if (flovide) {
               json = flovide;
@@ -217,6 +231,11 @@ export default function InteracCheckout({
         if (!json) return;
         setRailFn(fn);
         setAlias((json.alias as string | null) ?? null);
+        // Compact Autodeposit UI hides phone — drop any non-CA profile phone so it can't fail validation.
+        if (fn === FLOVIDE_FN || fn === FINCRA_FN) {
+          setForm((prev) => (prev.phone ? { ...prev, phone: "" } : prev));
+          setError(null);
+        }
         const eftJson = json.eft as { bankNumber?: string; transitNumber?: string; accountNumber?: string } | null;
         if (eftJson?.bankNumber && eftJson.transitNumber && eftJson.accountNumber) {
           setEft({
@@ -230,7 +249,11 @@ export default function InteracCheckout({
         else setConfigured(true);
         if (resumePending) {
           const pending = Array.isArray(json.pending) ? (json.pending[0] as InteracIntent) : null;
-          if (pending) setIntent(pending);
+          if (pending) {
+            setIntent(pending);
+            setAmount(String(pending.amount));
+            onIntentCreated?.(pending);
+          }
         }
       } finally {
         if (!cancelled) setBootstrapped(true);
@@ -240,12 +263,47 @@ export default function InteracCheckout({
     return () => {
       cancelled = true;
     };
-  }, [resumePending]);
+  }, [resumePending, onIntentCreated]);
+
+  const cancelAndChangeAmount = useCallback(async () => {
+    if (!intent) return;
+    setCancelling(true);
+    setError(null);
+    try {
+      const { data, error: fnError } = await supabase.functions.invoke(railFn, {
+        body: { action: "cancel", intent_id: intent.id },
+      });
+      if (fnError) throw new Error(await edgeErrorMessage(fnError, "Could not cancel this request"));
+      if ((data as { error?: string } | null)?.error) {
+        throw new Error(String((data as { error: string }).error));
+      }
+      setIntent(null);
+      setAmount(amountLocked ? String(fixedAmount) : String(intent.amount));
+      onIntentCleared?.();
+      toast.success(
+        lang === "fr"
+          ? "Demande annulée — vous pouvez changer le montant"
+          : "Request cancelled — you can change the amount",
+      );
+    } catch (e) {
+      const message = e instanceof Error ? e.message : "Could not cancel this request";
+      setError(message);
+      toast.error(message);
+    } finally {
+      setCancelling(false);
+    }
+  }, [intent, railFn, amountLocked, fixedAmount, lang, onIntentCleared]);
 
   const pay = useCallback(async () => {
     const compactRail = railFn === FLOVIDE_FN || railFn === FINCRA_FN;
+    // Autodeposit rails only need name + email — phone is hidden and not required.
+    // Profile phones (often non-CA) must not block checkout when the field isn't shown.
     const schema = compactRail ? payerSchema : payerSchemaFull;
-    const parsed = schema.safeParse({ ...form, amount });
+    const parsed = schema.safeParse({
+      ...form,
+      amount,
+      phone: compactRail ? "" : form.phone,
+    });
     if (!parsed.success) {
       const message = parsed.error.errors[0]?.message ?? "Check your details";
       setError(message);
@@ -263,7 +321,7 @@ export default function InteracCheckout({
         transfer_id: transferId,
         sender_name: `${parsed.data.firstName} ${parsed.data.lastName}`.trim(),
         sender_email: parsed.data.email,
-        sender_phone: form.phone || undefined,
+        sender_phone: compactRail ? undefined : (form.phone || undefined),
         sender_bank: form.bank || undefined,
         sender_account_type: form.accountType,
         sender_address_line1: parsed.data.line1 || form.line1 || "Canada",
@@ -280,7 +338,7 @@ export default function InteracCheckout({
         return data as Record<string, unknown>;
       };
 
-      const fallbackOrder = [FLOVIDE_FN, FINCRA_FN, WISE_FN].filter(
+      const fallbackOrder = [FINCRA_FN, FLOVIDE_FN, WISE_FN].filter(
         (fn, i, arr) => fn !== railFn && arr.indexOf(fn) === i,
       );
 
@@ -335,6 +393,7 @@ export default function InteracCheckout({
       const aliasLine =
         (data.alias as string | null)
         || alias
+        || (usedFn === FINCRA_FN ? FINCRA_CAD_INTERAC_ALIAS : null)
         || (usedFn === FLOVIDE_FN ? "efin@flovide.com" : null);
       await navigator.clipboard
         .writeText(
@@ -365,57 +424,82 @@ export default function InteracCheckout({
     }
   }, [amount, form, walletId, purpose, transferId, onIntentCreated, t, railFn, alias]);
 
-  // Poll the active intent until it settles
+  // Auto-confirm: Fincra webhook marks the intent completed; realtime + poll update the UI.
   useEffect(() => {
     if (!intent || DONE.includes(intent.status)) return;
     let cancelled = false;
     let attempts = 0;
     let timer: ReturnType<typeof setTimeout> | undefined;
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+
+    const applyDone = (next: InteracIntent) => {
+      setIntent(next);
+      if (!DONE.includes(next.status)) return false;
+      toast.success(
+        purpose === "transfer"
+          ? `CAD ${next.amount} received — sending your transfer now`
+          : `CAD ${next.amount} credited to your wallet`,
+      );
+      onComplete?.();
+      return true;
+    };
+
+    const fetchIntent = async (): Promise<InteracIntent | null> => {
+      if (railFn === FLOVIDE_FN || railFn === FINCRA_FN) {
+        const { data } = await supabase.functions.invoke(
+          `${railFn}?intent_id=${encodeURIComponent(intent.id)}`,
+          { method: "GET" },
+        );
+        return (data as { intent?: InteracIntent } | null)?.intent ?? null;
+      }
+      const { data } = await supabase
+        .from("fincra_cad_interac_intents")
+        .select(
+          "id, public_id, amount, currency_code, reference, status, expires_at, claimed_sent_at, hosted_url, sender_name, sender_email, sender_phone, sender_bank",
+        )
+        .eq("id", intent.id)
+        .maybeSingle();
+      return data as InteracIntent | null;
+    };
+
+    if (railFn === FINCRA_FN) {
+      channel = supabase
+        .channel(`fincra-interac-${intent.id}`)
+        .on(
+          "postgres_changes",
+          {
+            event: "UPDATE",
+            schema: "public",
+            table: "fincra_cad_interac_intents",
+            filter: `id=eq.${intent.id}`,
+          },
+          (payload) => {
+            if (cancelled) return;
+            const row = payload.new as InteracIntent;
+            if (row?.status) applyDone(row);
+          },
+        )
+        .subscribe();
+    }
 
     const poll = async () => {
-      if (cancelled || attempts > 120) return;
+      if (cancelled || attempts > 180) return;
       attempts += 1;
       try {
-        let next: InteracIntent | null = null;
-        if (railFn === FLOVIDE_FN) {
-          const { data } = await supabase.functions.invoke(
-            `${railFn}?intent_id=${encodeURIComponent(intent.id)}`,
-            { method: "GET" },
-          );
-          next = (data as { intent?: InteracIntent } | null)?.intent ?? null;
-        } else {
-          const { data } = await supabase
-            .from("fincra_cad_interac_intents")
-            .select(
-              "id, public_id, amount, currency_code, reference, status, expires_at, claimed_sent_at, hosted_url, sender_name, sender_email, sender_phone, sender_bank",
-            )
-            .eq("id", intent.id)
-            .maybeSingle();
-          next = data as InteracIntent | null;
-        }
-
-        if (next) {
-          setIntent(next as InteracIntent);
-          if (DONE.includes(next.status)) {
-            toast.success(
-              purpose === "transfer"
-                ? `CAD ${next.amount} received — sending your transfer now`
-                : `CAD ${next.amount} credited to your wallet`,
-            );
-            onComplete?.();
-            return;
-          }
-        }
+        const next = await fetchIntent();
+        if (next && applyDone(next)) return;
       } catch {
         /* retry */
       }
-      if (!cancelled) timer = setTimeout(poll, 4000);
+      // Fincra: webhook is source of truth — poll a bit faster so UI catches up quickly.
+      if (!cancelled) timer = setTimeout(poll, railFn === FINCRA_FN ? 2500 : 4000);
     };
 
-    timer = setTimeout(poll, 3000);
+    timer = setTimeout(poll, railFn === FINCRA_FN ? 1500 : 3000);
     return () => {
       cancelled = true;
       if (timer) clearTimeout(timer);
+      if (channel) void supabase.removeChannel(channel);
     };
   }, [intent?.id, intent?.status, onComplete, purpose, railFn]);
 
@@ -434,12 +518,14 @@ export default function InteracCheckout({
     return (
       <InteracStatusView
         intent={intent}
-        alias={alias || (isFlovide ? "efin@flovide.com" : null)}
+        alias={alias || (isFincra ? FINCRA_CAD_INTERAC_ALIAS : isFlovide ? "efin@flovide.com" : null)}
         eft={isFlovide || isFincra ? null : eft}
         lang={lang}
         purpose={purpose}
         done={DONE.includes(intent.status)}
         variant={isFlovide ? "flovide" : isFincra ? "fincra" : "loop"}
+        onChangeAmount={DONE.includes(intent.status) ? undefined : () => void cancelAndChangeAmount()}
+        changingAmount={cancelling}
       />
     );
   }

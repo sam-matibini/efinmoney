@@ -115,6 +115,8 @@ Deno.serve(async (req) => {
     let fxRate: number | null = null;
 
     if (walletCurrency === "CAD") {
+      // Nomba Checkout does not accept currency=CAD ("Invalid Currency").
+      // Charge USD internationally, then credit the CAD wallet.
       const rates = await fetchFxRates(admin);
       const cadToUsd = resolveFxRate("CAD", "USD", rates);
       if (!cadToUsd || cadToUsd <= 0) {
@@ -148,7 +150,9 @@ Deno.serve(async (req) => {
       }
     }
 
-    const useOfficialApi = nombaApiConfigured() && corridor === "nigeria";
+    // Official Nomba Checkout for NGN + international (CAD→USD, USD/EUR/GBP).
+    // Parent accountId stays in the header only — no settlement account numbers required.
+    const useOfficialApi = nombaApiConfigured() && (corridor === "nigeria" || corridor === "international");
     if (!useOfficialApi && !isNombaPayConfigured()) {
       return json({ error: "Card checkout is not configured", code: "provider_not_configured" }, 500);
     }
@@ -207,7 +211,7 @@ Deno.serve(async (req) => {
 
     if (insErr) return json({ error: "Could not record collection", detail: insErr.message }, 500);
 
-    // Prefer official Nomba Developer Checkout for NGN (company account).
+    // Official Nomba Developer Checkout (NGN + CAD/USD/EUR/GBP).
     if (useOfficialApi) {
       const appBase = (Deno.env.get("APP_URL") || "https://www.efin.money").replace(/\/+$/, "");
       const callbackUrl = returnUrl

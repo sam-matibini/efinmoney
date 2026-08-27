@@ -1,14 +1,16 @@
 /** Local EN/FR strings + Canadian lookups for the Interac checkout only. */
 
+import { FINCRA_CAD_INTERAC_ALIAS } from "@/lib/fincraCad";
+
 export type Lang = "en" | "fr";
 
 export const CHECKOUT_STRINGS = {
   en: {
     selectMethod: "Select a payment method",
     interac: "Interac",
-    interacDesc: "Send Interac Autodeposit to Loop Bank (etx@efin.money)",
+    interacDesc: `Send Interac Autodeposit to ${FINCRA_CAD_INTERAC_ALIAS}`,
     plaid: "Interac",
-    plaidDesc: "Send Interac Autodeposit to Loop Bank (etx@efin.money)",
+    plaidDesc: `Send Interac Autodeposit to ${FINCRA_CAD_INTERAC_ALIAS}`,
     loopBilling: "Loop payment link",
     loopBillingDesc: "Pay via Loop Billing (EFT bank debit · ~4 business days)",
     card: "Card",
@@ -37,13 +39,13 @@ export const CHECKOUT_STRINGS = {
     country: "Country",
     amountDue: "Amount due",
     pay: (amount: string) => `Pay ${amount}`,
-    poweredBy: "Powered by eFinMoney · Loop Bank",
+    poweredBy: "Powered by eFinMoney",
     openBank: "Copy payment details",
     openHosted: "Continue",
     pushHint:
-      "Send an Interac Autodeposit e-Transfer to etx@efin.money (Loop Bank). Or use Bank EFT with the institution details shown. Prefer Bank (Plaid) if your bank blocks Interac.",
-    detailsCopied: "Payment details copied — paste them in your e-Transfer or EFT memo",
-    waiting: "Waiting for your deposit to Loop Bank…",
+      `Send an Interac Autodeposit e-Transfer to ${FINCRA_CAD_INTERAC_ALIAS}. Put the reference in the message field so we can match your deposit.`,
+    detailsCopied: "Payment details copied — paste them in your e-Transfer",
+    waiting: "Waiting for your Interac e-Transfer…",
     received: "Payment received",
     paymentDetails: "Copy payment details",
     sendTo: "Send to",
@@ -53,7 +55,7 @@ export const CHECKOUT_STRINGS = {
     bankNumber: "Institution (Bank #)",
     transitNumber: "Transit #",
     accountNumber: "Account #",
-    eftHint: "Or pay by EFT / bank transfer to Loop Bank using these details:",
+    eftHint: "Or pay by EFT / bank transfer using these details:",
     flovideWaiting: "Waiting for your Interac e-Transfer…",
     flovidePushHint:
       "Send an Interac Autodeposit e-Transfer to efin@flovide.com. Put the reference in the message field so we can match your deposit.",
@@ -63,14 +65,14 @@ export const CHECKOUT_STRINGS = {
     flovideDetailsCopied: "Payment details copied — paste them in your e-Transfer",
     fincraWaiting: "Waiting for your Interac e-Transfer…",
     fincraPushHint:
-      "Send an Interac Autodeposit e-Transfer to the address shown. Put the reference in the message field so we can match your deposit.",
+      `Send an Interac Autodeposit e-Transfer to ${FINCRA_CAD_INTERAC_ALIAS}. Put the reference in the message field so we can match your deposit.`,
   },
   fr: {
     selectMethod: "Choisissez un mode de paiement",
     interac: "Interac",
-    interacDesc: "Envoyez un Virement Autodeposit vers Loop Bank (etx@efin.money)",
+    interacDesc: `Envoyez un Virement Autodeposit vers ${FINCRA_CAD_INTERAC_ALIAS}`,
     plaid: "Interac",
-    plaidDesc: "Envoyez un Virement Autodeposit vers Loop Bank (etx@efin.money)",
+    plaidDesc: `Envoyez un Virement Autodeposit vers ${FINCRA_CAD_INTERAC_ALIAS}`,
     loopBilling: "Lien de paiement Loop",
     loopBillingDesc: "Payer via Loop Billing (TEF · ~4 jours ouvrables)",
     card: "Carte",
@@ -99,13 +101,13 @@ export const CHECKOUT_STRINGS = {
     country: "Pays",
     amountDue: "Montant dû",
     pay: (amount: string) => `Payer ${amount}`,
-    poweredBy: "Propulsé par eFinMoney · Loop Bank",
+    poweredBy: "Propulsé par eFinMoney",
     openBank: "Copier les détails",
     openHosted: "Continuer",
     pushHint:
-      "Envoyez un Virement Interac Autodeposit à etx@efin.money (Loop Bank). Ou utilisez le TEF avec les coordonnées bancaires affichées. Préférez Banque (Plaid) si votre banque bloque Interac.",
-    detailsCopied: "Détails copiés — collez-les dans votre Virement Interac ou TEF",
-    waiting: "En attente de votre dépôt vers Loop Bank…",
+      `Envoyez un Virement Interac Autodeposit à ${FINCRA_CAD_INTERAC_ALIAS}. Mettez la référence dans le message pour que nous puissions apparier le dépôt.`,
+    detailsCopied: "Détails copiés — collez-les dans votre Virement Interac",
+    waiting: "En attente de votre Virement Interac…",
     received: "Paiement reçu",
     paymentDetails: "Copier les détails",
     sendTo: "Envoyer à",
@@ -115,7 +117,7 @@ export const CHECKOUT_STRINGS = {
     bankNumber: "Institution (n° de banque)",
     transitNumber: "N° de transit",
     accountNumber: "N° de compte",
-    eftHint: "Ou payez par TEF / virement bancaire vers Loop Bank :",
+    eftHint: "Ou payez par TEF / virement bancaire :",
     flovideWaiting: "En attente de votre Virement Interac…",
     flovidePushHint:
       "Envoyez un Virement Autodeposit à efin@flovide.com. Mettez la référence dans le message pour que nous puissions apparier le dépôt.",
@@ -125,7 +127,7 @@ export const CHECKOUT_STRINGS = {
     flovideDetailsCopied: "Détails copiés — collez-les dans votre Virement Interac",
     fincraWaiting: "En attente de votre Virement Interac…",
     fincraPushHint:
-      "Envoyez un Virement Autodeposit à l'adresse indiquée. Mettez la référence dans le message pour que nous puissions apparier le dépôt.",
+      `Envoyez un Virement Autodeposit à ${FINCRA_CAD_INTERAC_ALIAS}. Mettez la référence dans le message pour que nous puissions apparier le dépôt.`,
   },
 } as const;
 

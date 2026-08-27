@@ -106,6 +106,25 @@ Deno.serve(async (req) => {
     if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
 
     const body = await req.json().catch(() => ({})) as Record<string, unknown>;
+    const action = String(body.action || "create").toLowerCase();
+
+    if (action === "cancel") {
+      const intentId = String(body.intent_id || "");
+      if (!intentId) return json({ error: "intent_id required" }, 400);
+      const { data, error } = await admin
+        .from("flovide_transactions")
+        .update({ status: "cancelled" })
+        .eq("id", intentId)
+        .eq("user_id", user.id)
+        .eq("kind", "interac_collection")
+        .in("status", OPEN)
+        .select("id, status")
+        .maybeSingle();
+      if (error) return json({ error: error.message }, 500);
+      if (!data) return json({ error: "Intent not found or not cancellable" }, 404);
+      return json({ ok: true, intent: data, ...railMeta });
+    }
+
     const amount = Number(body.amount);
     const walletId = String(body.wallet_id || "");
     const payerEmail = String(body.sender_email || body.email || user.email || "").trim().toLowerCase();

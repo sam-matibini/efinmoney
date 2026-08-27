@@ -117,6 +117,7 @@ import {
 } from "@/lib/swychrPay";
 import { quoteDirectNombaTopup, quoteCadNombaTopup } from "@/lib/nombaTopupQuote";
 import { productFeatures } from "@/lib/productFeatures";
+import { FINCRA_CAD_INTERAC_ALIAS } from "@/lib/fincraCad";
 import {
   buildFincraCardSendRedirectUrl,
   isFincraCheckoutCurrency,
@@ -2127,12 +2128,13 @@ const SendPage = () => {
     || productFeatures.paytota || productFeatures.swychr || productFeatures.flutterwave;
 
   const interacFundingAvailable = !!cadWallet && (
-    productFeatures.flovide
+    productFeatures.fincraInterac
+    || productFeatures.flovide
     || productFeatures.flovideInterac
-    || productFeatures.fincraInterac
     || productFeatures.plaid
   );
-  const interacUsesFlovide = productFeatures.flovide || productFeatures.flovideInterac;
+  const interacUsesFincra = productFeatures.fincraInterac;
+  const interacUsesFlovide = !interacUsesFincra && (productFeatures.flovide || productFeatures.flovideInterac);
   const wisePayWallet = wallets?.find((w) => isWisePayCurrency(w.currency_code));
 
   const fundingMethodOptions: PaymentMethodOption<FundingSource>[] = [
@@ -2146,7 +2148,11 @@ const SendPage = () => {
       ? [{
           id: "interac" as const,
           label: "Interac",
-          sublabel: interacUsesFlovide ? "Autodeposit · efin@flovide.com" : "Bank account · instant",
+          sublabel: interacUsesFincra
+            ? `Autodeposit · ${FINCRA_CAD_INTERAC_ALIAS}`
+            : interacUsesFlovide
+            ? "Autodeposit · efin@flovide.com"
+            : "Bank account · instant",
           icon: Landmark,
           tone: "bank" as const,
         }]

@@ -6,6 +6,7 @@ import { CurrencyFlag } from "@/components/ui/FlagImage";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { CardFieldsInputs, type CardFieldsValue } from "@/components/payments/cardFields";
 import { productFeatures } from "@/lib/productFeatures";
+import { FINCRA_CAD_INTERAC_ALIAS } from "@/lib/fincraCad";
 
 export interface PanelWallet {
   wallet_id: string;
@@ -180,15 +181,18 @@ const MethodCheckoutPanel = ({
   );
 
   if (method === "interac") {
-    const flovideOn = productFeatures.flovide || productFeatures.flovideInterac;
+    const fincraOn = productFeatures.fincraInterac;
+    const flovideOn = !fincraOn && (productFeatures.flovide || productFeatures.flovideInterac);
     return (
       <div className="rounded-xl border-2 border-pay-bank/30 bg-pay-bank/5 p-4 space-y-3">
         <div>
-          <p className="text-sm font-semibold">{flovideOn ? "Interac (Flovide)" : "Interac (CAD)"}</p>
+          <p className="text-sm font-semibold">{fincraOn || flovideOn ? "Interac" : "Interac (CAD)"}</p>
           <p className="mt-1 text-xs text-muted-foreground">
-            {flovideOn
+            {fincraOn
+              ? `Confirm to open checkout for ${symbol}${money(total)} ${currency}. Send Interac Autodeposit to ${FINCRA_CAD_INTERAC_ALIAS} — your payout releases when the deposit matches.`
+              : flovideOn
               ? `Confirm to open checkout for ${symbol}${money(total)} ${currency}. We'll send an Interac request to your email — approve it in your banking app. Your payout releases when payment confirms.`
-              : `Confirm to open checkout for ${symbol}${money(total)} ${currency}. Send Interac Autodeposit to Loop Bank (etx@efin.money) — your payout releases when the deposit matches.`}
+              : `Confirm to open checkout for ${symbol}${money(total)} ${currency}. Send Interac Autodeposit — your payout releases when the deposit matches.`}
           </p>
         </div>
         <ChargeSummary amount={amount} fee={fee} total={total} currency={currency} symbol={symbol} debitLabel="Interac from your bank" />

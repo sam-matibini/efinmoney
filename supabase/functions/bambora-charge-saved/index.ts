@@ -22,7 +22,7 @@ Deno.serve(async (req) => {
   try {
     const auth = await requireUser(req);
     if ("error" in auth) return auth.error;
-    const { user, admin } = auth;
+    const { user, admin, profile } = auth;
 
     const cfg = getBamboraConfig();
     if (!cfg.merchantId || !cfg.paymentsPasscode) {
@@ -67,12 +67,19 @@ Deno.serve(async (req) => {
     const orderNumber = String(body.orderNumber || `efm${Date.now().toString(36)}`)
       .replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 30);
 
+    const customerEmail = String(profile?.email || user.email || "").trim();
+    const customerName = String(profile?.full_name || "Cardholder").trim() || "Cardholder";
+
     const charged = await bamboraChargeProfile({
       customerCode,
       cardId,
       amount,
       currency,
       orderNumber,
+      customer: {
+        name: customerName,
+        email: customerEmail || undefined,
+      },
     });
 
     const approved = isBamboraPaymentApproved(charged.json);

@@ -25,7 +25,6 @@ import { CheckCircle2, XCircle } from "lucide-react";
 import { useWallets } from "@/hooks/useWallets";
 import { useAuth } from "@/hooks/useAuth";
 import ElicateTopUpCard from "@/components/payments/ElicateTopUpCard";
-import LinkBankPanel from "@/components/payments/LinkBankPanel";
 import WiseTopUpCard from "@/components/payments/WiseTopUpCard";
 import WisePayLinkCard from "@/components/payments/WisePayLinkCard";
 import { isWisePayCurrency } from "@/lib/wisePayLink";
@@ -111,6 +110,8 @@ function availableIntlMethods(currency: string): IntlTopupMethod[] {
   const c = currency.toUpperCase();
   const methods: IntlTopupMethod[] = [];
   if (MULTI_RAIL_TOPUP_CURRENCIES.includes(c)) {
+    // Nomba CAD first when live (charges USD → credits CAD)
+    if (productFeatures.nombaNigeria && isNombaTopupLive(c)) methods.push("nomba");
     if (productFeatures.fincra && ["EUR", "GBP"].includes(c)) methods.push("fincra");
     if (productFeatures.paytota) methods.push("paytota");
     if (productFeatures.dodo) methods.push("dodo");
@@ -131,10 +132,11 @@ function availableIntlMethods(currency: string): IntlTopupMethod[] {
     }
     return methods;
   }
-  // NGN: Fincra → Flutterwave → Nomba (auto-picked)
+  // NGN: Nomba primary → Flutterwave → Fincra failover
   if (c === "NGN") {
-    if (productFeatures.fincra) methods.push("fincra");
+    if (productFeatures.nombaNigeria && isNombaTopupLive("NGN")) methods.push("nomba");
     if (productFeatures.flutterwave) methods.push("flutterwave");
+    if (productFeatures.fincra) methods.push("fincra");
     if (productFeatures.wise) methods.push("wise");
     return methods;
   }
@@ -314,12 +316,27 @@ const TopUpPage = () => {
     setPolicyIntlOverride(null);
     setPolicyAfricaOverride(null);
     setPolicyFailoverPartners([]);
+    setSelectedMethodId("");
     const fromQuery = params.get("method") || params.get("provider") || params.get("rail");
     if (fromQuery) return;
     void (async () => {
       try {
         const pref = await resolveCollectMethodPreference(currency);
-        if (cancelled || !pref.method) return;
+        if (cancelled) return;
+        // Hard preference: Nomba Card for CAD + NGN (ignore stale Fincra/Worldline/Bambora policies).
+        const ccy = currency.toUpperCase();
+        if (productFeatures.nombaNigeria && isNombaTopupLive(ccy) && intlMethods.includes("nomba")) {
+          setPolicyIntlOverride("nomba");
+          setPolicyFailoverPartners(
+            (pref.rails || [])
+              .map((r) => r.toLowerCase())
+              .filter((r) => r && r !== "nomba" && r !== "bambora" && r !== "worldline")
+              .slice(0, 3),
+          );
+          setSelectedMethodId("nomba");
+          return;
+        }
+        if (!pref.method) return;
         const m = pref.method as string;
         if (intlMethods.includes(m as IntlTopupMethod)) {
           setPolicyIntlOverride(m as IntlTopupMethod);
@@ -809,15 +826,19 @@ const TopUpPage = () => {
     const walletId = selectedWallet.wallet_id;
     const rails = new Set<string>([...intlMethods, ...africaMomoMethods]);
     const ccyUpper = currency.toUpperCase();
-    const defaultRail = defaultCollectPartner(ccyUpper);
+    const forceNombaCard =
+      productFeatures.nombaNigeria
+      && isNombaTopupLive(ccyUpper)
+      && (ccyUpper === "CAD" || ccyUpper === "NGN");
+    const defaultRail = forceNombaCard ? "nomba" : defaultCollectPartner(ccyUpper);
     const collectPrimary =
-      (policyIntlOverride && intlMethods.includes(policyIntlOverride) && policyIntlOverride)
+      (forceNombaCard && "nomba")
+      || (policyIntlOverride && intlMethods.includes(policyIntlOverride) && policyIntlOverride)
       || (policyAfricaOverride && africaMomoMethods.includes(policyAfricaOverride) && policyAfricaOverride)
-      || (defaultRail && activeRails.has(defaultRail) ? defaultRail : null)
+      || (defaultRail && (forceNombaCard || activeRails.has(defaultRail)) ? defaultRail : null)
       || null;
     const primaryIds = collectPrimary ? collectPayMethodIds(collectPrimary) : [];
     const showRail = (id: string) => {
-      if (id === "link_bank") return true;
       if (id === "bank_va" && (ccyUpper === "NGN" || ccyUpper === "GHS") && productFeatures.flutterwave) return true;
       // Always offer Wise as its own top-level rail when the feature is on.
       if ((id === "wise" || id === "wise_link") && productFeatures.wise) return true;
@@ -826,25 +847,17 @@ const TopUpPage = () => {
       }
       if (primaryIds.length === 0) return true;
       if (primaryIds.includes(id)) return true;
-      // CAD: keep Interac on the Bank tab even when Card (Square) is primary.
+      // CAD: keep Interac on the Bank tab even when Nomba/card is primary.
       if (ccyUpper === "CAD" && (id === "interac" || id === "plaid") && !primaryIds.includes("interac")) {
         return true;
       }
+      // CAD/NGN: always allow Nomba card rail when live.
+      if (forceNombaCard && id === "nomba") return true;
       return false;
     };
 
-    payMethods.push({
-      id: "link_bank",
-      tone: "bank",
-      label: "Link or add a bank account",
-      description: "Instant linking or manual account details",
-      content: (
-        <SectionBoundary name="LinkBankPanel">
-          <LinkBankPanel walletCurrency={currency} />
-        </SectionBoundary>
-      ),
-    });
-
+    // link_bank (Plaid / manual save) temporarily hidden — it only stores a funding
+    // source, it does not collect into the wallet on this page.
     if (showRail("bank_va") && productFeatures.flutterwave && (ccyUpper === "NGN" || ccyUpper === "GHS")) {
       payMethods.push({
         id: "bank_va",
@@ -868,9 +881,27 @@ const TopUpPage = () => {
       westernCardRail === "paypal"
       || (!productFeatures.square && productFeatures.paypal && rails.has("paypal"));
 
-    // CAD/USD card collect: Bambora / Worldline (Canadian merchant) — primary for CAD; also USD.
+    // Nomba Card first for CAD + NGN (hosted Checkout — not Worldline/Fincra).
+    if (forceNombaCard) {
+      payMethods.push({
+        id: "nomba",
+        tone: "card",
+        label: "Card",
+        description:
+          ccyUpper === "CAD"
+            ? "Visa / Mastercard — secure checkout"
+            : "Card or bank transfer",
+        content: (
+          <SectionBoundary name="NombaTopUp">
+            <NombaTopUpCard walletId={walletId} walletCurrency={currency} initialAmount={amount} embedded onComplete={invalidateWallets} />
+          </SectionBoundary>
+        ),
+      });
+    }
+
+    // Bambora/Worldline: USD only when Nomba is not the CAD card rail.
     if (
-      (ccyUpper === "CAD" || ccyUpper === "USD") &&
+      ccyUpper === "USD" &&
       (showRail("square") || showRail("card") || showRail("bambora")) &&
       productFeatures.bambora
     ) {
@@ -878,7 +909,7 @@ const TopUpPage = () => {
         id: "bambora",
         tone: "card",
         label: "Card",
-        description: ccyUpper === "CAD" ? "Visa / Mastercard — Canada" : "Visa / Mastercard — Worldline",
+        description: "Visa / Mastercard — Worldline",
         content: (
           <SectionBoundary name="BamboraTopUp">
             <BamboraTopUpCard
@@ -893,7 +924,7 @@ const TopUpPage = () => {
       });
     }
 
-    if (showRail("square") && (productFeatures.square || productFeatures.paypal) && ccyUpper !== "CAD" && !(ccyUpper === "USD" && productFeatures.bambora)) {
+    if (showRail("square") && (productFeatures.square || productFeatures.paypal) && ccyUpper !== "CAD" && ccyUpper !== "NGN" && !(ccyUpper === "USD" && productFeatures.bambora)) {
       payMethods.push({
         id: "square",
         tone: "card",
@@ -1012,12 +1043,15 @@ const TopUpPage = () => {
       });
     }
 
-    if (showRail("nomba") && productFeatures.nombaNigeria && rails.has("nomba") && isNombaTopupLive(currency)) {
+    if (showRail("nomba") && !forceNombaCard && productFeatures.nombaNigeria && isNombaTopupLive(currency)) {
       payMethods.push({
         id: "nomba",
         tone: "card",
-        label: "Card or bank transfer",
-        description: "Pay with card or bank transfer",
+        label: "Card",
+        description:
+          currency.toUpperCase() === "CAD"
+            ? "Visa / Mastercard — secure checkout"
+            : "Card or bank transfer",
         content: (
           <SectionBoundary name="NombaTopUp">
             <NombaTopUpCard walletId={walletId} walletCurrency={currency} initialAmount={amount} embedded onComplete={invalidateWallets} />
@@ -1126,7 +1160,7 @@ const TopUpPage = () => {
     }
 
 
-    if (showRail("fincra") && productFeatures.fincra && rails.has("fincra")) {
+    if (showRail("fincra") && productFeatures.fincra && rails.has("fincra") && !forceNombaCard) {
       const isCadViaUsd = currency.toUpperCase() === "CAD";
       const cadQuote = isCadViaUsd ? quoteCadNombaTopup(amountNum || 0, fxRates) : null;
       const fincraTone: PayTone =
@@ -1251,15 +1285,23 @@ const TopUpPage = () => {
     ghana_pay: "ghana",
     elicate: "elicate",
   };
-  const defaultRail = defaultCollectPartner(currency);
+  const forceNombaForWallet =
+    productFeatures.nombaNigeria
+    && isNombaTopupLive(currency.toUpperCase())
+    && (currency.toUpperCase() === "CAD" || currency.toUpperCase() === "NGN");
+  const defaultRail = forceNombaForWallet
+    ? "nomba"
+    : defaultCollectPartner(currency);
   const collectPrimaryIds = collectPayMethodIds(
-    policyIntlOverride
+    (forceNombaForWallet && "nomba")
+    || policyIntlOverride
     || policyAfricaOverride
-    || (defaultRail && activeRails.has(defaultRail) ? defaultRail : "")
+    || (defaultRail && (forceNombaForWallet || activeRails.has(defaultRail)) ? defaultRail : "")
     || "",
   );
   const defaultMethodId =
-    payMethods.find((m) => collectPrimaryIds.includes(m.id))?.id
+    (forceNombaForWallet && payMethods.some((m) => m.id === "nomba") && "nomba")
+    || payMethods.find((m) => collectPrimaryIds.includes(m.id))?.id
     || payMethods.find((m) => m.id === GATEWAY_DEFAULT_METHOD[gateway])?.id
     || payMethods[0]?.id
     || "";

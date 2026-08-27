@@ -87,6 +87,14 @@ export default function InteracPayerForm({
         onSubmit();
       }}
     >
+      {compact && (
+        <p className="rounded-lg border bg-muted/40 px-3 py-2 text-[12px] leading-relaxed text-muted-foreground">
+          {lang === "fr"
+            ? "Après « Payer », vous recevrez l'adresse Autodeposit et une référence. Envoyez le Virement — nous créditons automatiquement dès réception."
+            : "After Pay, you'll get the Autodeposit address and a reference. Send the e-Transfer — we credit automatically when it arrives."}
+        </p>
+      )}
+
       {onAmountChange && (
         <div className="space-y-1.5">
           <Label htmlFor="etx-amount">{t.amountDue} (CAD)</Label>
@@ -98,6 +106,9 @@ export default function InteracPayerForm({
             value={amount ?? ""}
             onChange={(e) => onAmountChange(e.target.value)}
           />
+          <p className="text-[11px] text-muted-foreground">
+            {lang === "fr" ? "Minimum 2,00 CAD. Envoyez ce montant exact." : "Minimum CAD 2.00. Send this exact amount."}
+          </p>
         </div>
       )}
 
@@ -247,7 +258,11 @@ export default function InteracPayerForm({
 
       <Button type="submit" className="w-full" disabled={submitting}>
         {submitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Lock className="mr-2 h-4 w-4" />}
-        {t.pay(amountLabel)}
+        {compact
+          ? lang === "fr"
+            ? `Continuer — ${amountLabel}`
+            : `Continue — ${amountLabel}`
+          : t.pay(amountLabel)}
       </Button>
     </form>
   );

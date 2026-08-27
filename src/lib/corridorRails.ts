@@ -166,11 +166,11 @@ export function collectMethodForPartner(partner: string): string | null {
 
 /** Code default when no collect policy is saved. */
 export const DEFAULT_COLLECT_PARTNER: Record<string, string> = {
-  CAD: "interac",
+  CAD: "nomba",
   USD: "square",
   EUR: "square",
   GBP: "square",
-  NGN: "fincra",
+  NGN: "nomba",
   GHS: "fincra",
   KES: "fincra",
   UGX: "fincra",
@@ -327,13 +327,18 @@ export async function resolveCollectMethodPreference(
       .map((r) => r.toLowerCase())
       .filter(Boolean)
       .filter(keepActive);
+    // CAD/NGN: Nomba Checkout is the live card collect — ignore stale Worldline/Fincra policies.
+    if ((ccy === "CAD" || ccy === "NGN") && keepActive("nomba")) {
+      const rest = rails.filter((r) => r !== "nomba" && r !== "bambora" && r !== "worldline");
+      return { method: "nomba", rails: ["nomba", ...rest], source: "policy" };
+    }
     if (rails.length) {
       const method = collectMethodForPartner(rails[0] || "");
       return { method, rails, source: "policy" };
     }
   }
   const fallback = defaultCollectPartner(ccy);
-  if (fallback && keepActive(fallback)) {
+  if (fallback && (keepActive(fallback) || ((ccy === "CAD" || ccy === "NGN") && fallback === "nomba"))) {
     return { method: collectMethodForPartner(fallback) || fallback, rails: [fallback], source: "default" };
   }
   return { method: null, rails: [], source: "none" };

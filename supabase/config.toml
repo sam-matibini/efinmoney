@@ -447,6 +447,9 @@ verify_jwt = false
 [functions.fincra-cad-va-probe]
 verify_jwt = false
 
+[functions.fincra-cad-va-submit]
+verify_jwt = false
+
 [functions.bambora-probe]
 verify_jwt = false
 

@@ -81,12 +81,23 @@ Deno.serve(async (req) => {
       return jr(400, { error: `Wallet currency is ${wallet.currency_code}, not ${currency}` });
     }
 
+    const { data: profile } = await admin.from("profiles")
+      .select("email, full_name")
+      .eq("user_id", user.id)
+      .maybeSingle();
+    const customerEmail = String(profile?.email || user.email || "").trim();
+    const customerName = String(profile?.full_name || cardName).trim() || cardName;
+
     const charged = await bamboraChargeToken({
       token,
       name: cardName,
       amount,
       currency,
       orderNumber,
+      customer: {
+        name: customerName,
+        email: customerEmail || undefined,
+      },
     });
 
     const approved = isBamboraPaymentApproved(charged.json);

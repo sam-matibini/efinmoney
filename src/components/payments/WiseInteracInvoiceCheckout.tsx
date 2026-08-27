@@ -8,6 +8,7 @@ import type { InteracIntent } from "@/components/payments/InteracCheckout";
 import { type Lang } from "@/components/payments/checkoutStrings";
 import { loopBillingLinkConfigured } from "@/lib/loopCad";
 import { productFeatures } from "@/lib/productFeatures";
+import { FINCRA_CAD_INTERAC_ALIAS } from "@/lib/fincraCad";
 
 interface Props {
   walletId: string;
@@ -64,9 +65,14 @@ export default function WiseInteracInvoiceCheckout({
 
   const [method, setMethod] = useState<CheckoutMethod | null>(null);
   const showLoopBilling = loopBillingLinkConfigured();
-  const flovideOn = productFeatures.flovide || productFeatures.flovideInterac;
-  const interacTitle = flovideOn ? "Interac" : undefined;
-  const interacDescription = flovideOn
+  const fincraOn = productFeatures.fincraInterac;
+  const flovideOn = !fincraOn && (productFeatures.flovide || productFeatures.flovideInterac);
+  const interacTitle = fincraOn || flovideOn ? "Interac" : undefined;
+  const interacDescription = fincraOn
+    ? lang === "fr"
+      ? `Virement Autodeposit vers ${FINCRA_CAD_INTERAC_ALIAS}`
+      : `Send Interac Autodeposit to ${FINCRA_CAD_INTERAC_ALIAS}`
+    : flovideOn
     ? lang === "fr"
       ? "Demande Interac à votre courriel — approuvez dans votre app bancaire"
       : "Interac request to your email — approve in your banking app"
