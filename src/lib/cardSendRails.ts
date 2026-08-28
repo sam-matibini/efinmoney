@@ -60,6 +60,23 @@ const FINCRA_CARD_COLLECT = [
   "MWK",
 ] as const;
 
+/** Nomba Checkout collect (NGN card/bank/USSD) — payout via Nomba on all supported corridors. */
+const NOMBA_CARD_COLLECT = ["NGN"] as const;
+const NOMBA_CARD_MOMO_DEST = ["GHS", "KES", "UGX", "TZS", "RWF"] as const;
+
+function isNombaCardSendCorridor(
+  sourceCurrency: string,
+  destCurrency: string,
+  transferType: "bank" | "mobile_money",
+): boolean {
+  const s = sourceCurrency.toUpperCase();
+  const d = destCurrency.toUpperCase();
+  if (!(NOMBA_CARD_COLLECT as readonly string[]).includes(s)) return false;
+  if (d === "NGN" && transferType === "bank") return true;
+  return transferType === "mobile_money"
+    && (NOMBA_CARD_MOMO_DEST as readonly string[]).includes(d);
+}
+
 export function isCardSendCollectCurrency(currency: string): boolean {
   return (CARD_SEND_COLLECT_CURRENCIES as readonly string[]).includes(currency.toUpperCase());
 }
@@ -84,19 +101,15 @@ export function cardSendProvidersForCorridor(
     out.push("square");
   }
 
-  if (productFeatures.fincra && (FINCRA_CARD_COLLECT as readonly string[]).includes(s)) {
-    out.push("fincra");
-  }
-
-
   if (
-    productFeatures.nombaNigeria &&
-    false &&
-    s === "NGN" &&
-    d === "NGN" &&
-    transferType === "bank"
+    productFeatures.nombaNigeria
+    && isNombaCardSendCorridor(s, d, transferType)
   ) {
     out.push("nomba");
+  }
+
+  if (productFeatures.fincra && (FINCRA_CARD_COLLECT as readonly string[]).includes(s)) {
+    out.push("fincra");
   }
 
   if (productFeatures.lenhubFlutter && false && (LENHUB_COLLECT as readonly string[]).includes(s)) {
@@ -150,7 +163,7 @@ export function cardSendProvidersForCorridor(
 
 /**
  * Auto-pick card collect provider.
- * Fincra first where live, then Flutterwave, then Nomba, then the rest.
+ * Nomba first for NGN card-send corridors, then Fincra / Flutterwave, then the rest.
  */
 export function pickBestCardProvider(
   sourceCurrency: string,
@@ -159,7 +172,7 @@ export function pickBestCardProvider(
 ): CardSendProvider | null {
   const available = cardSendProvidersForCorridor(sourceCurrency, destCurrency, transferType);
   if (available.length === 0) return null;
-  const priority: CardSendProvider[] = ["square", "fincra", "flutterwave", "nomba", "lenhub", "paytota", "swychr"];
+  const priority: CardSendProvider[] = ["square", "nomba", "fincra", "flutterwave", "lenhub", "paytota", "swychr"];
   for (const p of priority) {
     if (available.includes(p)) return p;
   }
@@ -182,7 +195,7 @@ export function cardSendDestCurrencies(sourceCurrency: string): string[] {
 export function cardSendProviderLabel(provider: CardSendProvider): string {
   if (provider === "square") return "Debit or credit card";
   if (provider === "fincra") return "Secure checkout";
-  if (provider === "nomba") return "Express card";
+  if (provider === "nomba") return "Nomba checkout";
   if (provider === "lenhub") return "Card (direct)";
   if (provider === "paytota") return "MoMo checkout";
   if (provider === "swychr") return "Mobile checkout";
@@ -207,7 +220,7 @@ export function cardSendProviderDescription(provider: CardSendProvider): string 
     return "Pay by card or bank transfer on a secure page, then we deliver the transfer.";
   }
   if (provider === "nomba") {
-    return "Quick card payment on a secure checkout page, then we deliver the transfer.";
+    return "Pay by Naira card or bank on Nomba\u2019s secure checkout, then we deliver via Nomba payout.";
   }
   if (provider === "lenhub") {
     return "Enter your card in the app — PIN/OTP secured — then we deliver the transfer.";

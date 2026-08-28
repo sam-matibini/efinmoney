@@ -1083,7 +1083,7 @@ const SendPage = () => {
       return;
     }
 
-    // ── Card: Fincra → Flutterwave → Nomba… collect → credit → payout ─
+    // ── Card: Nomba → Fincra → Flutterwave… collect → credit → payout ─
     if (funding === "card") {
       try {
         if (!selectedWallet || !isCardSendCollectCurrency(selectedWallet.currency_code)) {
@@ -1211,11 +1211,6 @@ const SendPage = () => {
         }
 
         if (provider === "nomba") {
-          if (targetCountry.code !== "NGN" || !isNGNBank) {
-            toast.error("Express card currently pays out to Nigerian bank accounts only.");
-            setConfirming(false);
-            return;
-          }
           const returnUrl = `${window.location.origin}/send?cardSend=1&provider=nomba&walletId=${encodeURIComponent(selectedWallet.wallet_id)}`;
           const collection = await initiateNombaCollection({
             credit_amount: totalCharge,

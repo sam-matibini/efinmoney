@@ -8,6 +8,8 @@
  *   /v3/*                         → https://api.flutterwave.com/v3/*
  *   /fincra/*                     → https://api.fincra.com/*
  *   /fincra-sandbox/*             → https://sandboxapi.fincra.com/*
+ *   /nomba/*                      → https://api.nomba.com/*
+ *   /nomba-sandbox/*              → https://sandbox.nomba.com/*
  *   /webhooks/lenhub-flutter      → Supabase lenhub-flutter-webhook
  *   /egress-ip                    → public IP Fincra/FLW will see from this Worker
  *   /*  (everything else)         → https://f4bexperience.flutterwave.com/*
@@ -19,7 +21,11 @@
  * Supabase secrets:
  *   FLW_PROXY_URL=https://efin-flw-proxy.ukwenzyb.workers.dev
  *   FINCRA_BASE_URL=https://efin-flw-proxy.ukwenzyb.workers.dev/fincra
+ *   NOMBA_API_BASE=https://efin-flw-proxy.ukwenzyb.workers.dev/nomba
  *   (keep FINCRA_ENV=live)
+ *
+ * Nomba production IP whitelist (no self-service dashboard):
+ *   Email docs@nomba.com with the IPv4 from /egress-ip (max 3 addresses).
  *
  * Fincra dashboard → IP Whitelisting:
  *   GET https://efin-flw-proxy.ukwenzyb.workers.dev/egress-ip
@@ -29,6 +35,8 @@ const V3_UPSTREAM = "https://api.flutterwave.com";
 const V4_UPSTREAM = "https://f4bexperience.flutterwave.com";
 const FINCRA_LIVE_UPSTREAM = "https://api.fincra.com";
 const FINCRA_SANDBOX_UPSTREAM = "https://sandboxapi.fincra.com";
+const NOMBA_LIVE_UPSTREAM = "https://api.nomba.com";
+const NOMBA_SANDBOX_UPSTREAM = "https://sandbox.nomba.com";
 const LENHUB_WEBHOOK_UPSTREAM =
   "https://dkdnwumllibwdlqbjkwy.supabase.co/functions/v1/lenhub-flutter-webhook";
 
@@ -75,9 +83,11 @@ export default {
         v4: V4_UPSTREAM,
         fincra: "/fincra/* → api.fincra.com",
         fincra_sandbox: "/fincra-sandbox/* → sandboxapi.fincra.com",
+        nomba: "/nomba/* → api.nomba.com",
+        nomba_sandbox: "/nomba-sandbox/* → sandbox.nomba.com",
         egress_ip: "/egress-ip",
         lenhub_webhook: "/webhooks/lenhub-flutter",
-        hint: "Whitelist /egress-ip on Fincra; set FINCRA_BASE_URL=…/fincra on Supabase",
+        hint: "Whitelist /egress-ip on Fincra + Nomba (email docs@nomba.com); set FINCRA_BASE_URL / NOMBA_API_BASE on Supabase",
       });
     }
 
@@ -104,16 +114,19 @@ export default {
           /* optional */
         }
         if (!/^\d{1,3}(\.\d{1,3}){3}$/.test(ipv4)) {
-          return Response.json(
-            {
-              ok: false,
-              error: "Could not resolve IPv4 egress",
-              raw: ipv4,
-              ipv6,
-              note: "Fincra only accepts IPv4 (e.g. 1.2.3.4), not IPv6.",
-            },
-            { status: 502 },
-          );
+          return Response.json({
+            ok: !!ipv6,
+            ip: null,
+            ipv6: ipv6 || ipv4,
+            error: ipv6 ? undefined : "Could not resolve IPv4 or IPv6 egress",
+            note: ipv6
+              ? "Cloudflare Worker egress is IPv6-only. Send ipv6 to Nomba for whitelist, or use Oracle/VPS for IPv4."
+              : "No egress IP detected.",
+            nomba_note: ipv6
+              ? `Nomba whitelist candidate (IPv6): ${ipv6}`
+              : undefined,
+            fincra_note: "Fincra requires IPv4 — use a VPS proxy for Fincra if needed.",
+          }, { status: ipv6 ? 200 : 502 });
         }
         return Response.json({
           ok: true,
@@ -199,6 +212,32 @@ export default {
         "/fincra-sandbox",
       );
       outHeaders.set("x-efin-proxy", "fincra-sandbox");
+      return new Response(res.body, {
+        status: res.status,
+        statusText: res.statusText,
+        headers: outHeaders,
+      });
+    }
+
+    // Nomba live (api.nomba.com) — Supabase Edge has no static IP; whitelist /egress-ip with Nomba.
+    if (url.pathname === "/nomba" || url.pathname.startsWith("/nomba/")) {
+      const { res, outHeaders } = await proxyTo(request, NOMBA_LIVE_UPSTREAM, "/nomba");
+      outHeaders.set("x-efin-proxy", "nomba-live");
+      return new Response(res.body, {
+        status: res.status,
+        statusText: res.statusText,
+        headers: outHeaders,
+      });
+    }
+
+    // Nomba sandbox
+    if (url.pathname === "/nomba-sandbox" || url.pathname.startsWith("/nomba-sandbox/")) {
+      const { res, outHeaders } = await proxyTo(
+        request,
+        NOMBA_SANDBOX_UPSTREAM,
+        "/nomba-sandbox",
+      );
+      outHeaders.set("x-efin-proxy", "nomba-sandbox");
       return new Response(res.body, {
         status: res.status,
         statusText: res.statusText,

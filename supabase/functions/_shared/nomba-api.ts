@@ -14,13 +14,22 @@ export type NombaApiConfig = {
   environment: "live" | "sandbox";
 };
 
+
 export function getNombaApiConfig(): NombaApiConfig {
   const environment = (Deno.env.get("NOMBA_ENV") || "live").trim().toLowerCase() === "sandbox"
     ? "sandbox"
     : "live";
-  const apiBase = (Deno.env.get("NOMBA_API_BASE") || (
-    environment === "sandbox" ? "https://sandbox.nomba.com" : "https://api.nomba.com"
-  )).trim().replace(/\/+$/, "");
+  const explicit = Deno.env.get("NOMBA_API_BASE")?.trim();
+  const proxyUrl = (Deno.env.get("NOMBA_PROXY_URL") || Deno.env.get("FLW_PROXY_URL") || "").trim().replace(/\/+$/, "");
+  // Nomba requires whitelisted IPv4. Do NOT default to Cloudflare Worker (often IPv6-only).
+  // Set NOMBA_API_BASE to your VPS proxy, e.g. http://203.0.113.10:8787/nomba
+  let apiBase = explicit
+    || (proxyUrl ? `${proxyUrl}/nomba` : "")
+    || (environment === "sandbox" ? "https://sandbox.nomba.com" : "https://api.nomba.com");
+  if (environment === "sandbox" && !explicit && proxyUrl) {
+    apiBase = `${proxyUrl}/nomba-sandbox`;
+  }
+  apiBase = apiBase.replace(/\/+$/, "");
   return {
     clientId: (Deno.env.get("NOMBA_CLIENT_ID") || "").trim(),
     clientSecret: (Deno.env.get("NOMBA_CLIENT_SECRET") || "").trim(),
@@ -49,6 +58,9 @@ export async function getNombaAccessToken(): Promise<string> {
     headers: {
       "Content-Type": "application/json",
       accountId: cfg.accountId,
+      ...((Deno.env.get("NOMBA_PROXY_SECRET") || "").trim()
+        ? { "x-proxy-secret": (Deno.env.get("NOMBA_PROXY_SECRET") || "").trim() }
+        : {}),
     },
     body: JSON.stringify({
       grant_type: "client_credentials",
@@ -75,12 +87,14 @@ export async function nombaApiFetch(
 ): Promise<{ ok: boolean; status: number; json: any }> {
   const cfg = getNombaApiConfig();
   const token = await getNombaAccessToken();
+  const proxySecret = (Deno.env.get("NOMBA_PROXY_SECRET") || "").trim();
   const res = await fetch(`${cfg.apiBase}${path.startsWith("/") ? path : `/${path}`}`, {
     ...init,
     headers: {
       Authorization: `Bearer ${token}`,
       "Content-Type": "application/json",
       accountId: cfg.accountId,
+      ...(proxySecret ? { "x-proxy-secret": proxySecret } : {}),
       ...(init.headers as Record<string, string> | undefined),
     },
   });
