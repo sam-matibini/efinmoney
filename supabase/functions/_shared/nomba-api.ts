@@ -43,12 +43,24 @@ export function nombaApiConfigured(cfg = getNombaApiConfig()): boolean {
   return !!(cfg.clientId && cfg.clientSecret && cfg.accountId);
 }
 
-/** Checkout/collect hits Nomba directly — no IP whitelist required (unlike payouts). */
+/**
+ * Checkout/collect API base.
+ * When Nomba IP whitelist is on, ALL APIs (checkout + payout) must egress the whitelisted IP (VPS).
+ * Override with NOMBA_CHECKOUT_API_BASE only if Nomba confirms checkout is exempt from IP lock.
+ */
 export function getNombaCheckoutApiBase(): string {
   const explicit = Deno.env.get("NOMBA_CHECKOUT_API_BASE")?.trim();
   if (explicit) return explicit.replace(/\/+$/, "");
+  const payoutBase = Deno.env.get("NOMBA_API_BASE")?.trim();
+  if (payoutBase) return payoutBase.replace(/\/+$/, "");
   const environment = (Deno.env.get("NOMBA_ENV") || "live").trim().toLowerCase();
   return environment === "sandbox" ? "https://sandbox.nomba.com" : "https://api.nomba.com";
+}
+
+function nombaUsesVpsProxy(apiBase: string): boolean {
+  const cfg = getNombaApiConfig();
+  return apiBase.replace(/\/+$/, "") === cfg.apiBase.replace(/\/+$/, "")
+    && !!apiBase && !apiBase.includes("api.nomba.com");
 }
 
 type NombaFetchOpts = {
@@ -126,14 +138,15 @@ export async function nombaApiFetch(
   return { ok: res.ok && (json?.code === "00" || json?.code == null), status: res.status, json };
 }
 
-/** Checkout + transaction requery — always direct to Nomba (not the payout VPS proxy). */
+/** Checkout + transaction requery — same whitelisted egress as payouts when VPS is configured. */
 async function nombaCheckoutApiFetch(
   path: string,
   init: RequestInit = {},
 ): Promise<{ ok: boolean; status: number; json: any }> {
+  const checkoutBase = getNombaCheckoutApiBase();
   return nombaApiFetch(path, init, {
-    apiBase: getNombaCheckoutApiBase(),
-    useProxySecret: false,
+    apiBase: checkoutBase,
+    useProxySecret: nombaUsesVpsProxy(checkoutBase),
   });
 }
 
