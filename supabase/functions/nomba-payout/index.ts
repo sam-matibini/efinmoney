@@ -1,9 +1,18 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import {
-  isNombaNigeriaConfigured,
-  nombaBankTransfer,
-  nombaTransferConversion,
-} from "../_shared/nomba-nigeria.ts";
+  authorizeNombaGlobalTransfer,
+  createNombaDomesticBankTransfer,
+  fetchNombaExchangeRates,
+  listNombaInstitutions,
+  nombaApiConfigured,
+} from "../_shared/nomba-api.ts";
+import {
+  classifyNombaPayout,
+  momoNetworkHints,
+  nombaBankPaymentMethod,
+  normalizeNombaCountry,
+  pickNombaInstitution,
+} from "../_shared/nomba-payout-corridors.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -11,32 +20,83 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-async function reverseTransferLedger(supabase: ReturnType<typeof createClient>, transferId: string) {
-  const { data: existing } = await supabase.from("ledger_entries").select("id")
-    .eq("reference_type", "transfer_reversal").eq("reference_id", transferId).limit(1);
-  if (existing?.length) return { reversed: false, reason: "already_reversed" };
+const DIAL_BY_COUNTRY: Record<string, string> = {
+  NG: "234",
+  KE: "254",
+  GH: "233",
+  UG: "256",
+  TZ: "255",
+  RW: "250",
+  ZM: "260",
+  SN: "221",
+  CI: "225",
+  CM: "237",
+  GA: "241",
+  NE: "227",
+  ET: "251",
+  CD: "243",
+};
 
-  const { data: originals, error } = await supabase.from("ledger_entries")
-    .select("account_id, wallet_id, currency_code, debit_amount, credit_amount, description, created_by")
-    .eq("reference_type", "transfer").eq("reference_id", transferId);
-  if (error || !originals?.length) return { reversed: false, reason: error?.message || "no_entries" };
+const CURRENCY_DEFAULT_NETWORK: Record<string, string> = {
+  KES: "mpesa",
+  GHS: "mtn",
+  UGX: "mtn",
+  TZS: "airtel",
+  RWF: "mtn",
+  XOF: "orange",
+  XAF: "mtn",
+  ETB: "mpesa",
+  CDF: "mpesa",
+  USD: "mpesa",
+};
 
-  const journalId = crypto.randomUUID();
-  const rows = originals.map((o) => ({
-    journal_id: journalId,
-    account_id: o.account_id,
-    wallet_id: o.wallet_id,
-    currency_code: o.currency_code,
-    debit_amount: o.credit_amount,
-    credit_amount: o.debit_amount,
-    description: `REVERSAL: ${o.description ?? ""}`.slice(0, 500),
-    reference_type: "transfer_reversal",
-    reference_id: transferId,
-    created_by: o.created_by,
-  }));
-  const { error: insErr } = await supabase.from("ledger_entries").insert(rows);
-  if (insErr) return { reversed: false, reason: insErr.message };
-  return { reversed: true };
+const PAYOUT_METHOD_TO_NETWORK: Record<string, string> = {
+  mtn_mobile: "mtn",
+  airtel_money: "airtel",
+  airteltigo_money: "airtel",
+  zamtel_money: "zamtel",
+  vodafone_cash: "vodafone",
+  vodafone_money: "vodafone",
+  tigo_pesa: "tigo",
+  mpesa: "mpesa",
+  orange_money: "orange",
+};
+
+function resolveNetwork(payoutMethod: string | null | undefined, currency: string): string {
+  if (payoutMethod && PAYOUT_METHOD_TO_NETWORK[payoutMethod]) {
+    return PAYOUT_METHOD_TO_NETWORK[payoutMethod];
+  }
+  const lower = (payoutMethod ?? "").toLowerCase().trim();
+  if (["mtn", "airtel", "zamtel", "mpesa", "vodafone", "tigo", "orange", "wave", "moov"].includes(lower)) {
+    return lower;
+  }
+  return CURRENCY_DEFAULT_NETWORK[currency] || "mpesa";
+}
+
+function normalizePhone(phone: string, country: string): string {
+  let digits = phone.replace(/\D/g, "");
+  const dial = DIAL_BY_COUNTRY[country] || "";
+  if (digits.startsWith("0") && !(dial && digits.startsWith(dial))) digits = digits.slice(1);
+  if (dial && digits.startsWith(dial + dial)) digits = dial + digits.slice(dial.length * 2);
+  if (dial && !digits.startsWith(dial)) digits = `${dial}${digits}`;
+  return digits;
+}
+
+function json(body: unknown, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+}
+
+function isTerminalSuccess(status: string): boolean {
+  const s = status.toUpperCase();
+  return s === "SUCCESS" || s === "COMPLETED" || s === "SETTLED" || s.includes("SUCCESS");
+}
+
+function isPendingStatus(status: string): boolean {
+  const s = status.toUpperCase();
+  return s.includes("PROCESS") || s.includes("PENDING") || s === "INITIATED";
 }
 
 Deno.serve(async (req) => {
@@ -44,10 +104,7 @@ Deno.serve(async (req) => {
 
   const expectedSecret = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
   if (!expectedSecret || req.headers.get("x-internal-secret") !== expectedSecret) {
-    return new Response(JSON.stringify({ success: false, error: "Unauthorized" }), {
-      status: 401,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return json({ success: false, error: "Unauthorized" }, 401);
   }
 
   const supabase = createClient(
@@ -56,12 +113,17 @@ Deno.serve(async (req) => {
   );
 
   try {
-    const { transfer_id } = await req.json().catch(() => ({}));
-    if (!transfer_id) {
-      return new Response(JSON.stringify({ success: false, error: "transfer_id required" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+    const body = await req.json().catch(() => ({})) as Record<string, unknown>;
+    const transfer_id = String(body.transfer_id || "").trim();
+    if (!transfer_id) return json({ success: false, error: "transfer_id required" }, 400);
+
+    if (!nombaApiConfigured()) {
+      return json({
+        success: false,
+        error: "Nomba API not configured (NOMBA_CLIENT_ID/SECRET/ACCOUNT_ID)",
+        code: "not_configured",
+        rail: "nomba",
+      }, 500);
     }
 
     const { data: transfer, error: tErr } = await supabase
@@ -69,160 +131,479 @@ Deno.serve(async (req) => {
       .select("*")
       .eq("id", transfer_id)
       .single();
-    if (tErr || !transfer) {
-      return new Response(JSON.stringify({ success: false, error: "Transfer not found" }), {
-        status: 404,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    if (!isNombaNigeriaConfigured()) {
-      return new Response(JSON.stringify({ success: false, error: "Nomba Nigeria not configured", code: "not_configured" }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+    if (tErr || !transfer) return json({ success: false, error: "Transfer not found" }, 404);
 
     const targetCurrency = String(transfer.target_currency || "NGN").toUpperCase();
-    const sourceCurrency = String(transfer.source_currency || "NGN").toUpperCase();
-    if (targetCurrency !== "NGN") {
-      return new Response(JSON.stringify({ success: false, error: "Nomba payout only supports NGN bank transfers" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+    const sourceCurrencyWallet = String(transfer.source_currency || targetCurrency).toUpperCase();
+    const payoutMethod = String(transfer.payout_method || body.network || "").trim();
+    const country = normalizeNombaCountry(
+      String(transfer.recipient_country || body.recipient_country || ""),
+      targetCurrency,
+    );
+    const kind = classifyNombaPayout({
+      currency: targetCurrency,
+      country,
+      method: payoutMethod || (targetCurrency === "NGN" ? "bank" : "mobile_money"),
+    });
+
+    if (kind === "unsupported") {
+      return json({
+        success: false,
+        error: `Nomba does not support payouts to ${targetCurrency}${country ? ` (${country})` : ""}`,
+        code: "corridor_unsupported",
+        rail: "nomba",
+      }, 400);
     }
 
-    const accountNumber = String(transfer.recipient_account || "").replace(/\D/g, "");
-    const bankCode = String(transfer.recipient_bank_code || "").trim();
     const accountName = String(transfer.recipient_name || "Recipient").trim();
-    if (!accountNumber || accountNumber.length !== 10 || !bankCode) {
-      return new Response(JSON.stringify({
-        success: false,
-        error: "Nigerian bank payout requires bank_code and 10-digit account_number",
-        code: "invalid_bank_details",
-      }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    const narrative = String(transfer.description || `Transfer to ${accountName}`).slice(0, 120);
+    const reference = `nomba-payout-${transfer_id}`;
+    const senderId = transfer.sender_id as string;
+
+    // Prefer debiting Nomba in destination ccy (same-currency). Ops can force a float ccy.
+    const forcedSource = (Deno.env.get("NOMBA_PAYOUT_SOURCE_CURRENCY") || "").trim().toUpperCase();
+    let payoutSourceCurrency = forcedSource || (
+      kind === "domestic_ngn" ? "NGN" : targetCurrency
+    );
+    // Cross-wallet send: if Nomba float override not set, use transfer source when different.
+    if (!forcedSource && sourceCurrencyWallet !== targetCurrency && kind !== "domestic_ngn") {
+      payoutSourceCurrency = sourceCurrencyWallet;
     }
 
     let payoutAmount = Number(transfer.target_amount ?? 0);
-    if (sourceCurrency !== "NGN") {
-      const sourceAmount = Number(transfer.source_amount ?? 0);
-      const conv = await nombaTransferConversion(sourceAmount, sourceCurrency, "NGN");
-      if (!conv.ok || !conv.convertedAmount) {
-        return new Response(JSON.stringify({
-          success: false,
-          error: conv.message || "FX conversion failed",
-          code: conv.code || "conversion_failed",
-          rail: "nomba",
-          provider_message: conv.message,
-          nomba_raw: conv.json,
-        }), { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-      }
-      payoutAmount = conv.convertedAmount;
-      await supabase.from("transfers").update({
-        target_amount: payoutAmount,
-        exchange_rate: payoutAmount / sourceAmount,
-      }).eq("id", transfer_id);
+    let lockedExchangeRateId: string | undefined;
+    if (payoutSourceCurrency !== targetCurrency) {
+      payoutAmount = Number(transfer.source_amount ?? transfer.target_amount ?? 0);
+      const rates = await fetchNombaExchangeRates({
+        sourceCurrency: payoutSourceCurrency,
+        destinationCurrency: targetCurrency,
+      });
+      if (rates.exchangeRateId) lockedExchangeRateId = rates.exchangeRateId;
+    }
+    if (!payoutAmount || payoutAmount <= 0) {
+      return json({ success: false, error: "Invalid payout amount", rail: "nomba" }, 400);
     }
 
-    if (!payoutAmount || payoutAmount <= 0) {
-      return new Response(JSON.stringify({ success: false, error: "Invalid payout amount" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+    // ── Domestic NGN bank ─────────────────────────────────────────────
+    if (kind === "domestic_ngn") {
+      const accountNumber = String(transfer.recipient_account || body.account_number || "").replace(/\D/g, "");
+      const bankCode = String(transfer.recipient_bank_code || body.bank_code || "").trim();
+      if (!accountNumber || accountNumber.length !== 10 || !bankCode) {
+        return json({
+          success: false,
+          error: "Nigerian bank payout requires bank_code and 10-digit account_number",
+          code: "invalid_bank_details",
+          rail: "nomba",
+          error_class: "hard",
+        }, 400);
+      }
+
+      await upsertPayoutTxn(supabase, {
+        user_id: senderId,
+        transfer_id,
+        reference,
+        amount: payoutAmount,
+        currency: "NGN",
+        account_number: accountNumber,
+        bank_code: bankCode,
+        account_name: accountName,
+        status: "pending",
+        raw_request: {
+          kind,
+          amount: payoutAmount,
+          accountNumber,
+          bankCode,
+          merchantTxRef: reference,
+        },
+      });
+
+      const result = await createNombaDomesticBankTransfer({
+        amount: payoutAmount,
+        accountNumber,
+        accountName,
+        bankCode,
+        merchantTxRef: reference,
+        senderName: "eFinMoney",
+        narration: narrative,
+      });
+
+      if (!result.ok) {
+        const reason = String(result.json?.description || result.json?.message || "Nomba NGN bank payout failed");
+        await supabase.from("nomba_payout_transactions").update({
+          status: "failed",
+          failure_reason: reason.slice(0, 500),
+          raw_response: result.json,
+        }).eq("reference", reference);
+        return json({
+          success: false,
+          error: reason,
+          code: "nomba_payout_failed",
+          rail: "nomba",
+          provider_message: reason,
+          nomba_raw: result.json,
+          raw_response: result.json,
+        }, 502);
+      }
+
+      return await finalizeSuccess(supabase, {
+        transfer_id,
+        reference,
+        senderId,
+        accountName,
+        amount: payoutAmount,
+        currency: "NGN",
+        providerRef: result.providerRef || reference,
+        raw: result.json,
+        status: result.transferStatus,
       });
     }
 
-    const reference = `nomba-payout-${transfer_id}`;
-    const senderId = transfer.sender_id as string;
-    const narrative = String(transfer.description || `Transfer to ${accountName}`).slice(0, 120);
+    // ── Global Interac ────────────────────────────────────────────────
+    if (kind === "global_interac") {
+      const email = String(
+        transfer.recipient_email
+          || (transfer as Record<string, unknown>).recipient_interac_email
+          || body.recipient_email
+          || "",
+      ).trim();
+      if (!email || !email.includes("@")) {
+        return json({
+          success: false,
+          error: "Nomba Interac payout requires recipient email",
+          code: "invalid_interac_details",
+          rail: "nomba",
+          error_class: "hard",
+        }, 400);
+      }
 
-    const { error: insErr } = await supabase.from("nomba_payout_transactions").insert({
+      const payload: Record<string, unknown> = {
+        amount: payoutAmount,
+        sourceCurrency: payoutSourceCurrency,
+        destinationCurrency: "CAD",
+        receiverName: accountName,
+        sourceCountryIsoCode: String(transfer.sender_country || "NG").slice(0, 2).toUpperCase() || "NG",
+        destinationCountryIsoCode: "CA",
+        paymentMethod: "INTERAC",
+        accountType: "INDIVIDUAL",
+        narration: narrative,
+        beneficiary: {
+          beneficiaryEmail: email,
+        },
+      };
+      if (lockedExchangeRateId) payload.lockedExchangeRateId = lockedExchangeRateId;
+
+      await upsertPayoutTxn(supabase, {
+        user_id: senderId,
+        transfer_id,
+        reference,
+        amount: payoutAmount,
+        currency: "CAD",
+        account_number: email,
+        bank_code: "INTERAC",
+        account_name: accountName,
+        status: "pending",
+        raw_request: payload,
+      });
+
+      const result = await authorizeNombaGlobalTransfer(payload);
+      if (!result.ok) {
+        const reason = String(result.json?.description || result.json?.message || "Nomba Interac payout failed");
+        await supabase.from("nomba_payout_transactions").update({
+          status: "failed",
+          failure_reason: reason.slice(0, 500),
+          raw_response: result.json,
+        }).eq("reference", reference);
+        return json({
+          success: false,
+          error: reason,
+          code: "nomba_payout_failed",
+          rail: "nomba",
+          provider_message: reason,
+          nomba_raw: result.json,
+          raw_response: result.json,
+        }, 502);
+      }
+
+      return await finalizeSuccess(supabase, {
+        transfer_id,
+        reference,
+        senderId,
+        accountName,
+        amount: Number(transfer.target_amount ?? payoutAmount),
+        currency: "CAD",
+        providerRef: result.transactionId || reference,
+        raw: result.json,
+        status: result.transferStatus,
+      });
+    }
+
+    // ── Global MoMo ───────────────────────────────────────────────────
+    if (kind === "global_momo") {
+      const destCountry = country || normalizeNombaCountry(null, targetCurrency);
+      const network = resolveNetwork(payoutMethod, targetCurrency);
+      const phoneRaw = String(transfer.recipient_phone || transfer.recipient_account || body.phone_number || "").trim();
+      if (!phoneRaw) {
+        return json({
+          success: false,
+          error: "Mobile money payout requires recipient phone",
+          code: "invalid_momo_details",
+          rail: "nomba",
+          error_class: "hard",
+        }, 400);
+      }
+      const accountNumber = normalizePhone(phoneRaw, destCountry);
+
+      const listed = await listNombaInstitutions({ countryIsoCode: destCountry, isMobileMoney: true });
+      const institution = pickNombaInstitution(
+        listed.institutions,
+        momoNetworkHints(network, destCountry),
+        destCountry,
+        network,
+      );
+      if (!institution) {
+        return json({
+          success: false,
+          error: `No Nomba MoMo provider for ${destCountry}/${network}`,
+          code: "provider_not_found",
+          rail: "nomba",
+        }, 502);
+      }
+
+      const payload: Record<string, unknown> = {
+        amount: payoutAmount,
+        sourceCurrency: payoutSourceCurrency,
+        destinationCurrency: targetCurrency,
+        receiverName: accountName,
+        accountNumber,
+        institutionName: institution.displayName,
+        institutionCode: institution.code,
+        sourceCountryIsoCode: String(transfer.sender_country || "NG").slice(0, 2).toUpperCase() || "NG",
+        destinationCountryIsoCode: destCountry,
+        paymentMethod: "MobileMoney",
+        accountType: "INDIVIDUAL",
+        narration: narrative,
+      };
+      if (lockedExchangeRateId) payload.lockedExchangeRateId = lockedExchangeRateId;
+
+      await upsertPayoutTxn(supabase, {
+        user_id: senderId,
+        transfer_id,
+        reference,
+        amount: Number(transfer.target_amount ?? payoutAmount),
+        currency: targetCurrency,
+        account_number: accountNumber,
+        bank_code: institution.code || "MOMO",
+        account_name: accountName,
+        status: "pending",
+        raw_request: payload,
+      });
+
+      const result = await authorizeNombaGlobalTransfer(payload);
+      if (!result.ok) {
+        const reason = String(result.json?.description || result.json?.message || "Nomba MoMo payout failed");
+        await supabase.from("nomba_payout_transactions").update({
+          status: "failed",
+          failure_reason: reason.slice(0, 500),
+          raw_response: result.json,
+        }).eq("reference", reference);
+        return json({
+          success: false,
+          error: reason,
+          code: "nomba_payout_failed",
+          rail: "nomba",
+          provider_message: reason,
+          nomba_raw: result.json,
+          raw_response: result.json,
+        }, 502);
+      }
+
+      return await finalizeSuccess(supabase, {
+        transfer_id,
+        reference,
+        senderId,
+        accountName,
+        amount: Number(transfer.target_amount ?? payoutAmount),
+        currency: targetCurrency,
+        providerRef: result.transactionId || reference,
+        raw: result.json,
+        status: result.transferStatus,
+      });
+    }
+
+    // ── Global bank / ACH / SEPA / Faster Payments ────────────────────
+    const destCountry = country || normalizeNombaCountry(null, targetCurrency);
+    const accountNumber = String(transfer.recipient_account || body.account_number || "").trim();
+    const bankCode = String(transfer.recipient_bank_code || body.bank_code || "").trim();
+    const bankName = String(transfer.recipient_bank_name || body.bank_name || "").trim();
+    if (!accountNumber) {
+      return json({
+        success: false,
+        error: "Bank payout requires account number",
+        code: "invalid_bank_details",
+        rail: "nomba",
+        error_class: "hard",
+      }, 400);
+    }
+
+    const paymentMethod = nombaBankPaymentMethod(targetCurrency, destCountry, payoutMethod);
+    let institutionCode = bankCode;
+    let institutionName = bankName;
+
+    if (!institutionName || !institutionCode) {
+      const listed = await listNombaInstitutions({ countryIsoCode: destCountry, isMobileMoney: false });
+      const match = listed.institutions.find((i) =>
+        i.code === bankCode
+        || i.code.toLowerCase() === bankCode.toLowerCase()
+        || (bankName && i.displayName.toLowerCase().includes(bankName.toLowerCase()))
+      ) || listed.institutions[0];
+      if (match) {
+        institutionCode = institutionCode || match.code;
+        institutionName = institutionName || match.displayName;
+      }
+    }
+
+    const payload: Record<string, unknown> = {
+      amount: payoutAmount,
+      sourceCurrency: payoutSourceCurrency,
+      destinationCurrency: targetCurrency,
+      receiverName: accountName,
+      accountNumber,
+      sourceCountryIsoCode: String(transfer.sender_country || "NG").slice(0, 2).toUpperCase() || "NG",
+      destinationCountryIsoCode: destCountry,
+      paymentMethod,
+      accountType: "INDIVIDUAL",
+      narration: narrative,
+    };
+    if (institutionCode) payload.institutionCode = institutionCode;
+    if (institutionName) payload.institutionName = institutionName;
+    if (lockedExchangeRateId) payload.lockedExchangeRateId = lockedExchangeRateId;
+
+    // Optional compliance fields when present on the transfer row.
+    const t = transfer as Record<string, unknown>;
+    if (t.purpose_of_payment) payload.purposeOfPayment = t.purpose_of_payment;
+    if (t.bank_account_type) payload.bankAccountType = t.bank_account_type;
+    if (t.recipient_email || t.beneficiary_email) {
+      payload.beneficiary = {
+        ...(payload.beneficiary as Record<string, unknown> | undefined),
+        beneficiaryEmail: String(t.recipient_email || t.beneficiary_email),
+      };
+    }
+    if (t.transit_number) {
+      payload.beneficiary = {
+        ...(payload.beneficiary as Record<string, unknown> | undefined),
+        transitNumber: String(t.transit_number),
+      };
+    }
+
+    await upsertPayoutTxn(supabase, {
       user_id: senderId,
       transfer_id,
       reference,
-      amount: payoutAmount,
-      currency: "NGN",
+      amount: Number(transfer.target_amount ?? payoutAmount),
+      currency: targetCurrency,
       account_number: accountNumber,
-      bank_code: bankCode,
+      bank_code: institutionCode || paymentMethod,
       account_name: accountName,
       status: "pending",
-      raw_request: {
-        amount: payoutAmount,
-        account_number: accountNumber,
-        bankcode: bankCode,
-        account_name: accountName,
-        ref_text: transfer_id,
-        narrative,
-      },
-    });
-    if (insErr && !insErr.message.includes("duplicate")) {
-      return new Response(JSON.stringify({ success: false, error: insErr.message }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    const result = await nombaBankTransfer({
-      amount: payoutAmount,
-      account_number: accountNumber,
-      bankcode: bankCode,
-      account_name: accountName,
-      ref_text: transfer_id,
-      narrative,
+      raw_request: payload,
     });
 
+    const result = await authorizeNombaGlobalTransfer(payload);
     if (!result.ok) {
-      const reason = result.message || "Bank payout failed";
+      const reason = String(result.json?.description || result.json?.message || "Nomba bank payout failed");
       await supabase.from("nomba_payout_transactions").update({
         status: "failed",
         failure_reason: reason.slice(0, 500),
         raw_response: result.json,
       }).eq("reference", reference);
-      return new Response(JSON.stringify({
+      return json({
         success: false,
         error: reason,
-        code: result.code || "nomba_payout_failed",
+        code: "nomba_payout_failed",
         rail: "nomba",
         provider_message: reason,
         nomba_raw: result.json,
         raw_response: result.json,
-      }), { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }, 502);
     }
 
-    const providerRef = result.providerRef || reference;
-    const completedAt = new Date().toISOString();
-    await supabase.from("transfers").update({
-      status: "completed",
-      completed_at: completedAt,
-      provider_reference: providerRef,
-      failure_reason: null,
-    }).eq("id", transfer_id);
-    await supabase.from("nomba_payout_transactions").update({
-      status: "completed",
-      provider_reference: providerRef,
-      raw_response: result.json,
-    }).eq("reference", reference);
-
-    await supabase.from("notifications").insert({
-      user_id: senderId,
-      title: "Transfer complete",
-      message: `Your NGN ${payoutAmount} transfer to ${accountName} has been delivered.`,
-      type: "info",
+    return await finalizeSuccess(supabase, {
+      transfer_id,
+      reference,
+      senderId,
+      accountName,
+      amount: Number(transfer.target_amount ?? payoutAmount),
+      currency: targetCurrency,
+      providerRef: result.transactionId || reference,
+      raw: result.json,
+      status: result.transferStatus,
     });
-
-    return new Response(JSON.stringify({
-      success: true,
-      reference: providerRef,
-      amount: payoutAmount,
-      currency: "NGN",
-      source: "nomba",
-      status: "completed",
-    }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Unknown error";
     console.error("nomba-payout error:", msg);
-    return new Response(JSON.stringify({ success: false, error: msg }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return json({ success: false, error: msg, rail: "nomba" }, 500);
   }
 });
+
+async function upsertPayoutTxn(
+  supabase: ReturnType<typeof createClient>,
+  row: Record<string, unknown>,
+) {
+  const { error: insErr } = await supabase.from("nomba_payout_transactions").insert(row);
+  if (insErr && !String(insErr.message || "").includes("duplicate")) {
+    throw new Error(insErr.message);
+  }
+}
+
+async function finalizeSuccess(
+  supabase: ReturnType<typeof createClient>,
+  opts: {
+    transfer_id: string;
+    reference: string;
+    senderId: string;
+    accountName: string;
+    amount: number;
+    currency: string;
+    providerRef: string;
+    raw: unknown;
+    status: string;
+  },
+) {
+  const done = isTerminalSuccess(opts.status);
+  const pending = !done && isPendingStatus(opts.status);
+  const completedAt = new Date().toISOString();
+
+  await supabase.from("nomba_payout_transactions").update({
+    status: done ? "completed" : "processing",
+    provider_reference: opts.providerRef,
+    raw_response: opts.raw,
+  }).eq("reference", opts.reference);
+
+  await supabase.from("transfers").update({
+    status: done ? "completed" : "processing",
+    completed_at: done ? completedAt : null,
+    provider_reference: opts.providerRef,
+    provider_charge_id: "rail:nomba",
+    failure_reason: null,
+  }).eq("id", opts.transfer_id);
+
+  if (done) {
+    await supabase.from("notifications").insert({
+      user_id: opts.senderId,
+      title: "Transfer complete",
+      message: `Your ${opts.currency} ${opts.amount} transfer to ${opts.accountName} has been delivered.`,
+      type: "info",
+    });
+  }
+
+  return json({
+    success: true,
+    queued: pending || !done,
+    reference: opts.providerRef,
+    amount: opts.amount,
+    currency: opts.currency,
+    source: "nomba",
+    rail: "nomba",
+    status: done ? "completed" : "processing",
+  });
+}

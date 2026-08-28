@@ -1,5 +1,4 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
-import { isNombaNigeriaConfigured } from "../_shared/nomba-nigeria.ts";
 import { dispatchRoutedPayout } from "../_shared/routingExecute.ts";
 import { observeRoute } from "../_shared/routeResolver.ts";
 import { recordEconomics } from "../_shared/transactionEconomics.ts";
@@ -8,6 +7,7 @@ import { isLivePayoutCurrency } from "../_shared/retailPayoutFees.ts";
 import { payoutFnForRail, resolveCorridorRails } from "../_shared/corridor-rails.ts";
 import { explainPayoutError, notifyOpsBrief, notifyOpsFailoverPing } from "../_shared/ops-alert.ts";
 import { validatePayoutMin } from "../_shared/payoutMins.ts";
+import { nombaApiConfigured } from "../_shared/nomba-api.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -528,8 +528,8 @@ Deno.serve(async (req) => {
       !!transfer.recipient_bank_code;
 
     // Corridors Fincra can serve → fixed priority chain (not random).
-    // Order: Fincra → Flutterwave → … (Flovide inserted for NG/GH/KE/UG)
-    // EXCEPTION: Zambia + Kenya + Ghana MoMo are Fincra-only (no FLW/Ghana Pay/Elicate failover).
+    // Order: Nomba (default) → Fincra → Flutterwave → … when no admin policy.
+    // EXCEPTION: Zambia MoMo stays Fincra-only (Nomba does not support ZMW).
     const fincraCapable =
       !isCanada
       && transfer.payout_method !== "card_push"
@@ -538,17 +538,9 @@ Deno.serve(async (req) => {
         || isNigeriaBank
         || isGhanaBank
       );
-    // Zambia MoMo is Fincra-exclusive: Fincra is the only payout rail for ZMW.
-    // No Elicate / Flutterwave failover.
+    // Zambia MoMo is Fincra-exclusive: Nomba has no ZMW corridor.
     const zambiaMomo = isMobileMoneyMethod && (isZambia || targetCurrency === "ZMW");
-    const fincraExclusiveCorridor =
-      isMobileMoneyMethod
-      && (
-        zambiaMomo
-        || isKenya || isGhana
-        || targetCurrency === "KES"
-        || targetCurrency === "GHS"
-      );
+    const fincraExclusiveCorridor = zambiaMomo;
 
 
     const paytotaMomoCurrencies = new Set(["UGX", "KES", "RWF"]);
@@ -571,6 +563,7 @@ Deno.serve(async (req) => {
       "payout",
       targetCurrency,
       recipientCountry || transfer.recipient_country,
+      transfer.payout_method,
     );
     let policyRouted = false;
 
@@ -589,9 +582,8 @@ Deno.serve(async (req) => {
     };
 
     let engineRouted = false;
-    // Zambia/Kenya MoMo and ops force_rail skip the routing engine — the hardcoded
-    // Fincra-first priority chain below owns those corridors.
-    // Admin policy rails also skip the scoring engine (explicit ops choice).
+    // Zambia MoMo and ops force_rail skip the routing engine — Fincra-only for ZMW.
+    // Admin / code-default payout rails also skip the scoring engine (explicit ops choice).
     if (!forceFincraOnly && !fincraExclusiveCorridor && !zambiaMomo && policyRails.length === 0) {
 
       try {
@@ -715,7 +707,7 @@ Deno.serve(async (req) => {
           }
         }
       } else if (forceFincraOnly || fincraExclusiveCorridor) {
-        // Zambia + Kenya + Ghana MoMo (and ops force_rail): Fincra only — no FLW/Ghana Pay failover.
+        // Zambia MoMo (and ops force_rail): Fincra only — Nomba has no ZMW corridor.
         // Ledger reverses inside fincra-payout when skip_reversal is false.
         if (!fincraConfigured) {
           payoutResult = {
@@ -749,36 +741,6 @@ Deno.serve(async (req) => {
             rail: "fincra",
             force_rail: forceFincraOnly ? "fincra_only" : "fincra_exclusive",
           };
-          // Flovide failover for KE/GH/UG MoMo when Fincra declines / is down.
-          const flovideExclusiveFailover =
-            isKenya || isGhana
-            || targetCurrency === "KES"
-            || targetCurrency === "GHS"
-            || targetCurrency === "UGX";
-          if (
-            !payoutOk(payoutResult)
-            && !forceFincraOnly
-            && !zambiaMomo
-            && flovideExclusiveFailover
-            && Deno.env.get("FLOVIDE_PUBLIC_KEY")?.trim()
-            && Deno.env.get("FLOVIDE_SECRET_KEY")?.trim()
-          ) {
-            const fvRes = await fetch(
-              `${Deno.env.get("SUPABASE_URL")}/functions/v1/flovide-payout`,
-              {
-                method: "POST",
-                headers: internalHeaders,
-                body: JSON.stringify({ ...flwBody(), transfer_id }),
-              },
-            );
-            const fvJson = await fvRes.json().catch(() => ({
-              success: false,
-              error: `flovide-payout HTTP ${fvRes.status}`,
-            }));
-            if (payoutOk(fvJson)) {
-              payoutResult = { ...fvJson, rail: "flovide", priority_chain: ["fincra", "flovide"] };
-            }
-          }
         }
       } else if (usePawapay) {
         const res = await fetch(
@@ -883,7 +845,7 @@ Deno.serve(async (req) => {
           payoutResult = await res.json();
         }
       } else if (fincraCapable) {
-        // Fixed priority: Fincra → Elicate (ZMW) → Flutterwave → Lenhub → Nomba → Paytota → Swychr
+        // Fixed priority: Nomba (when configured) → Fincra → Flovide → Flutterwave → Paytota → Swychr
         const attempts: string[] = [];
         // Set when a rail returns a hard decline (bad recipient/number/limits) — never
         // re-attempt that on another provider.
@@ -935,38 +897,27 @@ Deno.serve(async (req) => {
           }
         };
 
-
-        // 1) Fincra (primary for Zambia ZMW + most MoMo)
-        // For NGN bank, try Flovide first when live keys exist (CAD/NGN treasury), then Fincra.
         const flovideKeys = !!(
           Deno.env.get("FLOVIDE_PUBLIC_KEY")?.trim()
           && Deno.env.get("FLOVIDE_SECRET_KEY")?.trim()
         );
-        const flovideFirstNgn = flovideKeys && isNigeriaBank && Deno.env.get("FLOVIDE_PAYOUT_FIRST") !== "false";
-        // Fincra KE MoMo often accepts then fails async with a vague reason — prefer Flovide first.
-        const isKesMomo = targetCurrency === "KES" && !isNigeriaBank && !isGhanaBank
-          && String(transfer.payout_method || "").toLowerCase() !== "bank";
-        const flovideFirstKes = flovideKeys && isKesMomo && Deno.env.get("FLOVIDE_KES_FIRST") !== "false";
 
-        if (flovideFirstNgn || flovideFirstKes) {
-          await tryNext("flovide", async () => {
-            const fvRes = await fetch(
-              `${Deno.env.get("SUPABASE_URL")}/functions/v1/flovide-payout`,
-              {
-                method: "POST",
-                headers: internalHeaders,
-                body: JSON.stringify({ ...flwBody(), transfer_id }),
-              },
+        // 0) Nomba — default for every corridor it supports (NGN bank + Global Payout MoMo/bank)
+        if (nombaApiConfigured() && !zambiaMomo && targetCurrency !== "ZMW") {
+          await tryNext("nomba", async () => {
+            const nombaRes = await fetch(
+              `${Deno.env.get("SUPABASE_URL")}/functions/v1/nomba-payout`,
+              { method: "POST", headers: internalHeaders, body: JSON.stringify({ transfer_id }) },
             );
-            return fvRes.json().catch(() => ({
+            return nombaRes.json().catch(() => ({
               success: false,
-              error: `flovide-payout HTTP ${fvRes.status}`,
-              rail: "flovide",
+              error: `nomba-payout HTTP ${nombaRes.status}`,
+              rail: "nomba",
             }));
           });
         }
 
-        // 1b) Fincra
+        // 1) Fincra
         if (!fincraConfigured) {
           console.error(
             "fincra rail skipped: FINCRA_SECRET_KEY/FINCRA_BUSINESS_ID not configured",
@@ -1013,11 +964,9 @@ Deno.serve(async (req) => {
           }
         }
 
-        // 1c) Flovide — NGN bank / GHS bank / KES-GHS-UGX MoMo when Fincra misses
+        // 2) Flovide — NGN bank / GHS bank / KES-GHS-UGX MoMo when earlier rails miss
         if (
           flovideKeys
-          && !flovideFirstNgn
-          && !flovideFirstKes
           && (isNigeriaBank || isGhanaBank || ["KES", "GHS", "UGX"].includes(targetCurrency))
         ) {
           await tryNext("flovide", async () => {
@@ -1037,7 +986,7 @@ Deno.serve(async (req) => {
           });
         }
 
-        // 2) Flutterwave — never for Zambia ZMW (Fincra-only corridor).
+        // 3) Flutterwave — never for Zambia ZMW (Fincra-only corridor).
         if (!zambiaMomo && targetCurrency !== "ZMW") {
           await tryNext("flutterwave", async () => {
             const flwRes = await fetch(
@@ -1052,24 +1001,7 @@ Deno.serve(async (req) => {
           });
         }
 
-        // Lenhub retired — skipped.
-
-        // 4) Nomba (official api.nomba.com only; Lenhub /api/efin Nigeria payout is off)
-        if (isNigeriaBank && isNombaNigeriaConfigured()) {
-          await tryNext("nomba", async () => {
-            const nombaRes = await fetch(
-              `${Deno.env.get("SUPABASE_URL")}/functions/v1/nomba-payout`,
-              { method: "POST", headers: internalHeaders, body: JSON.stringify({ transfer_id }) },
-            );
-            return nombaRes.json().catch(() => ({
-              success: false,
-              error: `nomba-payout HTTP ${nombaRes.status}`,
-              rail: "nomba",
-            }));
-          });
-        }
-
-        // 5) Paytota (UGX/KES/RWF MoMo)
+        // 4) Paytota (UGX/KES/RWF MoMo)
         if (paytotaCapable) {
           await tryNext("paytota", async () => {
             const paytotaRes = await fetch(
@@ -1084,7 +1016,7 @@ Deno.serve(async (req) => {
           });
         }
 
-        // 6) Swychr (NGN bank when enabled)
+        // 5) Swychr (NGN bank when enabled)
         if (isNigeriaBank && swychrEnabled) {
           await tryNext("swychr", async () => {
             const swychrRes = await fetch(
@@ -1098,8 +1030,6 @@ Deno.serve(async (req) => {
             }));
           });
         }
-
-        // Ghana Pay (Lenhub /api/efin) retired — skipped.
 
         console.log("priority payout chain", attempts, "final", payoutResult?.rail, payoutResult?.success);
       } else if (isZambia) {

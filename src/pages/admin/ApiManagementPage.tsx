@@ -39,7 +39,7 @@ const INTEGRATIONS: Array<{
   envHints: string[];
 }> = [
   // Payments — Africa
-  { key: "nomba", name: "Nomba", description: "Nigeria NGN bank & card payouts, FX, collection", category: "Payments — Africa", envHints: ["NOMBA_PAY_API_URL", "NOMBA_PAY_USER"] },
+  { key: "nomba", name: "Nomba", description: "NGN bank + Global Payout (Africa MoMo, CAD/GBP/EUR/USD) & collection", category: "Payments — Africa", envHints: ["NOMBA_CLIENT_ID", "NOMBA_CLIENT_SECRET", "NOMBA_ACCOUNT_ID", "NOMBA_PAYOUT_SOURCE_CURRENCY"] },
   { key: "ghana", name: "Ghana Pay", description: "Ghana GHS collection & mobile-money payouts", category: "Payments — Africa", envHints: ["GHANA_PAY_API_URL", "GHANA_PAY_USER"] },
   { key: "fincra", name: "Fincra", description: "Africa collect + NGN/GHS/KES payouts & CAD Interac", category: "Payments — Africa", envHints: ["FINCRA_SECRET_KEY", "FINCRA_BUSINESS_ID"] },
   { key: "flovide", name: "Flovide", description: "CAD Interac Auto Deposit + NGN/KES/GHS payouts (OhentPay)", category: "Payments — Global & Cards", envHints: ["FLOVIDE_PUBLIC_KEY", "FLOVIDE_SECRET_KEY"] },
@@ -212,7 +212,7 @@ const EDGE_FUNCTIONS: Array<{ name: string; description: string; jwt: boolean; c
   { name: "nomba-exchange-rate",       description: "Nomba FX rates",                          jwt: false, category: "Nomba" },
   { name: "nomba-get-banks",           description: "Fetch bank list via Nomba",               jwt: true,  category: "Nomba" },
   { name: "nomba-payment-callback",    description: "Receives Nomba payment callbacks",        jwt: false, category: "Nomba" },
-  { name: "nomba-payout",              description: "Initiates Nomba NGN payouts",             jwt: false, category: "Nomba" },
+  { name: "nomba-payout",              description: "Nomba NGN + Global Payout disbursements", jwt: false, category: "Nomba" },
   { name: "nomba-resolve-account",     description: "Validate bank account via Nomba",         jwt: true,  category: "Nomba" },
   { name: "nomba-transfer-conversion", description: "Nomba transfer conversion",               jwt: true,  category: "Nomba" },
   { name: "nomba-verify-transfer",     description: "Verify Nomba transfer status",            jwt: true,  category: "Nomba" },

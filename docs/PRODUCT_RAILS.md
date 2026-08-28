@@ -6,7 +6,7 @@ This document reflects the **UI simplification pass** (July 2026). Edge function
 
 | Rail | Currencies / use | Frontend | Edge functions |
 |------|------------------|----------|----------------|
-| **Nomba Nigeria** | NGN bank send, NGN/USD/EUR/GBP top-up, NGN FX; **CAD top-up via USD international checkout** | `SendPage`, `TopUpPage`, `ExchangePage`, `NombaTopUpCard` | `nomba-collection`, `nomba-payment-callback`, … |
+| **Nomba** | NGN bank send; Global Payout default for KE/GH/UG/TZ/RW/XOF/XAF/CAD/GBP/EUR/USD/ZAR (not ZMW); NGN/CAD top-up | `SendPage`, `TopUpPage`, `NombaTopUpCard` | `nomba-collection`, `nomba-payout`, `nomba-payment-callback`, … |
 | **Ghana Pay** | GHS top-up, GHS MoMo send | `GhanaTopUpCard`, send flow for GHS | Ghana collection/payout functions (lenhub) |
 | **Swychr Connect** | Secondary payin, NGN payout fallback, vCards, airtime | `SwychrTopUpCard`, `SwychrCardsPanel`, `SwychrAirtimePanel` (flagged off) | `swychr-collection`, `swychr-payout`, `swychr-card-*`, `swychr-airtime-*` |
 | **Plaid** | Link external bank accounts | Send funding (`plaid` flag), settings | Plaid link-token functions |

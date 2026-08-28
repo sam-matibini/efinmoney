@@ -3,6 +3,7 @@ import {
   RAIL_OPTIONS,
   activeRailSetFromPartners,
   defaultCollectPartner,
+  defaultPayoutPartner,
   useCorridorRailPolicies,
   useDeleteCorridorRailPolicy,
   useSaveCorridorRailPolicy,
@@ -61,7 +62,7 @@ type PartnerMeta = {
 const PARTNERS: PartnerMeta[] = [
   { id: "flovide", name: "Flovide", blurb: "Interac top-up in Canada; bank send to NG/KE/GH/UG/CA", collect: ["CAD"], payout: ["NGN", "KES", "GHS", "UGX", "CAD"] },
   { id: "fincra", name: "Fincra", blurb: "Africa collect + payout; CAD Interac collect", collect: ["CAD", "USD", "EUR", "GBP", "NGN", "GHS", "KES", "UGX", "TZS", "ZMW", "ZAR", "XOF", "XAF", "MWK"], payout: ["NGN", "GHS", "KES", "UGX", "TZS", "ZMW", "ZAR", "XOF", "XAF"] },
-  { id: "nomba", name: "Nomba", blurb: "Nigeria wallet top-up and bank payouts", collect: ["NGN"], payout: ["NGN"] },
+  { id: "nomba", name: "Nomba", blurb: "NGN bank + Global Payout (KE/GH/UG/TZ/RW/XOF/XAF/CAD/GBP/EUR/USD/ZAR…)", collect: ["NGN", "CAD"], payout: ["NGN", "GHS", "KES", "UGX", "TZS", "RWF", "XOF", "XAF", "ZAR", "CAD", "GBP", "EUR", "USD"] },
   { id: "flutterwave", name: "Flutterwave", blurb: "Africa + some western card rails", collect: ["CAD", "USD", "NGN", "GHS", "KES", "UGX", "RWF", "TZS", "ZMW"], payout: ["NGN", "GHS", "KES", "UGX", "RWF", "TZS", "ZMW"] },
   { id: "lenhub_flutter", name: "Lenhub", blurb: "Card collect + FX bank/MoMo payouts", collect: ["CAD", "USD", "EUR", "GBP", "NGN", "GHS", "KES", "UGX", "RWF", "TZS"], payout: ["NGN", "GHS", "KES", "UGX", "TZS", "RWF", "ZMW"] },
   { id: "paytota", name: "Paytota", blurb: "Western invoices + East Africa MoMo", collect: ["CAD", "USD", "EUR", "GBP", "UGX", "KES", "RWF"], payout: ["UGX", "KES", "RWF"] },
@@ -80,8 +81,8 @@ function partnersFor(direction: RailDirection, currency: string): PartnerMeta[] 
     const allowed = direction === "collect" ? p.collect : p.payout;
     return allowed.includes(currency) || allowed.includes("*");
   });
-  if (direction !== "collect") return list;
-  const preferred = defaultCollectPartner(currency);
+  const preferred =
+    direction === "collect" ? defaultCollectPartner(currency) : defaultPayoutPartner(currency);
   if (!preferred) return list;
   return [...list].sort((a, b) => {
     if (a.id === preferred) return -1;
@@ -202,7 +203,7 @@ export default function CorridorRailsPanel() {
     const nextAvailable = partnersFor(direction, ccy);
     const existing = findPolicy(rows, direction, ccy, cc);
     const fallback =
-      (direction === "collect" ? defaultCollectPartner(ccy) : "") ||
+      (direction === "collect" ? defaultCollectPartner(ccy) : defaultPayoutPartner(ccy)) ||
       nextAvailable[0]?.id ||
       "";
     const preferred =

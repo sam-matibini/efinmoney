@@ -187,6 +187,34 @@ export function defaultCollectPartner(currency: string): string | null {
   return DEFAULT_COLLECT_PARTNER[currency.toUpperCase()] || null;
 }
 
+/**
+ * Default preferred payout partner when no admin policy exists.
+ * Nomba first for every corridor it supports; Zambia stays Fincra.
+ */
+export const DEFAULT_PAYOUT_PARTNER: Record<string, string> = {
+  NGN: "nomba",
+  GHS: "nomba",
+  KES: "nomba",
+  UGX: "nomba",
+  TZS: "nomba",
+  RWF: "nomba",
+  XOF: "nomba",
+  XAF: "nomba",
+  ETB: "nomba",
+  CDF: "nomba",
+  ZAR: "nomba",
+  AED: "nomba",
+  CAD: "nomba",
+  GBP: "nomba",
+  EUR: "nomba",
+  USD: "nomba",
+  ZMW: "fincra",
+};
+
+export function defaultPayoutPartner(currency: string): string | null {
+  return DEFAULT_PAYOUT_PARTNER[currency.toUpperCase()] || null;
+}
+
 /** Map a collect partner / method onto TopUpPage method ids. */
 export function collectPayMethodIds(partnerOrMethod: string): string[] {
   const raw = partnerOrMethod.trim().toLowerCase();

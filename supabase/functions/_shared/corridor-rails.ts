@@ -3,6 +3,8 @@
  */
 import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { filterLiveRails, isRetiredRail } from "./retiredPartners.ts";
+import { defaultPayoutRails, nombaPayoutSupported } from "./nomba-payout-corridors.ts";
+import { nombaApiConfigured } from "./nomba-api.ts";
 
 export type RailDirection = "collect" | "payout";
 
@@ -81,10 +83,11 @@ export async function resolveCorridorRails(
   direction: RailDirection,
   currency: string,
   country?: string | null,
-): Promise<{ policy: CorridorRailPolicy | null; rails: string[] }> {
+  method?: string | null,
+): Promise<{ policy: CorridorRailPolicy | null; rails: string[]; source: "policy" | "default" | "none" }> {
   const ccy = String(currency || "").trim().toUpperCase();
   const cc = normalizePolicyCountry(country, ccy);
-  if (!ccy) return { policy: null, rails: [] };
+  if (!ccy) return { policy: null, rails: [], source: "none" };
 
   // Prefer exact ISO2 match, then currency-wide (empty country), then any enabled row for currency
   // (covers legacy transfers that stored NGN/Nigeria instead of NG).
@@ -117,10 +120,38 @@ export async function resolveCorridorRails(
       .maybeSingle();
     row = (data as CorridorRailPolicy | null) ?? null;
   }
-  if (!row) return { policy: null, rails: [] };
-  const rails = await filterActivePartnerRails(admin, filterLiveRails(railsFromPolicy(row)));
-  if (!rails.length) return { policy: null, rails: [] };
-  return { policy: row, rails };
+  let source: "policy" | "default" | "none" = "none";
+  let policy: CorridorRailPolicy | null = null;
+  let rails: string[] = [];
+
+  if (row) {
+    rails = await filterActivePartnerRails(admin, filterLiveRails(railsFromPolicy(row)));
+    if (rails.length) {
+      policy = row;
+      source = "policy";
+    }
+  }
+
+  // Code defaults when no admin policy row exists.
+  if (!rails.length && direction === "payout") {
+    const defaults = filterLiveRails(defaultPayoutRails({ currency: ccy, country: cc || country, method }));
+    rails = await filterActivePartnerRails(admin, defaults);
+    if (rails.length) source = "default";
+  }
+
+  // Always try Nomba first when configured + corridor supported — even if an older
+  // admin policy lists Flovide/Fincra ahead of Nomba.
+  if (direction === "payout" && rails.length && nombaApiConfigured()) {
+    if (nombaPayoutSupported({ currency: ccy, country: cc || country, method })) {
+      const rest = rails.filter((r) => r !== "nomba");
+      if (rails[0] !== "nomba") {
+        rails = ["nomba", ...rest];
+      }
+    }
+  }
+
+  if (rails.length) return { policy, rails, source };
+  return { policy: null, rails: [], source: "none" };
 }
 
 /** payment_partners.code → corridor rail ids (ghana vs ghana_pay, etc.). */

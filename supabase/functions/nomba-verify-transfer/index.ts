@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
+import { fetchNombaGlobalTransaction, nombaApiConfigured } from "../_shared/nomba-api.ts";
 
 function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -14,8 +15,19 @@ function nombaResponseIndicatesSuccess(rawResponse: unknown): boolean {
   const outer = (json.data ?? json) as Record<string, unknown>;
   const code = String(outer?.code ?? json.code ?? "");
   if (code === "00" || code === "200") return true;
+  const status = String(outer?.status ?? outer?.prettyStatus ?? json.status ?? "").toUpperCase();
+  if (status.includes("SUCCESS") || status === "COMPLETED" || status === "SETTLED") return true;
+  if (String(outer?.coreStatus || "").toUpperCase().includes("SUCCESS")) return true;
   if (outer?.status === true || json.status === true) return true;
   return false;
+}
+
+function nombaResponseIndicatesFailed(rawResponse: unknown): boolean {
+  if (!rawResponse || typeof rawResponse !== "object") return false;
+  const json = rawResponse as Record<string, unknown>;
+  const outer = (json.data ?? json) as Record<string, unknown>;
+  const status = String(outer?.status ?? outer?.prettyStatus ?? "").toUpperCase();
+  return status.includes("FAIL") || status === "REVERSED" || status === "CANCELLED";
 }
 
 Deno.serve(async (req) => {
@@ -119,6 +131,46 @@ Deno.serve(async (req) => {
         status: "completed",
         note: "nomba_payout_completed",
       });
+    }
+
+    // Poll official Global Payout / domestic status when still processing.
+    const providerRef = String(payoutTxn.provider_reference || "").trim();
+    if (providerRef && nombaApiConfigured() && !providerRef.startsWith("API-TRANSFER-")) {
+      try {
+        const live = await fetchNombaGlobalTransaction(providerRef);
+        if (live.ok || live.json?.data) {
+          await supabase.from("nomba_payout_transactions").update({
+            raw_response: live.json,
+          }).eq("id", payoutTxn.id);
+
+          if (nombaResponseIndicatesFailed(live.json) || /FAIL/i.test(live.transferStatus)) {
+            const reason = String(live.json?.description || live.json?.data?.prettyStatus || "Nomba payout failed");
+            await supabase.from("nomba_payout_transactions").update({
+              status: "failed",
+              failure_reason: reason.slice(0, 500),
+            }).eq("id", payoutTxn.id);
+            await supabase.from("transfers").update({
+              status: "failed",
+              failure_reason: reason.slice(0, 500),
+            }).eq("id", transfer_id);
+            return jsonResponse({ changed: true, status: "failed", note: "nomba_live_failed" });
+          }
+
+          if (nombaResponseIndicatesSuccess(live.json) || /COMPLETE|SUCCESS|SETTLED/i.test(live.transferStatus)) {
+            const completedAt = new Date().toISOString();
+            await supabase.from("nomba_payout_transactions").update({ status: "completed" }).eq("id", payoutTxn.id);
+            await supabase.from("transfers").update({
+              status: "completed",
+              completed_at: completedAt,
+              provider_reference: providerRef,
+              failure_reason: null,
+            }).eq("id", transfer_id);
+            return jsonResponse({ changed: true, status: "completed", note: "nomba_live_completed" });
+          }
+        }
+      } catch (e) {
+        console.error("nomba live verify failed", e);
+      }
     }
 
     if (
