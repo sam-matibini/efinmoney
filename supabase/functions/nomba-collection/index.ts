@@ -241,11 +241,12 @@ Deno.serve(async (req) => {
           raw_response: { error: created.error, rail: "nomba_api" },
         }).eq("id", txn.id);
         const accountHint = created.error.toLowerCase().includes("account number")
-          ? " If this persists, ask Nomba support to confirm Checkout is enabled on the Live parent account (do not put parent accountId in the order body)."
+          ? " Nomba needs Online Checkout enabled on your live parent account with a settlement account. Email docs@nomba.com — also verify NOMBA_SUBACCOUNT_ID is unset or is a real outlet ID (not the parent accountId)."
           : "";
         return json({
           error: `${created.error}${accountHint}`,
           code: "nomba_checkout_failed",
+          hint: accountHint ? "checkout_account_setup" : undefined,
         }, 200);
       }
 

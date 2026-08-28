@@ -50,9 +50,13 @@ function proxyRequest(req, res, upstreamBase, stripPrefix) {
   }
   const target = new URL(path + url.search, upstreamBase);
 
-  const headers = { ...req.headers, host: target.host };
-  delete headers["host"];
+  const headers = { ...req.headers };
+  delete headers.host;
+  delete headers.connection;
   headers.host = target.host;
+  // Node lowercases incoming headers — Nomba expects camelCase accountId.
+  const accountHeader = req.headers.accountid || req.headers.accountId;
+  if (accountHeader) headers.accountId = accountHeader;
 
   const lib = target.protocol === "https:" ? https : http;
   const upstreamReq = lib.request(

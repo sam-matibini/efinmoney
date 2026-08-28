@@ -6,6 +6,7 @@ import {
   createNombaCheckoutOrder,
   getNombaAccessToken,
   getNombaApiConfig,
+  getNombaCheckoutApiBase,
   nombaApiConfigured,
 } from "../_shared/nomba-api.ts";
 
@@ -26,6 +27,7 @@ Deno.serve(async (req) => {
     configured: nombaApiConfigured(cfg),
     environment: cfg.environment,
     apiBase: cfg.apiBase,
+    checkoutApiBase: getNombaCheckoutApiBase(),
     accountIdPresent: !!cfg.accountId,
     clientIdPresent: !!cfg.clientId,
     clientSecretPresent: !!cfg.clientSecret,

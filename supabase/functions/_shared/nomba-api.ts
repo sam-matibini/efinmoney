@@ -43,24 +43,42 @@ export function nombaApiConfigured(cfg = getNombaApiConfig()): boolean {
   return !!(cfg.clientId && cfg.clientSecret && cfg.accountId);
 }
 
-let cachedToken: { accessToken: string; expiresAt: number } | null = null;
+/** Checkout/collect hits Nomba directly — no IP whitelist required (unlike payouts). */
+export function getNombaCheckoutApiBase(): string {
+  const explicit = Deno.env.get("NOMBA_CHECKOUT_API_BASE")?.trim();
+  if (explicit) return explicit.replace(/\/+$/, "");
+  const environment = (Deno.env.get("NOMBA_ENV") || "live").trim().toLowerCase();
+  return environment === "sandbox" ? "https://sandbox.nomba.com" : "https://api.nomba.com";
+}
 
-export async function getNombaAccessToken(): Promise<string> {
+type NombaFetchOpts = {
+  /** Override API host (e.g. direct api.nomba.com for checkout). */
+  apiBase?: string;
+  /** Send x-proxy-secret when calling through the VPS proxy. */
+  useProxySecret?: boolean;
+};
+
+const tokenCache = new Map<string, { accessToken: string; expiresAt: number }>();
+
+export async function getNombaAccessToken(opts: NombaFetchOpts = {}): Promise<string> {
   const cfg = getNombaApiConfig();
   if (!nombaApiConfigured(cfg)) throw new Error("Nomba API not configured (NOMBA_CLIENT_ID/SECRET/ACCOUNT_ID)");
 
-  if (cachedToken && Date.now() < cachedToken.expiresAt - 60_000) {
-    return cachedToken.accessToken;
+  const apiBase = (opts.apiBase || cfg.apiBase).replace(/\/+$/, "");
+  const cached = tokenCache.get(apiBase);
+  if (cached && Date.now() < cached.expiresAt - 60_000) {
+    return cached.accessToken;
   }
 
-  const res = await fetch(`${cfg.apiBase}/v1/auth/token/issue`, {
+  const proxySecret = (Deno.env.get("NOMBA_PROXY_SECRET") || "").trim();
+  const sendProxySecret = opts.useProxySecret !== false && !!proxySecret && apiBase === cfg.apiBase;
+
+  const res = await fetch(`${apiBase}/v1/auth/token/issue`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       accountId: cfg.accountId,
-      ...((Deno.env.get("NOMBA_PROXY_SECRET") || "").trim()
-        ? { "x-proxy-secret": (Deno.env.get("NOMBA_PROXY_SECRET") || "").trim() }
-        : {}),
+      ...(sendProxySecret ? { "x-proxy-secret": proxySecret } : {}),
     },
     body: JSON.stringify({
       grant_type: "client_credentials",
@@ -77,29 +95,46 @@ export async function getNombaAccessToken(): Promise<string> {
     throw new Error(json.description || `Nomba OAuth failed (${res.status})`);
   }
   const expiresAt = json.data.expiresAt ? Date.parse(json.data.expiresAt) : Date.now() + 25 * 60_000;
-  cachedToken = { accessToken: json.data.access_token, expiresAt: Number.isFinite(expiresAt) ? expiresAt : Date.now() + 25 * 60_000 };
-  return cachedToken.accessToken;
+  tokenCache.set(apiBase, {
+    accessToken: json.data.access_token,
+    expiresAt: Number.isFinite(expiresAt) ? expiresAt : Date.now() + 25 * 60_000,
+  });
+  return json.data.access_token;
 }
 
 export async function nombaApiFetch(
   path: string,
   init: RequestInit = {},
+  opts: NombaFetchOpts = {},
 ): Promise<{ ok: boolean; status: number; json: any }> {
   const cfg = getNombaApiConfig();
-  const token = await getNombaAccessToken();
+  const apiBase = (opts.apiBase || cfg.apiBase).replace(/\/+$/, "");
+  const token = await getNombaAccessToken(opts);
   const proxySecret = (Deno.env.get("NOMBA_PROXY_SECRET") || "").trim();
-  const res = await fetch(`${cfg.apiBase}${path.startsWith("/") ? path : `/${path}`}`, {
+  const sendProxySecret = opts.useProxySecret !== false && !!proxySecret && apiBase === cfg.apiBase;
+  const res = await fetch(`${apiBase}${path.startsWith("/") ? path : `/${path}`}`, {
     ...init,
     headers: {
       Authorization: `Bearer ${token}`,
       "Content-Type": "application/json",
       accountId: cfg.accountId,
-      ...(proxySecret ? { "x-proxy-secret": proxySecret } : {}),
+      ...(sendProxySecret ? { "x-proxy-secret": proxySecret } : {}),
       ...(init.headers as Record<string, string> | undefined),
     },
   });
   const json = await res.json().catch(() => ({}));
   return { ok: res.ok && (json?.code === "00" || json?.code == null), status: res.status, json };
+}
+
+/** Checkout + transaction requery — always direct to Nomba (not the payout VPS proxy). */
+async function nombaCheckoutApiFetch(
+  path: string,
+  init: RequestInit = {},
+): Promise<{ ok: boolean; status: number; json: any }> {
+  return nombaApiFetch(path, init, {
+    apiBase: getNombaCheckoutApiBase(),
+    useProxySecret: false,
+  });
 }
 
 /** Create a Nomba Checkout order; returns hosted checkout URL. */
@@ -118,7 +153,11 @@ export async function createNombaCheckoutOrder(params: {
   // Body accountId is ONLY for outlet/sub-accounts — putting the parent UUID here
   // makes Nomba look up a settlement account number and fail with
   // "Invalid input: No Account Number found".
-  const subAccountId = (params.subAccountId || Deno.env.get("NOMBA_SUBACCOUNT_ID") || "").trim();
+  const cfg = getNombaApiConfig();
+  const subRaw = (params.subAccountId || Deno.env.get("NOMBA_SUBACCOUNT_ID") || "").trim();
+  // Never put the parent account UUID in the order body — Nomba returns
+  // "No Account Number found". Body accountId is for outlet/sub-accounts only.
+  const subAccountId = subRaw && subRaw !== cfg.accountId ? subRaw : "";
   const order: Record<string, unknown> = {
     amount: amountStr,
     currency: params.currency.toUpperCase(),
@@ -129,7 +168,7 @@ export async function createNombaCheckoutOrder(params: {
   };
   if (subAccountId) order.accountId = subAccountId;
 
-  const { ok, status, json } = await nombaApiFetch("/v1/checkout/order", {
+  const { ok, status, json } = await nombaCheckoutApiFetch("/v1/checkout/order", {
     method: "POST",
     body: JSON.stringify({ order }),
   });
@@ -161,7 +200,7 @@ export async function fetchNombaCheckoutTransaction(params: {
   idType?: "ORDER_REFERENCE" | "ORDER_ID";
 }): Promise<{ ok: boolean; status: number; json: any; paid: boolean }> {
   const idType = params.idType || (params.id.includes("efin-nomba") ? "ORDER_REFERENCE" : "ORDER_ID");
-  const { ok, status, json } = await nombaApiFetch(
+  const { ok, status, json } = await nombaCheckoutApiFetch(
     `/v1/checkout/transaction?idType=${encodeURIComponent(idType)}&id=${encodeURIComponent(params.id)}`,
     { method: "GET" },
   );
