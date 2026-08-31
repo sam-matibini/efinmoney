@@ -720,7 +720,17 @@ Deno.serve(async (req) => {
             }).eq("id", transfer_id);
           }
         }
+      } else if (kenyaNombaExclusive) {
+        // Kenya is Nomba-exclusive: fail cleanly instead of falling back to another rail.
+        payoutResult = {
+          success: false,
+          rail: "nomba",
+          error: "Nomba is not configured for Kenya payouts",
+          code: "partner_not_configured",
+          force_rail: "nomba_exclusive",
+        };
       } else if (forceFincraOnly || fincraExclusiveCorridor) {
+
         // Zambia MoMo (and ops force_rail): Fincra only — Nomba has no ZMW corridor.
         // Ledger reverses inside fincra-payout when skip_reversal is false.
         if (!fincraConfigured) {
