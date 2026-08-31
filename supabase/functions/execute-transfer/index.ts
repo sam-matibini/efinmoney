@@ -562,14 +562,19 @@ Deno.serve(async (req) => {
 
     // Admin corridor board (preferred + optional failover) — takes priority over
     // hardcoded exclusive corridors when an enabled policy exists.
-    const { policy: payoutPolicy, rails: policyRails } = await resolveCorridorRails(
+    const { policy: payoutPolicy, rails: resolvedPolicyRails } = await resolveCorridorRails(
       supabase,
       "payout",
       targetCurrency,
       recipientCountry || transfer.recipient_country,
       transfer.payout_method,
     );
+    // Kenya: Nomba only, whatever the saved policy/failover list says.
+    const policyRails = kenyaNombaExclusive
+      ? (nombaApiConfigured() ? ["nomba"] : [])
+      : resolvedPolicyRails;
     let policyRouted = false;
+
 
     // Routing engine (Phase 3): only takes over when an operator has switched the
     // active rule to live AND enabled live routing on this corridor. Otherwise the
