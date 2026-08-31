@@ -23,12 +23,13 @@ async function invokeErrorMessage(error: unknown): Promise<string> {
 
 async function authFetch(path: string, init?: RequestInit) {
   const { data: { session } } = await supabase.auth.getSession();
+  const anonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
   const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/${path}`;
   const res = await fetch(url, {
     ...init,
     headers: {
-      Authorization: `Bearer ${session?.access_token || ""}`,
-      apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+      Authorization: `Bearer ${session?.access_token || anonKey}`,
+      apikey: anonKey,
       "Content-Type": "application/json",
       ...(init?.headers || {}),
     },
