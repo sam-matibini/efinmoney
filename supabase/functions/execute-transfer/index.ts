@@ -541,6 +541,10 @@ Deno.serve(async (req) => {
     // Zambia MoMo is Fincra-exclusive: Nomba has no ZMW corridor.
     const zambiaMomo = isMobileMoneyMethod && (isZambia || targetCurrency === "ZMW");
     const fincraExclusiveCorridor = zambiaMomo;
+    // Kenya is Nomba-exclusive: no failover to Fincra/Flovide/Flutterwave/Paytota/Swychr.
+    const kenyaNombaExclusive =
+      (isKenya || targetCurrency === "KES") && transfer.payout_method !== "card_push";
+
 
 
     const paytotaMomoCurrencies = new Set(["UGX", "KES", "RWF"]);
@@ -558,14 +562,19 @@ Deno.serve(async (req) => {
 
     // Admin corridor board (preferred + optional failover) — takes priority over
     // hardcoded exclusive corridors when an enabled policy exists.
-    const { policy: payoutPolicy, rails: policyRails } = await resolveCorridorRails(
+    const { policy: payoutPolicy, rails: resolvedPolicyRails } = await resolveCorridorRails(
       supabase,
       "payout",
       targetCurrency,
       recipientCountry || transfer.recipient_country,
       transfer.payout_method,
     );
+    // Kenya: Nomba only, whatever the saved policy/failover list says.
+    const policyRails = kenyaNombaExclusive
+      ? (nombaApiConfigured() ? ["nomba"] : [])
+      : resolvedPolicyRails;
     let policyRouted = false;
+
 
     // Routing engine (Phase 3): only takes over when an operator has switched the
     // active rule to live AND enabled live routing on this corridor. Otherwise the
@@ -583,8 +592,13 @@ Deno.serve(async (req) => {
 
     let engineRouted = false;
     // Zambia MoMo and ops force_rail skip the routing engine — Fincra-only for ZMW.
+    // Kenya skips it too — Nomba-exclusive corridor.
     // Admin / code-default payout rails also skip the scoring engine (explicit ops choice).
-    if (!forceFincraOnly && !fincraExclusiveCorridor && !zambiaMomo && policyRails.length === 0) {
+    if (
+      !forceFincraOnly && !fincraExclusiveCorridor && !zambiaMomo
+      && !kenyaNombaExclusive && policyRails.length === 0
+    ) {
+
 
       try {
         const dispatch = await dispatchRoutedPayout(supabase, routeRequest, {
@@ -706,7 +720,17 @@ Deno.serve(async (req) => {
             }).eq("id", transfer_id);
           }
         }
+      } else if (kenyaNombaExclusive) {
+        // Kenya is Nomba-exclusive: fail cleanly instead of falling back to another rail.
+        payoutResult = {
+          success: false,
+          rail: "nomba",
+          error: "Nomba is not configured for Kenya payouts",
+          code: "partner_not_configured",
+          force_rail: "nomba_exclusive",
+        };
       } else if (forceFincraOnly || fincraExclusiveCorridor) {
+
         // Zambia MoMo (and ops force_rail): Fincra only — Nomba has no ZMW corridor.
         // Ledger reverses inside fincra-payout when skip_reversal is false.
         if (!fincraConfigured) {
