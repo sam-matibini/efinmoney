@@ -221,15 +221,26 @@ export async function fetchNombaCheckoutTransaction(params: {
   const details = (data.transactionDetails && typeof data.transactionDetails === "object")
     ? data.transactionDetails as Record<string, unknown>
     : {};
-  const statusCode = String(details.statusCode ?? data.status ?? data.message ?? "").toLowerCase();
+  const statusCode = String(details.statusCode ?? data.status ?? "").toLowerCase();
+  const dataMessage = String(data.message ?? details.message ?? "").toLowerCase();
   const successFlag = String(data.success ?? "").toLowerCase();
-  const paid = successFlag === "true"
-    || successFlag === "1"
-    || statusCode === "00"
-    || statusCode.includes("approved")
+  // Explicit unpaid / missing payment — never treat API envelope "description: success" as paid.
+  const explicitUnpaid = successFlag === "false"
+    || successFlag === "0"
+    || dataMessage.includes("no transaction")
+    || statusCode.includes("no transaction")
+    || statusCode.includes("pending")
+    || statusCode.includes("cancel")
+    || statusCode.includes("fail")
+    || statusCode.includes("unpaid");
+  const bySuccessFlag = successFlag === "true" || successFlag === "1";
+  const byStatus00 = statusCode === "00";
+  const byStatusWord = statusCode.includes("approved")
     || statusCode.includes("success")
     || statusCode.includes("paid")
-    || String(json?.description || "").toLowerCase().includes("success");
+    || statusCode.includes("complete");
+  // Do NOT use json.description — Nomba returns description:"success"/"Successful" for any OK lookup.
+  const paid = !explicitUnpaid && (bySuccessFlag || byStatus00 || byStatusWord);
   return { ok, status, json, paid };
 }
 

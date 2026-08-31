@@ -42,6 +42,27 @@ Deno.serve(async (req) => {
   }
 
   try {
+    // Raw OAuth probe so support gets the exact Nomba JSON (not just HTTP status).
+    const checkoutBase = getNombaCheckoutApiBase();
+    const proxySecret = (Deno.env.get("NOMBA_PROXY_SECRET") || "").trim();
+    const sendProxySecret = !!proxySecret && checkoutBase === cfg.apiBase;
+    const oauthRes = await fetch(`${checkoutBase}/v1/auth/token/issue`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        accountId: cfg.accountId,
+        ...(sendProxySecret ? { "x-proxy-secret": proxySecret } : {}),
+      },
+      body: JSON.stringify({
+        grant_type: "client_credentials",
+        client_id: cfg.clientId,
+        client_secret: cfg.clientSecret,
+      }),
+    });
+    const oauthJson = await oauthRes.json().catch(() => ({}));
+    result.oauthHttpStatus = oauthRes.status;
+    result.oauthRaw = oauthJson;
+
     const token = await getNombaAccessToken();
     result.ok = true;
     result.oauth = "ok";
@@ -80,6 +101,9 @@ Deno.serve(async (req) => {
         customerEmail: "sam@efintax.biz",
       });
       result.checkout = created;
+      if (!created.ok && "raw" in created) {
+        result.checkoutRaw = (created as { raw?: unknown }).raw;
+      }
     }
 
     return new Response(JSON.stringify(result), {

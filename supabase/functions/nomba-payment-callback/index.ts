@@ -291,20 +291,20 @@ async function handleBrowserReturn(req: Request, supabase: SupabaseAdmin): Promi
     return Response.redirect(buildReturnUrl(txn, "failed"), 302);
   }
 
-  const eventPayload = Object.fromEntries(url.searchParams.entries());
-  const result = await completeNombaCollection(
-    supabase,
-    txn,
-    orderId || String(txn.order_id || ""),
-    eventPayload,
-  );
-
-  if (!result.ok) {
-    console.error("nomba browser return credit failed:", result.error);
-    return Response.redirect(buildReturnUrl(txn, "failed"), 302);
+  // Never credit on browser return without Nomba confirming payment.
+  // Cancel/close often returns with orderId but no failure status — that used to fake-complete.
+  if (txn.status === "completed") {
+    return Response.redirect(buildReturnUrl(txn, "success"), 302);
   }
 
-  return Response.redirect(buildReturnUrl(txn, "success"), 302);
+  await supabase.from("nomba_pay_transactions").update({
+    last_event: {
+      ...Object.fromEntries(url.searchParams.entries()),
+      note: "browser_return_unverified_no_credit",
+    },
+  }).eq("id", txn.id);
+
+  return Response.redirect(buildReturnUrl(txn, "failed"), 302);
 }
 
 Deno.serve(async (req) => {
@@ -341,6 +341,8 @@ Deno.serve(async (req) => {
               { ...Object.fromEntries(url.searchParams.entries()), nomba_verify: fetched.json },
             );
             if (result.ok) return Response.redirect(buildReturnUrl(txn, "success"), 302);
+          } else if (txn?.status === "completed") {
+            return Response.redirect(buildReturnUrl(txn, "success"), 302);
           }
         }
       } catch (e) {

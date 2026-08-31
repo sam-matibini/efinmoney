@@ -516,9 +516,10 @@ const TopUpPage = () => {
             toast.success("Top-up complete");
             void queryClient.invalidateQueries({ queryKey: ["wallets"] });
           } else {
+            clearPendingNombaTxn();
             setVerifyState({
               status: "failed",
-              message: data?.error || "Payment not confirmed yet. If you were charged, contact support.",
+              message: data?.error || "Payment was not completed. No money was taken.",
             });
           }
         } catch (e) {
