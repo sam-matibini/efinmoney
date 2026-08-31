@@ -592,8 +592,13 @@ Deno.serve(async (req) => {
 
     let engineRouted = false;
     // Zambia MoMo and ops force_rail skip the routing engine — Fincra-only for ZMW.
+    // Kenya skips it too — Nomba-exclusive corridor.
     // Admin / code-default payout rails also skip the scoring engine (explicit ops choice).
-    if (!forceFincraOnly && !fincraExclusiveCorridor && !zambiaMomo && policyRails.length === 0) {
+    if (
+      !forceFincraOnly && !fincraExclusiveCorridor && !zambiaMomo
+      && !kenyaNombaExclusive && policyRails.length === 0
+    ) {
+
 
       try {
         const dispatch = await dispatchRoutedPayout(supabase, routeRequest, {
