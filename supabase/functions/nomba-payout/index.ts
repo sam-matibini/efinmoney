@@ -128,6 +128,28 @@ function isPendingStatus(status: string): boolean {
     || s.startsWith("PENDING");
 }
 
+/** Nomba Global Payout requires first + last name on receiverName. */
+function ensureNombaReceiverName(raw: string): string {
+  const parts = String(raw || "").trim().split(/\s+/).filter(Boolean);
+  if (parts.length >= 2) return parts.slice(0, 6).join(" ");
+  if (parts.length === 1) return `${parts[0]} Beneficiary`;
+  return "Wallet Beneficiary";
+}
+
+/** Pull Nomba's real error text (they often return { errors: [...] } with no description). */
+function nombaFailureReason(json: unknown, fallback: string): string {
+  if (!json || typeof json !== "object") return fallback;
+  const j = json as Record<string, unknown>;
+  if (Array.isArray(j.errors) && j.errors.length) {
+    return j.errors.map((e) => String(e)).join("; ").slice(0, 500);
+  }
+  const data = j.data && typeof j.data === "object" ? j.data as Record<string, unknown> : null;
+  if (data && Array.isArray(data.errors) && data.errors.length) {
+    return data.errors.map((e) => String(e)).join("; ").slice(0, 500);
+  }
+  return String(j.description || j.message || data?.message || fallback).slice(0, 500);
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
@@ -184,7 +206,7 @@ Deno.serve(async (req) => {
       }, 400);
     }
 
-    const accountName = String(transfer.recipient_name || "Recipient").trim();
+    const accountName = ensureNombaReceiverName(String(transfer.recipient_name || "Recipient"));
     const narrative = String(transfer.description || `Transfer to ${accountName}`).slice(0, 120);
     const reference = `nomba-payout-${transfer_id}`;
     const senderId = transfer.sender_id as string;
@@ -313,7 +335,7 @@ Deno.serve(async (req) => {
       });
 
       if (!result.ok) {
-        const reason = String(result.json?.description || result.json?.message || "Nomba NGN bank payout failed");
+        const reason = nombaFailureReason(result.json, "Nomba NGN bank payout failed");
         await supabase.from("nomba_payout_transactions").update({
           status: "failed",
           failure_reason: reason.slice(0, 500),
@@ -392,7 +414,7 @@ Deno.serve(async (req) => {
 
       const result = await authorizeNombaGlobalTransfer(payload);
       if (!result.ok) {
-        const reason = String(result.json?.description || result.json?.message || "Nomba Interac payout failed");
+        const reason = nombaFailureReason(result.json, "Nomba Interac payout failed");
         await supabase.from("nomba_payout_transactions").update({
           status: "failed",
           failure_reason: reason.slice(0, 500),
@@ -485,11 +507,11 @@ Deno.serve(async (req) => {
 
       const result = await authorizeNombaGlobalTransfer(payload);
       if (!result.ok) {
-        const reason = String(
-          result.json?.description
-          || result.json?.message
-          || result.json?.data?.message
-          || (result.transactionId ? `Nomba MoMo status ${result.transferStatus}` : "Nomba MoMo payout failed (no transaction id returned)"),
+        const reason = nombaFailureReason(
+          result.json,
+          result.transactionId
+            ? `Nomba MoMo status ${result.transferStatus}`
+            : "Nomba MoMo payout failed (no transaction id returned)",
         );
         await supabase.from("nomba_payout_transactions").update({
           status: "failed",
@@ -602,7 +624,7 @@ Deno.serve(async (req) => {
 
     const result = await authorizeNombaGlobalTransfer(payload);
     if (!result.ok) {
-      const reason = String(result.json?.description || result.json?.message || "Nomba bank payout failed");
+      const reason = nombaFailureReason(result.json, "Nomba bank payout failed");
       await supabase.from("nomba_payout_transactions").update({
         status: "failed",
         failure_reason: reason.slice(0, 500),
