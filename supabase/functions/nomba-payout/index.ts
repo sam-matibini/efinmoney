@@ -20,6 +20,26 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
+/** Pull a usable source→destination rate out of Nomba's exchange-rates payload. */
+function extractNombaRate(payload: unknown): number | null {
+  if (!payload || typeof payload !== "object") return null;
+  const data = (payload as Record<string, unknown>).data ?? payload;
+  const rows: unknown[] = Array.isArray(data)
+    ? data
+    : Array.isArray((data as Record<string, unknown>)?.rates)
+      ? ((data as Record<string, unknown>).rates as unknown[])
+      : [data];
+  for (const row of rows) {
+    if (!row || typeof row !== "object") continue;
+    const r = row as Record<string, unknown>;
+    for (const key of ["rate", "exchangeRate", "sellRate", "buyRate", "value"]) {
+      const n = Number(r[key]);
+      if (Number.isFinite(n) && n > 0) return n;
+    }
+  }
+  return null;
+}
+
 const DIAL_BY_COUNTRY: Record<string, string> = {
   NG: "234",
   KE: "254",
