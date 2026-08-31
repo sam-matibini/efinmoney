@@ -20,6 +20,26 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
+/** Pull a usable source→destination rate out of Nomba's exchange-rates payload. */
+function extractNombaRate(payload: unknown): number | null {
+  if (!payload || typeof payload !== "object") return null;
+  const data = (payload as Record<string, unknown>).data ?? payload;
+  const rows: unknown[] = Array.isArray(data)
+    ? data
+    : Array.isArray((data as Record<string, unknown>)?.rates)
+      ? ((data as Record<string, unknown>).rates as unknown[])
+      : [data];
+  for (const row of rows) {
+    if (!row || typeof row !== "object") continue;
+    const r = row as Record<string, unknown>;
+    for (const key of ["rate", "exchangeRate", "sellRate", "buyRate", "value"]) {
+      const n = Number(r[key]);
+      if (Number.isFinite(n) && n > 0) return n;
+    }
+  }
+  return null;
+}
+
 const DIAL_BY_COUNTRY: Record<string, string> = {
   NG: "234",
   KE: "254",
@@ -160,29 +180,76 @@ Deno.serve(async (req) => {
     const reference = `nomba-payout-${transfer_id}`;
     const senderId = transfer.sender_id as string;
 
-    // Prefer debiting Nomba in destination ccy (same-currency). Ops can force a float ccy.
+    // Debit currency must be a pair Nomba can actually trade for our account's
+    // trade region (NG). The customer's wallet currency (e.g. CAD) is NOT a valid
+    // Nomba debit currency — CAD/KES returns 404 "Neither CAD/KES nor KES/CAD is found".
     const forcedSource = (Deno.env.get("NOMBA_PAYOUT_SOURCE_CURRENCY") || "").trim().toUpperCase();
-    let payoutSourceCurrency = forcedSource || (
-      kind === "domestic_ngn" ? "NGN" : targetCurrency
-    );
-    // Cross-wallet send: if Nomba float override not set, use transfer source when different.
-    if (!forcedSource && sourceCurrencyWallet !== targetCurrency && kind !== "domestic_ngn") {
-      payoutSourceCurrency = sourceCurrencyWallet;
-    }
-
+    let payoutSourceCurrency = kind === "domestic_ngn" ? "NGN" : targetCurrency;
     let payoutAmount = Number(transfer.target_amount ?? 0);
     let lockedExchangeRateId: string | undefined;
-    if (payoutSourceCurrency !== targetCurrency) {
-      payoutAmount = Number(transfer.source_amount ?? transfer.target_amount ?? 0);
-      const rates = await fetchNombaExchangeRates({
-        sourceCurrency: payoutSourceCurrency,
-        destinationCurrency: targetCurrency,
-      });
-      if (rates.exchangeRateId) lockedExchangeRateId = rates.exchangeRateId;
+
+    if (kind !== "domestic_ngn") {
+      const candidates: string[] = [];
+      const push = (c?: string | null) => {
+        const v = String(c || "").trim().toUpperCase();
+        if (v && !candidates.includes(v)) candidates.push(v);
+      };
+      push(forcedSource);
+      push(targetCurrency); // same-currency debit (KES/KES) — no FX pair needed
+      push("NGN"); // NG trade-region float
+      // Only try the wallet currency last; usually unsupported from an NG account.
+      push(sourceCurrencyWallet);
+
+      const tried: string[] = [];
+      let resolved: { ccy: string; amount: number; rateId?: string } | null = null;
+
+      for (const ccy of candidates) {
+        if (ccy === targetCurrency) {
+          resolved = { ccy, amount: Number(transfer.target_amount ?? 0) };
+          break;
+        }
+        tried.push(`${ccy}/${targetCurrency}`);
+        let rates;
+        try {
+          rates = await fetchNombaExchangeRates({
+            sourceCurrency: ccy,
+            destinationCurrency: targetCurrency,
+          });
+        } catch (e) {
+          console.error("nomba exchange-rates failed", ccy, targetCurrency, e);
+          continue;
+        }
+        const rate = extractNombaRate(rates.json);
+        if (!rates.ok || !rate || rate <= 0) {
+          console.log("nomba pair unavailable", ccy, targetCurrency, JSON.stringify(rates.json)?.slice(0, 300));
+          continue;
+        }
+        const target = Number(transfer.target_amount ?? 0);
+        const debitAmount = Number((target / rate).toFixed(2));
+        if (!debitAmount || debitAmount <= 0) continue;
+        resolved = { ccy, amount: debitAmount, rateId: rates.exchangeRateId ?? undefined };
+        break;
+      }
+
+      if (!resolved) {
+        return json({
+          success: false,
+          error: `Nomba has no tradable currency pair for ${targetCurrency} (tried ${tried.join(", ") || targetCurrency})`,
+          code: "pair_unavailable",
+          rail: "nomba",
+          pairs_tried: tried,
+        }, 502);
+      }
+
+      payoutSourceCurrency = resolved.ccy;
+      payoutAmount = resolved.amount;
+      lockedExchangeRateId = resolved.rateId;
     }
+
     if (!payoutAmount || payoutAmount <= 0) {
       return json({ success: false, error: "Invalid payout amount", rail: "nomba" }, 400);
     }
+
 
     // ── Domestic NGN bank ─────────────────────────────────────────────
     if (kind === "domestic_ngn") {
