@@ -135,6 +135,22 @@ function isPendingStatus(status: string): boolean {
     || s.startsWith("PENDING");
 }
 
+/** Nomba often returns status=PROCESSING with coreStatus=PAYMENT_SUCCESSFUL. */
+function nombaRawIndicatesDelivered(raw: unknown): boolean {
+  if (!raw || typeof raw !== "object") return false;
+  const json = raw as Record<string, unknown>;
+  const data = (json.data && typeof json.data === "object")
+    ? json.data as Record<string, unknown>
+    : json;
+  const core = String(data.coreStatus || "").toUpperCase();
+  const pretty = String(data.prettyStatus || "").toUpperCase().trim();
+  const st = String(data.status || "").toUpperCase().trim();
+  if (core === "PAYMENT_SUCCESSFUL" || core.includes("PAYMENT_SUCCESS")) return true;
+  if (pretty === "SUCCESSFUL" || pretty === "SUCCESS" || pretty === "COMPLETED") return true;
+  if (st === "COMPLETED" || st === "SUCCESS" || st === "SUCCESSFUL" || st === "SETTLED") return true;
+  return false;
+}
+
 /** Nomba Global Payout requires first + last name on receiverName. */
 function ensureNombaReceiverName(raw: string): string {
   const parts = String(raw || "").trim().split(/\s+/).filter(Boolean);
@@ -708,7 +724,7 @@ async function finalizeSuccess(
     status: string;
   },
 ) {
-  const done = isTerminalSuccess(opts.status);
+  const done = isTerminalSuccess(opts.status) || nombaRawIndicatesDelivered(opts.raw);
   const pending = !done && isPendingStatus(opts.status);
   const completedAt = new Date().toISOString();
 
