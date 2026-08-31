@@ -27,14 +27,21 @@ function extractNombaRate(payload: unknown): number | null {
   const rows: unknown[] = Array.isArray(data)
     ? data
     : Array.isArray((data as Record<string, unknown>)?.rates)
-      ? ((data as Record<string, unknown>).rates as unknown[])
-      : [data];
+    ? ((data as Record<string, unknown>).rates as unknown[])
+    : [data];
+  const parse = (v: unknown): number | null => {
+    if (typeof v === "number" && Number.isFinite(v) && v > 0) return v;
+    const s = String(v ?? "").replace(/[^0-9.]/g, "");
+    const n = Number(s);
+    return Number.isFinite(n) && n > 0 ? n : null;
+  };
   for (const row of rows) {
     if (!row || typeof row !== "object") continue;
     const r = row as Record<string, unknown>;
-    for (const key of ["rate", "exchangeRate", "sellRate", "buyRate", "value"]) {
-      const n = Number(r[key]);
-      if (Number.isFinite(n) && n > 0) return n;
+    // Nomba docs return midRate/askRate/bidRate (often "$1.13" strings).
+    for (const key of ["midRate", "askRate", "bidRate", "rate", "exchangeRate", "sellRate", "buyRate", "value"]) {
+      const n = parse(r[key]);
+      if (n) return n;
     }
   }
   return null;
@@ -227,22 +234,18 @@ Deno.serve(async (req) => {
       };
       push(forcedSource);
       // Prefer the float that matches the customer's funded wallet, then NG-region
-      // NGN/USD (Nomba's Kenya docs use USD→KES). Same-currency dest (KES/KES) is
-      // last — we rarely hold KES float even when paying out KES MoMo.
+      // NGN/USD (Nomba's Kenya docs use USD→KES). Never invent a dest-currency float
+      // we don't hold (KES/KES fails for trade region NG).
       push(sourceCurrencyWallet);
       push("NGN");
       push("USD");
-      push(targetCurrency);
 
       const tried: string[] = [];
+      const tryNotes: string[] = [];
       let resolved: { ccy: string; amount: number; rateId?: string } | null = null;
 
       for (const ccy of candidates) {
-        if (ccy === targetCurrency) {
-          // Only use same-currency if nothing else worked — keep as last-resort candidate
-          // by skipping here and applying after the loop if still unresolved.
-          continue;
-        }
+        if (ccy === targetCurrency) continue; // same-currency only handled below when wallet matches
         tried.push(`${ccy}/${targetCurrency}`);
         let rates;
         try {
@@ -251,33 +254,55 @@ Deno.serve(async (req) => {
             destinationCurrency: targetCurrency,
           });
         } catch (e) {
+          tryNotes.push(`${ccy}/${targetCurrency}: fetch error`);
           console.error("nomba exchange-rates failed", ccy, targetCurrency, e);
           continue;
         }
-        const rate = extractNombaRate(rates.json);
-        if (!rates.ok || !rates.exchangeRateId || !rate || rate <= 0) {
+        if (!rates.exchangeRateId) {
+          tryNotes.push(`${ccy}/${targetCurrency}: no exchangeRateId (${rates.json?.description || rates.json?.code || rates.status})`);
           console.log("nomba pair unavailable", ccy, targetCurrency, JSON.stringify(rates.json)?.slice(0, 300));
+          continue;
+        }
+
+        // When debiting the customer's wallet currency, use their source_amount
+        // (Authorize Transfer amount is in source currency per Nomba docs).
+        if (ccy === sourceCurrencyWallet) {
+          const debit = Number(transfer.source_amount ?? 0);
+          if (debit > 0) {
+            resolved = { ccy, amount: debit, rateId: rates.exchangeRateId };
+            break;
+          }
+        }
+
+        const rate = extractNombaRate(rates.json);
+        if (!rate || rate <= 0) {
+          tryNotes.push(`${ccy}/${targetCurrency}: have rateId but could not parse mid/ask/bid`);
           continue;
         }
         const target = Number(transfer.target_amount ?? 0);
         const debitAmount = Number((target / rate).toFixed(2));
-        if (!debitAmount || debitAmount <= 0) continue;
+        if (!debitAmount || debitAmount <= 0) {
+          tryNotes.push(`${ccy}/${targetCurrency}: bad debit from target/rate`);
+          continue;
+        }
         resolved = { ccy, amount: debitAmount, rateId: rates.exchangeRateId };
         break;
       }
 
-      if (!resolved && candidates.includes(targetCurrency)) {
-        resolved = { ccy: targetCurrency, amount: Number(transfer.target_amount ?? 0) };
+      // Same-currency only if the sender wallet IS that currency (real float).
+      if (!resolved && sourceCurrencyWallet === targetCurrency) {
+        resolved = { ccy: targetCurrency, amount: Number(transfer.target_amount ?? transfer.source_amount ?? 0) };
         tried.push(`${targetCurrency}/${targetCurrency}`);
       }
 
       if (!resolved) {
         return json({
           success: false,
-          error: `Nomba has no tradable currency pair for ${targetCurrency} (tried ${tried.join(", ") || targetCurrency})`,
+          error: `Nomba has no tradable pair for ${targetCurrency} from trade region NG (tried ${tried.join(", ")}). ${tryNotes.slice(0, 3).join(" | ")}`,
           code: "pair_unavailable",
           rail: "nomba",
           pairs_tried: tried,
+          pair_notes: tryNotes,
         }, 502);
       }
 
