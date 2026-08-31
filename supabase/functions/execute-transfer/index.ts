@@ -541,6 +541,10 @@ Deno.serve(async (req) => {
     // Zambia MoMo is Fincra-exclusive: Nomba has no ZMW corridor.
     const zambiaMomo = isMobileMoneyMethod && (isZambia || targetCurrency === "ZMW");
     const fincraExclusiveCorridor = zambiaMomo;
+    // Kenya is Nomba-exclusive: no failover to Fincra/Flovide/Flutterwave/Paytota/Swychr.
+    const kenyaNombaExclusive =
+      (isKenya || targetCurrency === "KES") && transfer.payout_method !== "card_push";
+
 
 
     const paytotaMomoCurrencies = new Set(["UGX", "KES", "RWF"]);
