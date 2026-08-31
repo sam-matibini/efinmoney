@@ -335,15 +335,18 @@ export async function authorizeNombaGlobalTransfer(
   const transactionId = String(
     data.wtTransactionId || data.coreTransactionId || data.transactionId || data.id || "",
   ).trim() || null;
-  const prettyOk = /SUCCESS|COMPLETE|PROCESS|PENDING/i.test(transferStatus)
-    || String(data.prettyStatus || "").toLowerCase().includes("success")
-    || String(data.coreStatus || "").toUpperCase().includes("SUCCESS");
+  const statusLooksGood = /^(SUCCESS|SUCCESSFUL|COMPLETED|SETTLED|PROCESSING|PENDING|PENDING_BILLING|INITIATED)$/i
+    .test(transferStatus)
+    || /PAYMENT_SUCCESS/i.test(String(data.coreStatus || ""));
+  // Require a real Nomba transaction id — never treat empty/error envelopes as paid.
+  // (Do not use .includes("success") — "Unsuccessful" would match.)
+  const accepted = !!(ok && transactionId && statusLooksGood);
   return {
-    ok: ok || prettyOk,
+    ok: accepted,
     status,
     json,
     transactionId,
-    transferStatus: transferStatus || (ok ? "PROCESSING" : "FAILED"),
+    transferStatus: transferStatus || (accepted ? "PROCESSING" : "FAILED"),
   };
 }
 

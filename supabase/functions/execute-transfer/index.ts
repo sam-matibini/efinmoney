@@ -1163,7 +1163,13 @@ Deno.serve(async (req) => {
       });
 
       // Preferred rail failed but a backup paid — short FYI to ops (no action required).
-      if (railErrors.length > 0 && payoutResult?.rail) {
+      // Do NOT send this when we only held funds for ops (pending_ops) — that is not a payout.
+      if (
+        railErrors.length > 0
+        && payoutResult?.rail
+        && payoutResult?.pending_ops !== true
+        && payoutResult?.success === true
+      ) {
         const firstFail = railErrors[0] || "";
         const colon = firstFail.indexOf(":");
         const failedRail = colon > 0 ? firstFail.slice(0, colon).trim() : "unknown";

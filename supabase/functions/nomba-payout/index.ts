@@ -110,13 +110,22 @@ function json(body: unknown, status = 200) {
 }
 
 function isTerminalSuccess(status: string): boolean {
-  const s = status.toUpperCase();
-  return s === "SUCCESS" || s === "COMPLETED" || s === "SETTLED" || s.includes("SUCCESS");
+  const s = status.toUpperCase().trim();
+  // Exact / prefix matches only — never .includes("SUCCESS") (matches UNSUCCESSFUL).
+  return s === "SUCCESS"
+    || s === "SUCCESSFUL"
+    || s === "COMPLETED"
+    || s === "SETTLED"
+    || s === "PAYMENT_SUCCESSFUL";
 }
 
 function isPendingStatus(status: string): boolean {
-  const s = status.toUpperCase();
-  return s.includes("PROCESS") || s.includes("PENDING") || s === "INITIATED";
+  const s = status.toUpperCase().trim();
+  return s === "PROCESSING"
+    || s === "PENDING"
+    || s === "PENDING_BILLING"
+    || s === "INITIATED"
+    || s.startsWith("PENDING");
 }
 
 Deno.serve(async (req) => {
@@ -195,18 +204,22 @@ Deno.serve(async (req) => {
         if (v && !candidates.includes(v)) candidates.push(v);
       };
       push(forcedSource);
-      push(targetCurrency); // same-currency debit (KES/KES) — no FX pair needed
-      push("NGN"); // NG trade-region float
-      // Only try the wallet currency last; usually unsupported from an NG account.
+      // Prefer the float that matches the customer's funded wallet, then NG-region
+      // NGN/USD (Nomba's Kenya docs use USD→KES). Same-currency dest (KES/KES) is
+      // last — we rarely hold KES float even when paying out KES MoMo.
       push(sourceCurrencyWallet);
+      push("NGN");
+      push("USD");
+      push(targetCurrency);
 
       const tried: string[] = [];
       let resolved: { ccy: string; amount: number; rateId?: string } | null = null;
 
       for (const ccy of candidates) {
         if (ccy === targetCurrency) {
-          resolved = { ccy, amount: Number(transfer.target_amount ?? 0) };
-          break;
+          // Only use same-currency if nothing else worked — keep as last-resort candidate
+          // by skipping here and applying after the loop if still unresolved.
+          continue;
         }
         tried.push(`${ccy}/${targetCurrency}`);
         let rates;
@@ -220,15 +233,20 @@ Deno.serve(async (req) => {
           continue;
         }
         const rate = extractNombaRate(rates.json);
-        if (!rates.ok || !rate || rate <= 0) {
+        if (!rates.ok || !rates.exchangeRateId || !rate || rate <= 0) {
           console.log("nomba pair unavailable", ccy, targetCurrency, JSON.stringify(rates.json)?.slice(0, 300));
           continue;
         }
         const target = Number(transfer.target_amount ?? 0);
         const debitAmount = Number((target / rate).toFixed(2));
         if (!debitAmount || debitAmount <= 0) continue;
-        resolved = { ccy, amount: debitAmount, rateId: rates.exchangeRateId ?? undefined };
+        resolved = { ccy, amount: debitAmount, rateId: rates.exchangeRateId };
         break;
+      }
+
+      if (!resolved && candidates.includes(targetCurrency)) {
+        resolved = { ccy: targetCurrency, amount: Number(transfer.target_amount ?? 0) };
+        tried.push(`${targetCurrency}/${targetCurrency}`);
       }
 
       if (!resolved) {
@@ -467,7 +485,12 @@ Deno.serve(async (req) => {
 
       const result = await authorizeNombaGlobalTransfer(payload);
       if (!result.ok) {
-        const reason = String(result.json?.description || result.json?.message || "Nomba MoMo payout failed");
+        const reason = String(
+          result.json?.description
+          || result.json?.message
+          || result.json?.data?.message
+          || (result.transactionId ? `Nomba MoMo status ${result.transferStatus}` : "Nomba MoMo payout failed (no transaction id returned)"),
+        );
         await supabase.from("nomba_payout_transactions").update({
           status: "failed",
           failure_reason: reason.slice(0, 500),
@@ -481,6 +504,8 @@ Deno.serve(async (req) => {
           provider_message: reason,
           nomba_raw: result.json,
           raw_response: result.json,
+          payout_source_currency: payoutSourceCurrency,
+          payout_amount: payoutAmount,
         }, 502);
       }
 
