@@ -36,6 +36,7 @@ type NavGroup = {
 
 const TOP_NAV: NavItem[] = [
   { to: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { to: "/admin/simple", label: "Simple admin", icon: PanelLeft },
   { to: "/admin/board-dashboard", label: "Board", icon: Gauge },
   { to: "/admin/portal", label: "My portal", icon: CircleUser },
 ];
@@ -47,6 +48,7 @@ const NAV_GROUPS: NavGroup[] = [
     defaultOpen: true,
     emphasize: true,
     items: [
+      { to: "/admin/nomba-fincra", label: "Nomba & Fincra", icon: CreditCard },
       { to: "/admin/pricing?tab=partners", label: "Corridor rails", icon: Route },
       { to: "/admin/ops-queue", label: "Ops queue", icon: Scale },
       { to: "/admin/pricing?tab=rate-card", label: "Rate card", icon: Tags },

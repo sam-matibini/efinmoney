@@ -13,7 +13,7 @@ import AddCardModal from "@/components/modals/AddCardModal";
 import CreateWalletModal from "@/components/modals/CreateWalletModal";
 import TopUpModal from "@/components/modals/TopUpModal";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { useBeneficiaries, recordTransferRecipient, type Beneficiary } from "@/hooks/useBeneficiaries";
+import { useBeneficiaries, recordTransferRecipient, isCanadaBeneficiary, type Beneficiary } from "@/hooks/useBeneficiaries";
 import { useAuth } from "@/hooks/useAuth";
 
 import BackToDashboard from "@/components/layout/BackToDashboard";
@@ -240,6 +240,12 @@ const SendPage = () => {
   const [ghBankCode, setGhBankCode] = useState<string>("");
   const [ghBankSearch, setGhBankSearch] = useState("");
   const [ghAccountNumber, setGhAccountNumber] = useState<string>("");
+  // Canada international payout (NGN/USD → CAD): Interac email or EFT bank details.
+  const [cadPayoutMode, setCadPayoutMode] = useState<"interac" | "eft">("interac");
+  const [caInstitutionNumber, setCaInstitutionNumber] = useState("");
+  const [caTransitNumber, setCaTransitNumber] = useState("");
+  const [caAccountNumber, setCaAccountNumber] = useState("");
+  const [caBankName, setCaBankName] = useState("");
   // International "send a secure link" — recipient gets an emailed claim link and
   // enters their own payout details (no card details handled by the sender).
   const [intlLinkMode, setIntlLinkMode] = useState(false);
@@ -411,6 +417,11 @@ const SendPage = () => {
     setGhBankCode("");
     setGhAccountNumber("");
     setIntlLinkMode(false);
+    setCadPayoutMode("interac");
+    setCaInstitutionNumber("");
+    setCaTransitNumber("");
+    setCaAccountNumber("");
+    setCaBankName("");
   }, [targetCountryId, pendingBeneficiary]);
 
   const isNGNBank = targetCountry.code === "NGN";
@@ -422,6 +433,7 @@ const SendPage = () => {
   const linkWallet = (wallets || []).find((w) => w.currency_code === targetCountry.code);
   const linkEligible = productFeatures.paymentLinks && isClaimCardCurrency(targetCountry.code) && !!linkWallet;
   const useLink = linkEligible && intlLinkMode;
+  const isCanadaIntlPayout = targetCountry.code === "CAD" && !useLink;
 
   // Fetch Nigerian banks list when NGN destination is selected (Nomba primary, FLW fallback)
   useEffect(() => {
@@ -538,7 +550,9 @@ const SendPage = () => {
   const parsedAmount = Math.max(0, parseAmount(amount));
 
   // --- Canonical pricing (central rate card via price-quote) ---
-  const destPayoutMethod = isBankPayout ? 'bank' : 'mobile_money';
+  const destPayoutMethod = isCanadaIntlPayout
+    ? (cadPayoutMode === "interac" ? "interac" : "eft")
+    : isBankPayout ? "bank" : "mobile_money";
   const { data: priceQuote } = usePriceQuote({
     direction: 'payout',
     sourceCurrency,
@@ -808,6 +822,12 @@ const SendPage = () => {
     const bankAcct = isNGNBank ? ngnAcct : isGhanaBank ? ghAcct : "";
     const bankCode = isNGNBank ? ngnBankCode : isGhanaBank ? ghBankCode : "";
     const bankName = isNGNBank ? ngnBank : isGhanaBank ? ghBank : null;
+    const canadaPayoutMethod = cadPayoutMode === "interac" ? "interac" : "eft";
+    const canadaAcct = isCanadaIntlPayout
+      ? (cadPayoutMode === "interac"
+        ? recipientEmail.trim()
+        : `${caInstitutionNumber.replace(/\D/g, "")}-${caTransitNumber.replace(/\D/g, "")}-${caAccountNumber.replace(/\D/g, "")}`)
+      : "";
     const funding = overrides?.funding_source ?? fundingSource;
     const walletId =
       overrides?.sender_wallet_id
@@ -832,13 +852,13 @@ const SendPage = () => {
     const transfer = await createTransfer.mutateAsync({
       sender_wallet_id: walletId,
       recipient_name: overrides?.recipient_name ?? recipientName,
-      recipient_phone: overrides?.recipient_phone ?? (isBankPayout ? undefined : recipientPhone),
-      recipient_account: overrides?.recipient_account ?? (isBankPayout ? bankAcct : undefined),
-      recipient_bank_code: overrides?.recipient_bank_code ?? (isBankPayout ? bankCode : undefined),
-      recipient_bank_name: overrides?.recipient_bank_name ?? (isBankPayout ? (bankName || undefined) : undefined),
+      recipient_phone: overrides?.recipient_phone ?? (isBankPayout || isCanadaIntlPayout ? undefined : recipientPhone),
+      recipient_account: overrides?.recipient_account ?? (isBankPayout ? bankAcct : isCanadaIntlPayout ? canadaAcct : undefined),
+      recipient_bank_code: overrides?.recipient_bank_code ?? (isBankPayout ? bankCode : isCanadaIntlPayout && cadPayoutMode === "eft" ? caInstitutionNumber.replace(/\D/g, "") : undefined),
+      recipient_bank_name: overrides?.recipient_bank_name ?? (isBankPayout ? (bankName || undefined) : isCanadaIntlPayout && cadPayoutMode === "eft" ? (caBankName.trim() || undefined) : undefined),
       recipient_country: destCountryIso,
-      transfer_type: overrides?.transfer_type ?? (isBankPayout ? "bank" : "mobile_money"),
-      payout_method: overrides?.payout_method ?? (isBankPayout ? "bank" : effectivePayoutMethod),
+      transfer_type: overrides?.transfer_type ?? (isBankPayout || isCanadaIntlPayout ? "bank" : "mobile_money"),
+      payout_method: overrides?.payout_method ?? (isBankPayout ? "bank" : isCanadaIntlPayout ? canadaPayoutMethod : effectivePayoutMethod),
       source_currency: overrides?.source_currency ?? sourceCurrency,
       target_currency: destCurrency,
       source_amount: overrides?.source_amount ?? parsedAmount,
@@ -857,18 +877,23 @@ const SendPage = () => {
     setLastTransferId(transfer.id);
     if (user) {
       try {
-        const tType = overrides?.transfer_type ?? (isBankPayout ? "bank" : "mobile_money");
+        const tType = overrides?.transfer_type ?? (isBankPayout || isCanadaIntlPayout ? "bank" : "mobile_money");
         const { isNew } = await recordTransferRecipient({
           user_id: user.id,
           name: overrides?.recipient_name ?? recipientName,
-          phone: tType === "bank" ? "" : (overrides?.recipient_phone ?? recipientPhone),
+          phone: tType === "bank" || isCanadaIntlPayout ? "" : (overrides?.recipient_phone ?? recipientPhone),
           country_code: overrides?.recipient_country ?? destCurrency,
-          payout_method: overrides?.payout_method ?? (isBankPayout ? "bank" : effectivePayoutMethod),
-          network: tType === "bank" ? null : (activeNetwork?.id || null),
+          payout_method: overrides?.payout_method ?? (isBankPayout ? "bank" : isCanadaIntlPayout ? canadaPayoutMethod : effectivePayoutMethod),
+          network: tType === "bank" || isCanadaIntlPayout ? null : (activeNetwork?.id || null),
           currency_code: destCurrency,
-          bank_name: overrides?.recipient_bank_name ?? (isBankPayout ? bankName : null),
-          bank_account: overrides?.recipient_account ?? (isBankPayout ? bankAcct : null),
+          bank_name: overrides?.recipient_bank_name ?? (isBankPayout ? bankName : isCanadaIntlPayout && cadPayoutMode === "eft" ? (caBankName.trim() || null) : null),
+          bank_account: overrides?.recipient_account ?? (isBankPayout ? bankAcct : isCanadaIntlPayout && cadPayoutMode === "eft" ? caAccountNumber.replace(/\D/g, "") : null),
           bank_code: overrides?.recipient_bank_code ?? (isNGNBank ? ngnBankCode : null),
+          interac_email: isCanadaIntlPayout && cadPayoutMode === "interac" ? recipientEmail.trim() : null,
+          eft_institution: isCanadaIntlPayout && cadPayoutMode === "eft" ? caInstitutionNumber.replace(/\D/g, "") : null,
+          eft_transit: isCanadaIntlPayout && cadPayoutMode === "eft" ? caTransitNumber.replace(/\D/g, "") : null,
+          eft_account: isCanadaIntlPayout && cadPayoutMode === "eft" ? caAccountNumber.replace(/\D/g, "") : null,
+          eft_account_holder: isCanadaIntlPayout ? recipientName.trim() : null,
         } as any);
         if (isNew) {
           toast.success("Saved as a contact");
@@ -1217,7 +1242,7 @@ const SendPage = () => {
             amount: totalCharge,
             target_wallet_id: selectedWallet.wallet_id,
             email: user.email,
-            corridor: "nigeria",
+            corridor: sourceCurrency === "NGN" ? "nigeria" : "international",
             return_url: returnUrl,
           });
           if (!collection.payment_link) {
@@ -1359,6 +1384,11 @@ const SendPage = () => {
     setNgnBankCode("");
     setGhAccountNumber("");
     setGhBankCode("");
+    setCadPayoutMode("interac");
+    setCaInstitutionNumber("");
+    setCaTransitNumber("");
+    setCaAccountNumber("");
+    setCaBankName("");
     setSelectedNetworkId(null);
   }, []);
 
@@ -1383,6 +1413,18 @@ const SendPage = () => {
         setGhAccountNumber(String(b.bank_account).replace(/\D/g, "").slice(0, 20));
       }
       if (b.bank_code) setGhBankCode(String(b.bank_code));
+    }
+    if (b.country_code === "CAD" || isCanadaBeneficiary(b)) {
+      if (b.interac_email || b.payout_method === "interac") {
+        setCadPayoutMode("interac");
+        if (b.interac_email || b.email) setRecipientEmail(b.interac_email || b.email || "");
+      } else if (b.eft_account || b.payout_method === "eft") {
+        setCadPayoutMode("eft");
+        if (b.eft_institution) setCaInstitutionNumber(String(b.eft_institution).replace(/\D/g, "").slice(0, 3));
+        if (b.eft_transit) setCaTransitNumber(String(b.eft_transit).replace(/\D/g, "").slice(0, 5));
+        if (b.eft_account) setCaAccountNumber(String(b.eft_account).replace(/\D/g, ""));
+        if (b.bank_name) setCaBankName(b.bank_name);
+      }
     }
     if (b.country_code) {
       const c = findCountryByCode(b.country_code);
@@ -1454,6 +1496,23 @@ const SendPage = () => {
           else allApplied = false;
         }
       }
+    } else if (targetCountry.code === "CAD") {
+      if (b.interac_email || b.email) {
+        setCadPayoutMode("interac");
+        if (!recipientEmail) setRecipientEmail(b.interac_email || b.email || "");
+      } else if (b.eft_account) {
+        setCadPayoutMode("eft");
+        if (b.eft_institution && !caInstitutionNumber) {
+          setCaInstitutionNumber(String(b.eft_institution).replace(/\D/g, "").slice(0, 3));
+        }
+        if (b.eft_transit && !caTransitNumber) {
+          setCaTransitNumber(String(b.eft_transit).replace(/\D/g, "").slice(0, 5));
+        }
+        if (!caAccountNumber) {
+          setCaAccountNumber(String(b.eft_account).replace(/\D/g, ""));
+        }
+        if (b.bank_name && !caBankName) setCaBankName(b.bank_name);
+      }
     } else if (b.network || b.payout_method) {
       if (!availableNetworks || availableNetworks.length === 0) {
         // No network picker for this corridor — nothing further to apply.
@@ -1495,13 +1554,20 @@ const SendPage = () => {
       const bank = ghBanks.find((x) => x.code === ghBankCode)?.name;
       if (bank) parts.push(bank);
       if (ghAccountNumber) parts.push(ghAccountNumber);
+    } else if (isCanadaIntlPayout) {
+      if (cadPayoutMode === "interac") {
+        if (recipientEmail) parts.push(recipientEmail);
+      } else {
+        if (caInstitutionNumber && caTransitNumber) parts.push(`${caInstitutionNumber}-${caTransitNumber}`);
+        if (caAccountNumber) parts.push(`···${caAccountNumber.slice(-4)}`);
+      }
     } else {
       if (activeNetwork?.label) parts.push(activeNetwork.label);
       if (recipientPhone) parts.push(recipientPhone);
     }
     if (parts.length === 0) return "Couldn't prefill payout details — please enter them below";
     return parts.join(" · ");
-  }, [pickedBeneficiaryId, isNGNBank, isGhanaBank, ngnBanks, ngnBankCode, ngnAccountNumber, ghBanks, ghBankCode, ghAccountNumber, activeNetwork, recipientPhone]);
+  }, [pickedBeneficiaryId, isNGNBank, isGhanaBank, isCanadaIntlPayout, cadPayoutMode, ngnBanks, ngnBankCode, ngnAccountNumber, ghBanks, ghBankCode, ghAccountNumber, caInstitutionNumber, caTransitNumber, caAccountNumber, recipientEmail, activeNetwork, recipientPhone]);
 
   const phonePlaceholder = useMemo(() => {
     const mm = MM_COUNTRIES.find(
@@ -2026,6 +2092,16 @@ const SendPage = () => {
     ? (!!ngnBankCode && ngnAccountNumber.replace(/\D/g, "").length === 10 && !!ngnResolvedName && receivedAmount > 0)
     : isGhanaBank
     ? (recipientName.trim().length > 2 && !!ghBankCode && ghAccountNumber.replace(/\D/g, "").length >= 6 && receivedAmount > 0)
+    : isCanadaIntlPayout
+    ? (cadPayoutMode === "interac"
+      ? recipientName.trim().length > 1
+          && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipientEmail.trim())
+          && receivedAmount > 0
+      : recipientName.trim().length > 1
+          && /^\d{3}$/.test(caInstitutionNumber.replace(/\D/g, ""))
+          && /^\d{5}$/.test(caTransitNumber.replace(/\D/g, ""))
+          && caAccountNumber.replace(/\D/g, "").length >= 4
+          && receivedAmount > 0)
     : (recipientName.length > 2 && recipientPhone.length > 8 && !!effectivePayoutMethod && receivedAmount > 0);
 
   const continueBlockers = useMemo(() => {
@@ -2070,6 +2146,17 @@ const SendPage = () => {
       if (recipientName.trim().length <= 2) reasons.push("Enter the recipient’s name");
       if (!ghBankCode) reasons.push("Select the recipient’s bank");
       if (ghAccountNumber.replace(/\D/g, "").length < 6) reasons.push("Enter the bank account number");
+    } else if (isCanadaIntlPayout) {
+      if (recipientName.trim().length <= 1) reasons.push("Enter the recipient’s full legal name");
+      if (cadPayoutMode === "interac") {
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipientEmail.trim())) {
+          reasons.push("Enter their Interac autodeposit email");
+        }
+      } else {
+        if (!/^\d{3}$/.test(caInstitutionNumber.replace(/\D/g, ""))) reasons.push("Enter the 3-digit institution number");
+        if (!/^\d{5}$/.test(caTransitNumber.replace(/\D/g, ""))) reasons.push("Enter the 5-digit transit number");
+        if (caAccountNumber.replace(/\D/g, "").length < 4) reasons.push("Enter the bank account number");
+      }
     } else {
       if (recipientName.trim().length <= 2) reasons.push("Enter the recipient’s name");
       if (recipientPhone.replace(/\D/g, "").length <= 8) reasons.push("Enter the recipient’s phone number");
@@ -2107,6 +2194,11 @@ const SendPage = () => {
     isGhanaBank,
     ghBankCode,
     ghAccountNumber,
+    isCanadaIntlPayout,
+    cadPayoutMode,
+    caInstitutionNumber,
+    caTransitNumber,
+    caAccountNumber,
     recipientPhone,
     effectivePayoutMethod,
   ]);
@@ -2677,7 +2769,35 @@ const SendPage = () => {
                                         </div>
                                       </motion.div>
                                     )}
-                                    {!useLink && availableNetworks && availableNetworks.length > 1 && !isGhanaBank && !isNGNBank && (
+                                    {!useLink && isCanadaIntlPayout && (
+                                      <motion.div custom={1.2} variants={fieldVariants} initial="hidden" animate="show" className="space-y-2">
+                                        <Label>How should they receive CAD?</Label>
+                                        <div className="grid grid-cols-2 gap-2">
+                                          {([
+                                            { v: "interac" as const, label: "Interac e-Transfer", sub: "Autodeposit email" },
+                                            { v: "eft" as const, label: "Bank deposit", sub: "Institution + account" },
+                                          ]).map(({ v, label, sub }) => {
+                                            const active = cadPayoutMode === v;
+                                            return (
+                                              <button
+                                                key={v}
+                                                type="button"
+                                                onClick={() => setCadPayoutMode(v)}
+                                                className={`flex flex-col items-start rounded-md border px-3 py-2 text-sm font-medium transition-colors ${
+                                                  active
+                                                    ? "border-primary bg-primary/10 text-primary"
+                                                    : "border-border bg-card hover:bg-muted text-foreground"
+                                                }`}
+                                              >
+                                                <span>{label}</span>
+                                                <span className="text-[10px] font-normal opacity-70">{sub}</span>
+                                              </button>
+                                            );
+                                          })}
+                                        </div>
+                                      </motion.div>
+                                    )}
+                                    {!useLink && availableNetworks && availableNetworks.length > 1 && !isGhanaBank && !isNGNBank && !isCanadaIntlPayout && (
                                       <motion.div custom={1.5} variants={fieldVariants} initial="hidden" animate="show" className="space-y-2">
                                         <Label>Network</Label>
                                         <div className="grid grid-cols-3 gap-2">
@@ -2819,6 +2939,72 @@ const SendPage = () => {
                                           <p className="text-xs text-muted-foreground">Funds will be deposited directly to the GHS bank account above. Make sure the account number and recipient name match exactly.</p>
                                         </motion.div>
                                       </>
+                                    ) : isCanadaIntlPayout ? (
+                                      cadPayoutMode === "interac" ? (
+                                        <motion.div custom={2} variants={fieldVariants} initial="hidden" animate="show" className="space-y-2">
+                                          <Label>Interac autodeposit email</Label>
+                                          <Input
+                                            type="email"
+                                            value={recipientEmail}
+                                            onChange={(e) => setRecipientEmail(e.target.value.trimStart().slice(0, 254))}
+                                            placeholder="jane@example.com"
+                                            maxLength={254}
+                                            className="transition-shadow focus-visible:ring-2 focus-visible:ring-primary/40"
+                                          />
+                                          <p className="text-xs text-muted-foreground">
+                                            Use the email their Canadian bank has registered for Interac e-Transfer autodeposit. Legal first and last name must match their bank account.
+                                          </p>
+                                        </motion.div>
+                                      ) : (
+                                        <>
+                                          <motion.div custom={2} variants={fieldVariants} initial="hidden" animate="show" className="grid grid-cols-2 gap-3">
+                                            <div className="space-y-2">
+                                              <Label>Institution #</Label>
+                                              <Input
+                                                inputMode="numeric"
+                                                maxLength={3}
+                                                placeholder="001"
+                                                value={caInstitutionNumber}
+                                                onChange={(e) => setCaInstitutionNumber(e.target.value.replace(/\D/g, "").slice(0, 3))}
+                                                className="transition-shadow focus-visible:ring-2 focus-visible:ring-primary/40"
+                                              />
+                                            </div>
+                                            <div className="space-y-2">
+                                              <Label>Transit #</Label>
+                                              <Input
+                                                inputMode="numeric"
+                                                maxLength={5}
+                                                placeholder="12345"
+                                                value={caTransitNumber}
+                                                onChange={(e) => setCaTransitNumber(e.target.value.replace(/\D/g, "").slice(0, 5))}
+                                                className="transition-shadow focus-visible:ring-2 focus-visible:ring-primary/40"
+                                              />
+                                            </div>
+                                          </motion.div>
+                                          <motion.div custom={2.5} variants={fieldVariants} initial="hidden" animate="show" className="space-y-2">
+                                            <Label>Account number</Label>
+                                            <Input
+                                              inputMode="numeric"
+                                              placeholder="Recipient bank account number"
+                                              value={caAccountNumber}
+                                              onChange={(e) => setCaAccountNumber(e.target.value.replace(/\D/g, "").slice(0, 20))}
+                                              className="transition-shadow focus-visible:ring-2 focus-visible:ring-primary/40"
+                                            />
+                                          </motion.div>
+                                          <motion.div custom={2.6} variants={fieldVariants} initial="hidden" animate="show" className="space-y-2">
+                                            <Label>Bank name <span className="text-muted-foreground font-normal">(optional)</span></Label>
+                                            <Input
+                                              placeholder="Royal Bank of Canada"
+                                              value={caBankName}
+                                              onChange={(e) => setCaBankName(e.target.value)}
+                                              className="transition-shadow focus-visible:ring-2 focus-visible:ring-primary/40"
+                                            />
+                                            <p className="text-xs text-muted-foreground">
+                                              Funds deposit directly to their Canadian bank account. Account holder name must match exactly.
+                                            </p>
+                                          </motion.div>
+                                        </>
+                                      )
                                     ) : (
                                       <>
                                       <motion.div custom={2} variants={fieldVariants} initial="hidden" animate="show" className="space-y-2">
@@ -3065,11 +3251,20 @@ const SendPage = () => {
                                           <div className="flex justify-between"><span className="text-muted-foreground">Bank</span><span className="font-medium">{isNGNBank ? (ngnBanks.find((b) => b.code === ngnBankCode)?.name || "—") : (ghBanks.find((b) => b.code === ghBankCode)?.name || "—")}</span></div>
                                           <div className="flex justify-between"><span className="text-muted-foreground">Account</span><span className="font-medium">{isNGNBank ? ngnAccountNumber : ghAccountNumber}</span></div>
                                         </>
+                                      ) : isCanadaIntlPayout ? (
+                                        cadPayoutMode === "interac" ? (
+                                          <div className="flex justify-between"><span className="text-muted-foreground">Interac email</span><span className="font-medium">{recipientEmail}</span></div>
+                                        ) : (
+                                          <>
+                                            <div className="flex justify-between"><span className="text-muted-foreground">Bank</span><span className="font-medium">{caInstitutionNumber}-{caTransitNumber}{caBankName ? ` · ${caBankName}` : ""}</span></div>
+                                            <div className="flex justify-between"><span className="text-muted-foreground">Account</span><span className="font-medium">{caAccountNumber}</span></div>
+                                          </>
+                                        )
                                       ) : (
                                         <div className="flex justify-between"><span className="text-muted-foreground">Phone</span><span className="font-medium">{recipientPhone}</span></div>
                                       )}
                                       <div className="flex justify-between"><span className="text-muted-foreground">Destination</span><span className="font-medium">{targetCountry.flag} {targetCountry.country}</span></div>
-                                      <div className="flex justify-between"><span className="text-muted-foreground">Method</span><span className="font-medium">{useLink ? "Secure link (recipient picks)" : isBankPayout ? "Bank Transfer" : effectiveMethodLabel}</span></div>
+                                      <div className="flex justify-between"><span className="text-muted-foreground">Method</span><span className="font-medium">{useLink ? "Secure link (recipient picks)" : isBankPayout ? "Bank Transfer" : isCanadaIntlPayout ? (cadPayoutMode === "interac" ? "Interac e-Transfer" : "Bank deposit (EFT)") : effectiveMethodLabel}</span></div>
                                       <div className="flex justify-between">
                                         <span className="text-muted-foreground">Funding</span>
                                         <span className="font-medium capitalize">

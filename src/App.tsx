@@ -149,7 +149,13 @@ const CommunicationHubPage = lazyImport(() => import("./pages/admin/Communicatio
 const SupportInboxPage = lazyImport(() => import("./pages/admin/SupportInboxPage"));
 const PricingPage = lazyImport(() => import("./pages/admin/PricingPage"));
 const OpsQueuePage = lazyImport(() => import("./pages/admin/OpsQueuePage"));
+const NombaFincraPage = lazyImport(() => import("./pages/admin/NombaFincraPage"));
 const RevenuePage = lazyImport(() => import("./pages/admin/RevenuePage"));
+const SimpleAdminLayout = lazyImport(() => import("./components/admin-simple/SimpleAdminLayout"));
+const SimpleHomePage = lazyImport(() => import("./pages/admin-simple/SimpleHomePage"));
+const SimpleUsersPage = lazyImport(() => import("./pages/admin-simple/SimpleUsersPage"));
+const SimpleUserDetailPage = lazyImport(() => import("./pages/admin-simple/SimpleUserDetailPage"));
+const SimpleRatesPage = lazyImport(() => import("./pages/admin-simple/SimpleRatesPage"));
 const SupportPage = lazyImport(() => import("./pages/SupportPage"));
 const ResetPinPage = lazyImport(() => import("./pages/ResetPinPage"));
 
@@ -407,6 +413,13 @@ const AppRoutes = () => {
           <Route path="/admin/regulatory-changes" element={<RegulatoryChangesPage />} />
           <Route path="/admin/settlement-reconciliation" element={<SettlementReconciliationPage />} />
           <Route path="/admin/ops-queue" element={<OpsQueuePage />} />
+          <Route path="/admin/nomba-fincra" element={<NombaFincraPage />} />
+          <Route path="/admin/simple" element={<SimpleAdminLayout />}>
+            <Route index element={<SimpleHomePage />} />
+            <Route path="users" element={<SimpleUsersPage />} />
+            <Route path="users/:id" element={<SimpleUserDetailPage />} />
+            <Route path="rates" element={<SimpleRatesPage />} />
+          </Route>
           <Route path="/admin/period-end-controls" element={<PeriodEndControlsPage />} />
           <Route path="/admin/evidence-repository" element={<EvidenceRepositoryPage />} />
           <Route path="/admin/payments/adyen" element={<AdminAdyenLinksPage />} />

@@ -831,30 +831,89 @@ Deno.serve(async (req) => {
         );
         payoutResult = await res.json();
       } else if (isCanada) {
+        const canadaAttempts: string[] = [];
+        let canadaHardDecline = false;
+        const tryCanadaRail = async (rail: string, fn: () => Promise<any>) => {
+          if (payoutOk(payoutResult) || canadaHardDecline) return;
+          canadaAttempts.push(rail);
+          railsAttempted.push(rail);
+          const started = Date.now();
+          const r = await fn();
+          const ok = payoutOk(r);
+          try {
+            await supabase.from("routing_attempts").insert({
+              transfer_id,
+              partner_code: rail,
+              function_slug: `${rail.replace(/_/g, "-")}-payout`,
+              attempt_number: canadaAttempts.length,
+              outcome: ok ? "success" : "failed",
+              retryable: !ok && r?.error_class !== "hard" && r?.retryable !== false,
+              provider_reference: r?.reference ?? r?.provider_reference ?? null,
+              error_message: ok ? null : String(r?.error || r?.provider_message || "").slice(0, 500),
+              latency_ms: Date.now() - started,
+            });
+          } catch (e) {
+            console.error("routing_attempts insert failed", e);
+          }
+          if (ok) {
+            payoutResult = { ...r, rail: r?.rail || rail, priority_chain: canadaAttempts };
+          } else {
+            if (r?.error_class === "hard") canadaHardDecline = true;
+            const err = String(r?.error || r?.provider_message || `${rail} payout failed`);
+            railErrors.push(`${rail}: ${err}`);
+            payoutResult = {
+              ...(r || {}),
+              success: false,
+              rail,
+              error: err,
+              priority_chain: canadaAttempts,
+            };
+          }
+        };
+
+        // 0) Nomba — Interac + Canadian bank EFT (global payout)
+        if (nombaApiConfigured()) {
+          await tryCanadaRail("nomba", async () => {
+            const nombaRes = await fetch(
+              `${Deno.env.get("SUPABASE_URL")}/functions/v1/nomba-payout`,
+              { method: "POST", headers: internalHeaders, body: JSON.stringify({ transfer_id }) },
+            );
+            return nombaRes.json().catch(() => ({
+              success: false,
+              error: `nomba-payout HTTP ${nombaRes.status}`,
+              rail: "nomba",
+            }));
+          });
+        }
+
+        // 1) Flovide — Interac fallback
         const flovideReady = !!(
           Deno.env.get("FLOVIDE_PUBLIC_KEY")?.trim()
           && Deno.env.get("FLOVIDE_SECRET_KEY")?.trim()
         );
         const wantInterac = String(transfer.payout_method || "").toLowerCase().includes("interac");
         if (flovideReady && wantInterac) {
-          const fvRes = await fetch(
-            `${Deno.env.get("SUPABASE_URL")}/functions/v1/flovide-payout`,
-            {
-              method: "POST",
-              headers: internalHeaders,
-              body: JSON.stringify({ transfer_id }),
-            },
-          );
-          payoutResult = await fvRes.json().catch(() => ({
-            success: false,
-            error: `flovide-payout HTTP ${fvRes.status}`,
-            rail: "flovide",
-          }));
+          await tryCanadaRail("flovide", async () => {
+            const fvRes = await fetch(
+              `${Deno.env.get("SUPABASE_URL")}/functions/v1/flovide-payout`,
+              { method: "POST", headers: internalHeaders, body: JSON.stringify({ transfer_id }) },
+            );
+            return fvRes.json().catch(() => ({
+              success: false,
+              error: `flovide-payout HTTP ${fvRes.status}`,
+              rail: "flovide",
+            }));
+          });
         }
-        if (!payoutOk(payoutResult)) {
+
+        // 2) Stripe Connect / Paysafe legacy fallback
+        if (!payoutOk(payoutResult) && !canadaHardDecline) {
           const fnName = transfer.payout_method === "stripe_connect"
             ? "stripe-connect-instant-payout"
             : "paysafe-payout";
+          const legacyRail = fnName === "stripe-connect-instant-payout" ? "stripe_connect" : "paysafe";
+          railsAttempted.push(legacyRail);
+          canadaAttempts.push(legacyRail);
           const res = await fetch(
             `${Deno.env.get("SUPABASE_URL")}/functions/v1/${fnName}`,
             {
@@ -866,7 +925,20 @@ Deno.serve(async (req) => {
               body: JSON.stringify({ transfer_id }),
             },
           );
-          payoutResult = await res.json();
+          const legacyResult = await res.json();
+          if (payoutOk(legacyResult)) {
+            payoutResult = { ...legacyResult, rail: legacyRail, priority_chain: canadaAttempts };
+          } else {
+            const err = String(legacyResult?.error || legacyResult?.message || `${legacyRail} payout failed`);
+            railErrors.push(`${legacyRail}: ${err}`);
+            payoutResult = {
+              ...(legacyResult || {}),
+              success: false,
+              rail: legacyRail,
+              error: err,
+              priority_chain: canadaAttempts,
+            };
+          }
         }
       } else if (fincraCapable) {
         // Fixed priority: Nomba (when configured) → Fincra → Flovide → Flutterwave → Paytota → Swychr

@@ -33,8 +33,8 @@ const PAYTOTA_MOMO_DEST = ["UGX", "KES", "RWF"] as const;
 
 const SWYCHR_COLLECT = ["XAF", "XOF", "KES", "UGX"] as const;
 
-/** Square hosted checkout collect currencies (debit + credit cards). */
-const SQUARE_CARD_COLLECT = ["USD", "CAD", "EUR", "GBP"] as const;
+/** Square hosted checkout collect currencies (debit + credit cards). CAD uses Nomba. */
+const SQUARE_CARD_COLLECT = ["USD", "EUR", "GBP"] as const;
 
 
 /** Flutterwave collect currencies used for card-send. */
@@ -60,8 +60,8 @@ const FINCRA_CARD_COLLECT = [
   "MWK",
 ] as const;
 
-/** Nomba Checkout collect (NGN card/bank/USSD) — payout via Nomba on all supported corridors. */
-const NOMBA_CARD_COLLECT = ["NGN"] as const;
+/** Nomba Checkout collect — NGN card/bank/USSD; CAD card (USD charge → CAD wallet). */
+const NOMBA_CARD_COLLECT = ["NGN", "CAD"] as const;
 const NOMBA_CARD_MOMO_DEST = ["GHS", "KES", "UGX", "TZS", "RWF"] as const;
 
 function isNombaCardSendCorridor(
@@ -172,7 +172,7 @@ export function pickBestCardProvider(
 ): CardSendProvider | null {
   const available = cardSendProvidersForCorridor(sourceCurrency, destCurrency, transferType);
   if (available.length === 0) return null;
-  const priority: CardSendProvider[] = ["square", "nomba", "fincra", "flutterwave", "lenhub", "paytota", "swychr"];
+  const priority: CardSendProvider[] = ["nomba", "square", "fincra", "flutterwave", "lenhub", "paytota", "swychr"];
   for (const p of priority) {
     if (available.includes(p)) return p;
   }
@@ -220,7 +220,7 @@ export function cardSendProviderDescription(provider: CardSendProvider): string 
     return "Pay by card or bank transfer on a secure page, then we deliver the transfer.";
   }
   if (provider === "nomba") {
-    return "Pay by Naira card or bank on Nomba\u2019s secure checkout, then we deliver via Nomba payout.";
+    return "Pay by card or bank on Nomba\u2019s secure checkout, then we deliver the transfer.";
   }
   if (provider === "lenhub") {
     return "Enter your card in the app — PIN/OTP secured — then we deliver the transfer.";

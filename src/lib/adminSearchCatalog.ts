@@ -18,8 +18,12 @@ const partner = (panel: string, label: string, extra = "") =>
 /** Pages, sidebar items, and inner tabs the header search can jump to. */
 export const ADMIN_SEARCH_CATALOG: AdminSearchHit[] = [
   { id: "dash", label: "Dashboard", group: "Home", to: "/admin/dashboard", keywords: "overview kyc home" },
+  { id: "simple-admin", label: "Simple admin", group: "Home", to: "/admin/simple", keywords: "simple users rates fees nomba fincra clean" },
   { id: "board", label: "Board", group: "Home", to: "/admin/board-dashboard", keywords: "board dashboard" },
   { id: "portal", label: "My portal", group: "Home", to: "/admin/portal", keywords: "staff portal payslip" },
+
+  { id: "simple-users", label: "Simple · Users", group: "Simple admin", to: "/admin/simple/users", keywords: "customers 360 money tickets" },
+  { id: "simple-rates", label: "Simple · Partners & Rates", group: "Simple admin", to: "/admin/simple/rates", keywords: "fees fx rails nomba fincra" },
 
   partner("rails", "Corridor rails", "who moves money send top-up"),
   partner("partners", "Partners", "active inactive mailing address fincra paypal square"),
@@ -51,6 +55,7 @@ export const ADMIN_SEARCH_CATALOG: AdminSearchHit[] = [
   partner("alerts", "Partner alerts", ""),
 
   { id: "rate-card", label: "Rate card", group: "Partners & Pricing", to: "/admin/pricing?tab=rate-card", keywords: "customer fee" },
+  { id: "nomba-fincra", label: "Nomba & Fincra", group: "Partners & Pricing", to: "/admin/nomba-fincra", keywords: "primary providers payout collect rates transactions interac" },
   { id: "ops", label: "Ops queue", group: "Partners & Pricing", to: "/admin/ops-queue", keywords: "transfers payout boost refund" },
   { id: "api-mgmt", label: "Payment APIs", group: "Partners & Pricing", to: "/admin/api", keywords: "fincra paypal square flovide flutterwave test connection secrets" },
 

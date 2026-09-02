@@ -70,7 +70,7 @@ const PARTNERS: PartnerMeta[] = [
   { id: "ghana_pay", name: "Ghana Pay", blurb: "Ghana cedi top-up and payout", collect: ["GHS"], payout: ["GHS"] },
   { id: "elicate", name: "Elicate", blurb: "Zambia kwacha MoMo", collect: ["ZMW"], payout: ["ZMW"] },
   { id: "dodo", name: "Dodo", blurb: "Card checkout to top up western wallets", collect: ["CAD", "USD", "EUR", "GBP"], payout: [] },
-  { id: "square", name: "Square", blurb: "Card checkout for western wallets", collect: ["CAD", "USD", "EUR", "GBP"], payout: [] },
+  { id: "square", name: "Square", blurb: "Card checkout for western wallets", collect: ["USD", "EUR", "GBP"], payout: [] },
   { id: "paypal", name: "PayPal", blurb: "PayPal checkout for western wallets", collect: ["CAD", "USD", "EUR", "GBP"], payout: [] },
   { id: "wise", name: "Wise", blurb: "Bank deposit top-up with a payment reference", collect: ["CAD", "USD", "EUR", "GBP"], payout: [] },
   { id: "interac", name: "Interac (legacy)", blurb: "Older Interac collect path — prefer Flovide for CAD", collect: ["CAD"], payout: [] },

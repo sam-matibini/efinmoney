@@ -408,10 +408,12 @@ Deno.serve(async (req) => {
 
     // ── Global Interac ────────────────────────────────────────────────
     if (kind === "global_interac") {
+      const acctHint = String(transfer.recipient_account || "").trim();
       const email = String(
         transfer.recipient_email
           || (transfer as Record<string, unknown>).recipient_interac_email
           || body.recipient_email
+          || (acctHint.includes("@") ? acctHint : "")
           || "",
       ).trim();
       if (!email || !email.includes("@")) {
@@ -587,9 +589,32 @@ Deno.serve(async (req) => {
 
     // ── Global bank / ACH / SEPA / Faster Payments ────────────────────
     const destCountry = country || normalizeNombaCountry(null, targetCurrency);
-    const accountNumber = String(transfer.recipient_account || body.account_number || "").trim();
-    const bankCode = String(transfer.recipient_bank_code || body.bank_code || "").trim();
-    const bankName = String(transfer.recipient_bank_name || body.bank_name || "").trim();
+    let accountNumber = String(transfer.recipient_account || body.account_number || "").trim();
+    let bankCode = String(transfer.recipient_bank_code || body.bank_code || "").trim();
+    let bankName = String(transfer.recipient_bank_name || body.bank_name || "").trim();
+    let transitNumber = String(
+      (transfer as Record<string, unknown>).transit_number || body.transit_number || "",
+    ).trim();
+
+    // Canadian EFT: institution-transit-account stored in recipient_account.
+    const payoutMethodLower = String(transfer.payout_method || "").toLowerCase();
+    if (
+      targetCurrency === "CAD"
+      && (payoutMethodLower.includes("eft") || accountNumber.includes("-"))
+    ) {
+      const rawParts = accountNumber.split("-");
+      if (rawParts.length >= 3) {
+        const inst = (rawParts[0] || "").replace(/\D/g, "").padStart(3, "0");
+        const transit = (rawParts[1] || "").replace(/\D/g, "").padStart(5, "0");
+        const acct = String(rawParts.slice(2).join("-")).replace(/\D/g, "");
+        if (inst && transit && acct) {
+          bankCode = bankCode || inst;
+          transitNumber = transitNumber || transit;
+          accountNumber = acct;
+        }
+      }
+    }
+
     if (!accountNumber) {
       return json({
         success: false,
@@ -643,10 +668,10 @@ Deno.serve(async (req) => {
         beneficiaryEmail: String(t.recipient_email || t.beneficiary_email),
       };
     }
-    if (t.transit_number) {
+    if (t.transit_number || transitNumber) {
       payload.beneficiary = {
         ...(payload.beneficiary as Record<string, unknown> | undefined),
-        transitNumber: String(t.transit_number),
+        transitNumber: String(t.transit_number || transitNumber),
       };
     }
 

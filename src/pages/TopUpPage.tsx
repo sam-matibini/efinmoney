@@ -115,8 +115,8 @@ function availableIntlMethods(currency: string): IntlTopupMethod[] {
     if (productFeatures.fincra && ["EUR", "GBP"].includes(c)) methods.push("fincra");
     if (productFeatures.paytota) methods.push("paytota");
     if (productFeatures.dodo) methods.push("dodo");
-    if (productFeatures.square) methods.push("square");
-    if (productFeatures.paypal) methods.push("paypal");
+    if (productFeatures.square && c !== "CAD") methods.push("square");
+    if (productFeatures.paypal && c !== "CAD") methods.push("paypal");
     if (
       c === "CAD" &&
       (productFeatures.plaid ||
