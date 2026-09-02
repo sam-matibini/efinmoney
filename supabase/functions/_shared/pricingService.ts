@@ -11,7 +11,7 @@
  */
 import { computeCustomerRevenue, type CustomerPricingRow } from "./routingEngine.ts";
 import { resolveEffectiveRate, type RateRow } from "./fxRatesCore.ts";
-import { retailPayoutFeeUsd } from "./retailPayoutFees.ts";
+import { retailPayoutFeeNative, retailPayoutFeeUsd } from "./retailPayoutFees.ts";
 
 export type PriceDirection = "payin" | "payout";
 
@@ -47,13 +47,7 @@ type PricingClient = {
   from?: (table: string) => any;
 };
 
-async function usdFeeInSource(
-  supabase: PricingClient,
-  usd: number,
-  sourceCurrency: string,
-): Promise<number | null> {
-  const src = sourceCurrency.toUpperCase();
-  if (src === "USD") return r2(usd);
+async function loadFxRows(supabase: PricingClient): Promise<RateRow[] | null> {
   if (!supabase.from) return null;
   const { data, error } = await supabase
     .from("fx_rates")
@@ -64,13 +58,34 @@ async function usdFeeInSource(
     console.error("[pricingService] fx_rates lookup failed", error);
     return null;
   }
-  const rows = (Array.isArray(data) ? data : []) as RateRow[];
-  const rate = resolveEffectiveRate("USD", src, rows);
+  return (Array.isArray(data) ? data : []) as RateRow[];
+}
+
+async function feeInSourceCurrency(
+  supabase: PricingClient,
+  amount: number,
+  feeCurrency: string,
+  sourceCurrency: string,
+): Promise<number | null> {
+  const feeCcy = feeCurrency.toUpperCase();
+  const src = sourceCurrency.toUpperCase();
+  if (feeCcy === src) return r2(amount);
+  const rows = await loadFxRows(supabase);
+  if (!rows) return null;
+  const rate = resolveEffectiveRate(feeCcy, src, rows);
   if (!rate || rate <= 0) {
-    console.warn(`[pricingService] no USD→${src} rate for retail fee`);
+    console.warn(`[pricingService] no ${feeCcy}→${src} rate for retail fee`);
     return null;
   }
-  return r2(usd * rate);
+  return r2(amount * rate);
+}
+
+async function usdFeeInSource(
+  supabase: PricingClient,
+  usd: number,
+  sourceCurrency: string,
+): Promise<number | null> {
+  return feeInSourceCurrency(supabase, usd, "USD", sourceCurrency);
 }
 
 const r2 = (n: number) => Math.round(n * 100) / 100;
@@ -131,6 +146,21 @@ export async function quotePrice(
   }
 
   if (req.direction !== "payout") return quote;
+
+  // Native flat fees first (e.g. ₦200 for NGN bank payout).
+  const native = retailPayoutFeeNative(dst) ?? retailPayoutFeeNative(req.destCountry);
+  if (native) {
+    const converted = await feeInSourceCurrency(supabase, native.amount, native.currency, src);
+    if (converted != null) {
+      return {
+        ...quote,
+        fee: converted,
+        total: r2(converted + quote.fxRevenue),
+        pricingMissing: false,
+        source: "retail_override",
+      };
+    }
+  }
 
   const usdFee = retailPayoutFeeUsd(dst) ?? retailPayoutFeeUsd(req.destCountry);
   if (usdFee == null) return quote;

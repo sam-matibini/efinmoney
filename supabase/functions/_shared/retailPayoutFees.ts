@@ -8,6 +8,13 @@ export const RETAIL_PAYOUT_FEE_USD: Record<string, number> = {
   ZM: 3,
 };
 
+/** Flat fees in destination currency (e.g. NGN bank payout = ₦200). */
+export const RETAIL_PAYOUT_FEE_NATIVE: Record<string, { currency: string; amount: number }> = {
+  NGN: { currency: "NGN", amount: 200 },
+  NG: { currency: "NGN", amount: 200 },
+  NIGERIA: { currency: "NGN", amount: 200 },
+};
+
 export const LIVE_PAYIN_CURRENCIES = ["NGN", "GHS", "KES", "ZMW", "CAD", "USD"] as const;
 export const LIVE_PAYOUT_CURRENCIES = ["NGN", "GHS", "KES", "ZMW", "CAD", "USD"] as const;
 
@@ -15,6 +22,13 @@ export function retailPayoutFeeUsd(destCurrencyOrCountry: string | null | undefi
   const key = String(destCurrencyOrCountry || "").toUpperCase();
   const fee = RETAIL_PAYOUT_FEE_USD[key];
   return typeof fee === "number" ? fee : null;
+}
+
+export function retailPayoutFeeNative(
+  destCurrencyOrCountry: string | null | undefined,
+): { currency: string; amount: number } | null {
+  const key = String(destCurrencyOrCountry || "").toUpperCase();
+  return RETAIL_PAYOUT_FEE_NATIVE[key] ?? null;
 }
 
 export function isLivePayinCurrency(code: string | null | undefined): boolean {
