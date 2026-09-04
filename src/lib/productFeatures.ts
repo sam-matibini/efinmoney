@@ -31,6 +31,8 @@ export const productFeatures = {
   paytota: envFlag("VITE_FEATURE_PAYTOTA", true),
   /** Dodo Payments MoR checkout — western wallet top-up (USD/CAD/EUR/GBP). */
   dodo: envFlag("VITE_FEATURE_DODO", true),
+  /** ePay cashier gateway — CAD top-up test rail. */
+  epay: envFlag("VITE_FEATURE_EPAY", true),
   /** Paytota UGX/KES/RWF MoMo payout toggle on Send. */
   paytotaPayout: envFlag("VITE_FEATURE_PAYTOTA_PAYOUT", true),
   /** Fincra hosted checkout — western + Africa collect (NGN/GHS/KES/…). */

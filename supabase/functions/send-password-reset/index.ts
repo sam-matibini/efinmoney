@@ -15,6 +15,11 @@
 // `log_login_failure` flow already exists for repeated abuse).
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import {
+  buildAppAuthConfirmUrl,
+  extractHashedToken,
+  getPublicAppOrigin,
+} from "../_shared/authConfirmLink.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -47,7 +52,8 @@ Deno.serve(async (req) => {
     const safeNext = typeof next === "string" && next.startsWith("/") && !next.startsWith("//")
       ? next
       : "/auth";
-    const redirectTo = `${SUPABASE_URL.replace(/\/$/, "")}/auth/confirm?type=recovery&next=${encodeURIComponent(safeNext)}`;
+    const appOrigin = getPublicAppOrigin();
+    const redirectTo = `${appOrigin}/auth/confirm?type=recovery&next=${encodeURIComponent(safeNext)}`;
 
     const admin = createClient(SUPABASE_URL, SERVICE_KEY, {
       auth: { autoRefreshToken: false, persistSession: false },
@@ -59,12 +65,20 @@ Deno.serve(async (req) => {
       options: { redirectTo },
     });
 
+    const tokenHash = extractHashedToken(data?.properties);
     // No matching user, or the user is banned/suspended — reply OK so we
     // don't leak account existence. The email just isn't sent.
-    if (error || !data?.properties?.action_link) {
-      console.warn("[send-password-reset] generateLink:", error?.message ?? "no action_link");
+    if (error || !tokenHash) {
+      console.warn("[send-password-reset] generateLink:", error?.message ?? "no token");
       return json(200, { ok: true });
     }
+
+    const actionLink = buildAppAuthConfirmUrl({
+      tokenHash,
+      type: "recovery",
+      next: safeNext,
+      appOrigin,
+    });
 
     const sendRes = await fetch(`${SUPABASE_URL}/functions/v1/send-email`, {
       method: "POST",
@@ -76,7 +90,7 @@ Deno.serve(async (req) => {
         type: "password_reset",
         to: email,
         data: {
-          action_link: data.properties.action_link,
+          action_link: actionLink,
           expires_in_minutes: 60,
         },
       }),

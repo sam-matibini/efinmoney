@@ -1,0 +1,4539 @@
+openapi: 3.0.3
+info:
+  title: BaaS API
+  version: '1.0'
+servers:
+  - url: https://api.uat.payfarelabs.com
+components:
+  schemas:
+    Address:
+      type: object
+      properties:
+        address_line1:
+          type: string
+          description: The street address.
+          minLength: 1
+          maxLength: 255
+          example: 123 River St.
+        address_line2:
+          type: string
+          description: Optional address line for apartment number, suite, room, floor etc...
+          maxLength: 255
+          nullable: true
+          example: ""
+        city:
+          type: string
+          description: The name of the city.
+          minLength: 1
+          maxLength: 255
+          example: Toronto
+        region:
+          type: string
+          description: The region which is the short code for the state or province. (ISO-3166-2 subdivision code)
+          minLength: 2
+          maxLength: 2
+          example: 'ON'
+        country_code:
+          type: string
+          description: Short code representing the country of the shipping address. (ISO-3166-1 Alpha-2 country code)
+          minLength: 2
+          maxLength: 2
+          example: CA
+        postal_code:
+          type: string
+          description: >-
+            The zip code or postal code of the address.<br/>
+
+            "A1A1A1" - Canada<br/>
+            "NNNNN" - US<br/>
+            "NNNNN-NNNN" - US<br/>
+          minLength: 5
+          maxLength: 10
+          example: AB123
+      required:
+        - address_line1
+        - city
+        - region
+        - country_code
+        - postal_code
+    ExternalUserId:
+      type: object
+      properties:
+        external_id:
+          type: string
+          description: The ID of the user from your platform
+          minLength: 1
+          maxLength: 255
+          example: 123456789123456789abcdefg
+    InternalUserId:
+      type: object
+      properties:
+        payfare_id:
+          type: string
+          format: uuid
+          description: Payfare (EmFi) unique id.
+          example: 1bc25ac6-abae-46aa-9b25-329f1ac50ae5
+    RewardTierField:
+      type: object
+      properties:
+        reward_tier:
+          type: string
+          description: The reward category under which this user falls under.
+          minLength: 1
+          maxLength: 255
+          example: gold
+    UserRequest:
+      allOf:
+        - $ref: "#/components/schemas/ExternalUserId"
+        - $ref: "#/components/schemas/RewardTierField"
+        - properties:
+            first_name:
+              type: string
+              description: The first name of the user.
+              minLength: 1
+              maxLength: 255
+              example: John
+            middle_name:
+              type: string
+              minLength: 0
+              maxLength: 255
+              example: ''
+            last_name:
+              type: string
+              description: The last name of the user.
+              minLength: 1
+              maxLength: 255
+              example: Smith
+            embossed_name:
+              type: string
+              description: >-
+                Name printed on the card. If not provided then EmFi will derive.
+                <br/>
+                The length of the name printed on the card is restricted to 21 characters
+                including the space between the first and last name.
+                In addition, no accented characters are allowed within the embossed name.
+                <br/>
+                If the embossed_name within the request is not provided,
+                then EmFi will derive the embossed name applying the following rules:
+
+                - If length[first_name] + length[last_name] <= 20 then
+                    - embossed_name = concatenate first_name, space, last_name
+                      else if length [first_name initial] + length[last_name] <= 20 then
+                    - embossed_name = concatenate first_name initial, space, last_name
+                      else
+                    - embossed_name = concatenate first_name, space, truncate(last_name to 18 characters)
+
+                  All accented characters will be replaced with the non-accented equivalent.
+              minLength: 1
+              maxLength: 21
+              example: John Smith
+            phone_number:
+              type: string
+              description: The user's phone number with the international calling code. (E.164 format)
+              minLength: 7
+              maxLength: 15
+              example: '+11234567891'
+            email:
+              type: string
+              description: The email of the user. Must be unique.
+              minLength: 3
+              maxLength: 255
+              example: john.smith@email.com
+            rewards_eligible:
+              type: boolean
+              example: false
+            address:
+              description: The residential address of the user.
+              allOf:
+                - $ref: "#/components/schemas/Address"
+            date_of_birth:
+              type: string
+              description: The user's date of birth in YYYY-MM-DD (ISO-8601) date format.
+              format: date
+              minLength: 10
+              maxLength: 10
+              example: 1990-01-01
+            express_consent:
+              type: array
+              items:
+                type: object
+                properties:
+                  name:
+                    type: string
+                    description: The name of the terms or agreement that was presented to the user.
+                    example: Example Program User Agreement
+                  accepted:
+                    oneOf:
+                      - type: boolean
+                      - type: integer
+                        enum: [0, 1]
+                    description: A boolean which determines whether or not the user accepted the documentation.
+                    example: true
+                  date:
+                    type: string
+                    description: The date on which the user accepted the presented documented.
+                    format: date
+                    example: 2018-01-01
+              description: >-
+                An array containing the name and the dates of the accepted
+                agreements for the card program offered by EmFi.
+            ssn:
+              type: string
+              minLength: 9
+              maxLength: 10
+              example: "123456789"
+            tins:
+              type: array
+              description: Each tin belonging to the user.
+              items:
+                type: object
+                properties:
+                  jurisdiction:
+                    type: string
+                    example: Maldives
+                  tin:
+                    type: string
+                    example: "1234-334-333"
+                  no_tin_reason:
+                    type: string
+                    nullable: true
+                    example: ''    # Can't have a null example in request body.
+            ship_type:
+              type: string
+              example: mail
+            device_info:
+              type: object
+              properties:
+                device_model:
+                  type: string
+                  example: model
+                device_os_name:
+                  type: string
+                  example: osname
+                device_os_version:
+                  type: string
+                  example: "123.45"
+                cpu_abi:
+                  type: string
+                  example: ARM
+                ip_address:
+                  type: string
+                  example: "0.0.0.0"
+                public_ip_address:
+                  type: string
+                  example: "0.0.0.0"
+            preferred_language:
+              type: string
+              description: The preferred ISO 639-1 standard language code of the user.
+              example: en-us
+            metadata:
+              type: object
+              description: Any metadata that needs to be attached.
+              nullable: true
+              example: {
+                key: value
+              }
+            mock_response:
+              type: boolean
+              description: Used for mocking responses in a test environment.
+          required:
+            - first_name
+            - last_name
+            - email
+            - phone_number
+            - address
+            - date_of_birth
+            - external_id
+            - express_consent
+            - ssn
+            - ship_type
+    UserResponse:
+      allOf:
+        - $ref: "#/components/schemas/UserRequest"
+        - $ref: "#/components/schemas/InternalUserId"
+        - properties:
+            created_at:
+              type: string
+              format: date-time
+              description: ISO 8601 datetime
+              example: 2020-03-16T18:38:52+00:00
+            status:
+              type: string
+              enum:
+                - pending-activation
+                - active
+                - inactive
+                - suspended
+                - closed
+              example: pending-activation
+            wallet_status:
+              type: string
+              description: Refer to Wallet status table.
+              enum:
+                - active
+                - pending
+              example: pending
+    PartialPaymentResponse:
+      type: object
+      properties:
+        net_amount:
+          type: number
+          example: 1000
+        created_at:
+          type: string
+          description: ISO-8601
+          format: date-time
+          example: "2023-05-25T04:25:12+00:00"
+        currency_code:
+          type: string
+          example: USD
+    SuccessfulRequest:
+      type: object
+      properties:
+        status:
+          type: string
+          example: success
+        message:
+          type: string
+          example: ''
+    ErrorMessage:
+      type: object
+      properties:
+        status:
+          type: string
+          example: error
+        message:
+          type: string
+          example: ''
+  parameters:
+    InternalUserId:
+      name: payfare_id
+      in: path
+      description: The UUID of the Payfare (EmFi) user.
+      schema:
+        type: string
+        format: uuid
+        example: 8c0e91a3-2c9b-4bad-8ece-38a7de460d3c
+      required: true
+    PayoutId:
+      name: payout_id
+      in: path
+      schema:
+        type: string
+        format: uuid
+        example: 72056c22-eac4-4a2a-9b19-815a39392906
+      required: true
+    CardId:
+      name: card_id
+      in: path
+      description: The UUID of the EmFi card.
+      schema:
+        type: string
+        format: uuid
+        example: c6fe6212-c9b1-4477-9aac-55560b591083
+      required: true
+    RecipientId:
+      name: recipient_id
+      in: path
+      description: The UUID of the EmFi recipient.
+      schema:
+        type: string
+        format: uuid
+        example: 8ab683c8-ff22-45bc-9f7b-362e19a5ef91
+      required: true
+    AchId:
+      name: ach_id
+      in: path
+      description: The UUID of the account transfer
+      schema:
+        type: string
+        format: uuid
+        example: a3df5efd-03b0-4402-ad97-cc5c0367bc9c
+      required: true
+    FromDateTime:
+      name: from_datetime
+      in: query
+      description: >-
+        The starting UTC datetime in ISO 8601 format from which the
+        transactions will be filtered from.
+      schema:
+        type: string
+        example: '2023-05-01T08:00:00'
+    ToDateTime:
+      name: to_datetime
+      in: query
+      description: >-
+        The ending UTC datetime in ISO 8601 format from which the
+        transactions will be filtered from.
+      schema:
+        type: string
+        example: '2023-05-02T23:59:59'
+    ClientKey:
+      name: X-PFClient-Key
+      in: header
+      schema:
+        type: string
+        example: 126eeb7c-d130-45c4-b3db-280f01aebe20
+      required: true
+      description: 'API Key'
+    ClientSecret:
+      name: X-PFClient-Secret
+      in: header
+      schema:
+        type: string
+        example: 225e2b4b-7cb7-4267-a65c-097ea541b21f
+      required: true
+      description: 'API Secret'
+  responses:
+    400UserNotFound:
+      description: >-
+        When this error occurs, it means that the Payfare (EmFi) ID provided in the request
+        does not match with any user in the card program.
+        Notice the **10050** error code.
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: "#/components/schemas/ErrorMessage"
+              - properties:
+                  errors:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        field:
+                          type: string
+                          example: payfare_id
+                        code:
+                          type: integer
+                          enum: [10050]
+                          example: 10050
+                        message:
+                          type: string
+                          enum: [User not found]
+                          example: User not found
+                      description: User does not exist in our system.
+    401InvalidAuthorization:
+      description: >-
+        When this error response occurs, it means that either the **X-PFClient-Key** or
+        the **X-PFClient-Secret** is invalid.
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: "#/components/schemas/ErrorMessage"
+              - properties:
+                  errors:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        field:
+                          type: string
+                          example: ""
+                        code:
+                          type: integer
+                          enum: [11000]
+                          example: 11000
+                        message:
+                          type: string
+                          enum: [Invalid authorization]
+                          example: Invalid authorization
+    403AccessForbidden:
+      description: >-
+        When this error response occurs, it means that the **X-PFClient-Key**
+        used for this request does not have the required permissions to access this endpoint.
+        If you do not have a separate **X-PFClient-Key** for the BaaS endpoints,
+        please contact EmFi and it will be provisioned for you.
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: "#/components/schemas/ErrorMessage"
+              - properties:
+                  errors:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        field:
+                          type: string
+                          example: ""
+                        code:
+                          type: integer
+                          enum: [11403]
+                          example: 11403
+                        message:
+                          type: string
+                          enum: [Access Forbidden]
+                          example: Access Forbidden
+    404NoCompletedPayout:
+      description: >-
+        This error response occurs when the cardholder has **yet to receive a payout that has completed**.
+        Note the unique **40071** error code.
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: "#/components/schemas/ErrorMessage"
+              - properties:
+                  errors:
+                    type: array
+                    items:
+                      properties:
+                        field:
+                          type: string
+                          example: ""
+                        code:
+                          type: integer
+                          enum: [40071]
+                          example: 40071
+                        message:
+                          type: string
+                          enum: [User does not have any completed payout]
+                          example: User does not have any completed payout
+    422CardUserMismatch:
+      description: >-
+        When this error occurs, it means that the **card_id** specified in URL path params
+        does not belong to the **payfare_id** specified.
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: "#/components/schemas/ErrorMessage"
+              - properties:
+                  errors:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        field:
+                          type: string
+                          example: card_id
+                        code:
+                          type: integer
+                          enum: [20080]
+                          example: 20080
+                        message:
+                          type: string
+                          enum: [Card user mismatch]
+                          example: Card user mismatch
+    422NoCardForPayout:
+      description: >-
+        This error is a result of accessing this endpoint before a card has been ordered for this user.
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: "#/components/schemas/ErrorMessage"
+              - properties:
+                  errors:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        field:
+                          type: string
+                          enum: [card]
+                          example: "card"
+                        code:
+                          type: integer
+                          enum: [40050]
+                          example: 40050
+                        message:
+                          type: string
+                          enum: [No card for payout]
+                          example: No card for payout
+  examples:
+    InvalidCardStatusTransitionError:
+      value: {
+        "status": "error",
+        "errors": [
+          {
+            "code": 20040,
+            "message": "Invalid card status transition",
+            "field": ""
+          }
+        ],
+        "message": ""
+      }
+      description: >-
+        This error occurs when an invalid status is sent in the request.
+    UserNotFoundError:
+      value: {
+        "status": "error",
+        "errors": [
+          {
+            "code": 10050,
+            "message": "User not found",
+            "field": ""
+          }
+        ],
+        "message": ""
+      }
+      description: >-
+        When this error occurs, it means that the Payfare (EmFi) ID provided
+        in the request does not match with any user in the card program.
+    InvalidFormatError:
+      value: {
+        "status": "error",
+        "errors": [
+          {
+            "code": 2078,
+            "message": "Invalid format",
+            "field": "account_number"
+          }
+        ],
+        "message": ""
+      }
+      description: Also 400 can occur due to invalid format of some of the fields.
+paths:
+  /v1/users/create-application:
+    post:
+      x-group-name: B2B Endpoints
+      x-proxy-name: Create a User
+      summary: Create a User
+      description: >-
+        This endpoint allows partners to create a new user within the Payfare (EmFi) system.
+        When invoked, it registers a user account with the provided details and
+        initiates any necessary verification steps based on EmFi's onboarding requirements.
+        <br/>
+        This endpoint initiates the full onboarding process for a new user,
+        including completing KYC (Know Your Customer) requirements and ordering a card.
+        Upon successful request, EmFi will handle all steps in the process to ensure
+        the user is onboarded and their card is ordered automatically.
+      operationId: create_user_application
+      parameters:
+        - $ref: "#/components/parameters/ClientKey"
+        - $ref: "#/components/parameters/ClientSecret"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: "#/components/schemas/UserRequest"
+                - properties:
+                    shipping_address:
+                      $ref: "#/components/schemas/Address"
+      responses:
+        '200':
+          description: 200 Response
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessfulRequest"
+                  - properties:
+                      data:
+                        type: object
+                        properties:
+                          user:
+                            $ref: "#/components/schemas/UserResponse"
+              examples:
+                Result:
+                  value: {
+                    "status": "success",
+                    "data": {
+                      "user": {
+                        "payfare_id": "7585cad9-338f-40a9-9a82-e3349605eace",
+                        "first_name": "Assaassa",
+                        "last_name": "K",
+                        "phone_number": "+18918350508",
+                        "date_of_birth": "1975-02-23",
+                        "created_at": "2024-10-30T16:13:55+00:00",
+                        "status": "pending-activation",
+                        "wallet_status": null,
+                        "reason_code": null,
+                        "reward_tier": "Green",
+                        "metadata": {
+                          "test": "Test"
+                        },
+                        "email": "Marley46@yahoo.com",
+                        "middle_name": null,
+                        "embossed_name": "Assaassa K",
+                        "external_id": "4b5e8d61-3112-4305-8e1a-167dd839cad4",
+                        "express_consent": [
+                          {
+                            "id": 34618,
+                            "payfare_id": "7585cad9-338f-40a9-9a82-e3349605eace",
+                            "name": "Agreement A",
+                            "accepted": 1,
+                            "date": "2023-11-01T00:00:00+00:00",
+                            "created_at": "2024-10-30T16:13:55.594000+00:00",
+                            "updated_at": "2024-10-30T16:13:55.594000+00:00"
+                          },
+                          {
+                            "id": 34619,
+                            "payfare_id": "7585cad9-338f-40a9-9a82-e3349605eace",
+                            "name": "Agreement B",
+                            "accepted": 1,
+                            "date": "2024-11-01T00:00:00+00:00",
+                            "created_at": "2024-10-30T16:13:55.600000+00:00",
+                            "updated_at": "2024-10-30T16:13:55.600000+00:00"
+                          }
+                        ],
+                        "preferred_language": "en-ca",
+                        "address": {
+                          "address_line1": "111 Lafayette Road",
+                          "address_line2": null,
+                          "address_line3": null,
+                          "address_line4": null,
+                          "city": "Syracuse",
+                          "region": "NY",
+                          "country_code": "us",
+                          "postal_code": "13205"
+                        },
+                        "last_login": null,
+                        "ssn_last_four": "2499",
+                        "id_number": "ID-4052",
+                        "id_type": "DL",
+                        "country_of_issue": "US",
+                        "region_of_issue": "ON",
+                        "expiry_date": "2025-03-03",
+                        "occupation": "Architecture and engineering occupations",
+                        "job_level": null,
+                        "ship_type": "mail"
+                      }
+                    },
+                    "message": ""
+                  }
+        '400':
+          description: 400 Response
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ErrorMessage"
+                  - properties:
+                      errors:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            field:
+                              type: string
+                              example: external_id
+                            code:
+                              type: integer
+                              enum: [10010, 10020, 10030, 10040, 10051, 10055, 2078]
+                              example: 10010
+                            message:
+                              type: string
+                              enum: 
+                                - User already exists
+                                - Required Field
+                                - Invalid Format
+                                - Invalid value
+                                - Invalid parameter encoding
+                                - User is closed by Payfare
+                                - Request format is not valid
+                              example: User already exists
+              examples:
+                UserAlreadyExists:
+                  summary: The user already exists.
+                  value: {
+                      "status": "error",
+                      "errors": [
+                          {
+                              "code": 10010,
+                              "message": "User already exists",
+                              "field": ""
+                          }
+                      ],
+                      "message": ""
+                  }
+                MultipleValidationErrors:
+                  summary: Request had multiple validation errors.
+                  value: {
+                      "status": "error",
+                      "errors": [
+                        {
+                          "code": 10010,
+                          "message": "User already exists",
+                          "field": "external_id",
+                        },
+                        {
+                          "code": 10020,
+                          "message": " Required field missing",
+                          "field": "first_name",
+                        }
+                      ]
+                  }
+                AllValidationErrors:
+                  value: {
+                    "status": "error",
+                    "errors": [
+                      {
+                        "code": 10010,
+                        "message": "User already exists",
+                        "field": "external_id",
+                      },
+                      {
+                        "code": 10020,
+                        "message": "Required Field",
+                        "field": "first_name",
+                      },
+                      {
+                        "code": 10030,
+                        "message": "Invalid Format",
+                        "field": "embossed_name",
+                      },
+                      {
+                        "code": 10040,
+                        "message": "Invalid value",
+                        "field": "region",
+                      },
+                      {
+                        "code": 10051,
+                        "message": "Invalid parameter encoding",
+                        "field": "address_line1",
+                      },
+                      {
+                        "code": 10055,
+                        "message": "User is closed by Payfare",
+                        "field": "external_id",
+                      },
+                      {
+                        "code": 2078,
+                        "message": "Request format is not valid",
+                        "field": "",
+                      }
+                    ],
+                    "message": ""
+                  }
+        '401':
+          $ref: "#/components/responses/401InvalidAuthorization"
+      deprecated: false
+  /v1/users/{payfare_id}:
+    get:
+      x-group-name: B2B Endpoints
+      x-proxy-name: Get a User
+      summary: Get a User
+      description: >-
+        This endpoint retrieves detailed information about a specified user on the platform.
+        By calling this endpoint, partners can access user-specific data such as profile details, account status.
+      operationId: get_user
+      parameters:
+        - $ref: "#/components/parameters/InternalUserId"
+        - $ref: "#/components/parameters/ClientKey"
+        - $ref: "#/components/parameters/ClientSecret"
+      responses:
+        '200':
+          description: 200 Response
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessfulRequest"
+                  -  properties:
+                      data:
+                        allOf:
+                          - $ref: "#/components/schemas/UserResponse"
+                          - properties:
+                              auto_disbursement:
+                                type: boolean
+                                description: >-
+                                  true or false depending on the user's decision. If the value was not stored, it returns None.
+                                nullable: true
+                                example: true
+              examples:
+                Result:
+                  value: {
+                    "status": "success",
+                    "data": {
+                      "first_name": "Able",
+                      "middle_name": null,
+                      "last_name": "Person",
+                      "embossed_name": "Able Person",
+                      "email": "aperson@example.com",
+                      "phone_number": "+19995551234",
+                      "address": {
+                        "address_line1": "67 mowat rd",
+                        "address_line2": "suite 100",
+                        "city": "Vancouver",
+                        "region": "BC",
+                        "postal_code": "B1A1A1",
+                        "country_code": "CA"
+                      },
+                      "external_id": "PartnerID-123456",
+                      "created_at": 1532973790,
+                      "payfare_id": "ce49eba7-b746-4cef-ac3a-79d2d6bff274",
+                      "express_consent": [
+                        {
+                          "name": "Cardholder Agreement",
+                          "date": "2018-09-10",
+                          "accepted": true
+                        },
+                        {
+                          "name": "Drivers Agreement",
+                          "date": "2018-09-10",
+                          "accepted": true
+                        }
+                      ],
+                      "status": "pending-activation",
+                      "reward_tier": "green"
+                    },
+                    "message": ""
+                  }
+        '400':
+          $ref: "#/components/responses/400UserNotFound"
+        '401':
+          $ref: "#/components/responses/401InvalidAuthorization"
+      deprecated: false
+    put:
+      x-group-name: B2B Endpoints
+      x-proxy-name: Update a User
+      summary: Update a User
+      description: >-
+        This endpoint allows for updating the user's information such as their reward tiers.
+      operationId: update_user
+      parameters:
+        - $ref: "#/components/parameters/InternalUserId"
+        - $ref: "#/components/parameters/ClientKey"
+        - $ref: "#/components/parameters/ClientSecret"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RewardTierField"
+      responses:
+        '200':
+          description: 200 Response
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessfulRequest"
+                  - properties:
+                      data:
+                        $ref: "#/components/schemas/UserResponse"
+              examples:
+                Result:
+                  value: {
+                    "status": "success",
+                    "data": {
+                      "payfare_id": "a3ccc307-9419-4f38-bf2a-bbad6b017bbe",
+                      "first_name": "John",
+                      "last_name": "Smith",
+                      "phone_number": "+1416756435",
+                      "date_of_birth": "1975-02-02",
+                      "created_at": "2024-10-25T10:44:35+00:00",
+                      "status": "pending-activation",
+                      "wallet_status": null,
+                      "reason_code": null,
+                      "reward_tier": "No_tier",
+                      "metadata": null,
+                      "email": "test6715222@payfare.com",
+                      "middle_name": null,
+                      "embossed_name": "John Smith",
+                      "external_id": "ext-id-5124534",
+                      "express_consent": [
+                        {
+                          "id": 34578,
+                          "payfare_id": "a3ccc307-9419-4f38-bf2a-bbad6b017bbe",
+                          "name": "Agreement A",
+                          "accepted": 1,
+                          "date": "2018-01-01T00:00:00+00:00",
+                          "created_at": "2024-10-25T10:44:36.127000+00:00",
+                          "updated_at": "2024-10-25T10:44:36.127000+00:00"
+                        }
+                      ],
+                      "preferred_language": "en-us",
+                      "address": {
+                        "address_line1": "222 Lafayette Road",
+                        "address_line2": "333 Lafayette Road",
+                        "address_line3": "444 Lafayette Road",
+                        "address_line4": "555 Lafayette Road",
+                        "city": "Syracuse",
+                        "region": "NY",
+                        "country_code": "us",
+                        "postal_code": "13205"
+                      },
+                      "last_login": null
+                    },
+                    "message": ""
+                  }
+        '400':
+          description: 400 Response
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ErrorMessage"
+                  - properties:
+                      errors:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            field:
+                              type: string
+                              enum: [reward_tier, payfare_id]
+                              example: reward_tier
+                            code:
+                              type: integer
+                              enum: [10030, 10050, 10051, 10055, 2078]
+                              example: 10030
+                            message:
+                              type: string
+                              enum: 
+                                - Invalid Format
+                                - User not found
+                                - Invalid parameter encoding
+                                - User is closed by Payfare
+                                - Request format is not valid
+                              example: Invalid Format
+              examples:
+                InvalidFormatError:
+                  value: {
+                      "status": "error",
+                      "errors": [
+                          {
+                              "code": 10030,
+                              "message": "Invalid Format",
+                              "field": "reward_tier"
+                          }
+                      ],
+                      "message": ""
+                  }
+                UserNotFoundError:
+                  $ref: "#/components/examples/UserNotFoundError"
+        '401':
+          $ref: "#/components/responses/401InvalidAuthorization"
+  /v1/users/{payfare_id}/kyc:
+    get:
+      x-group-name: B2B Endpoints
+      x-proxy-name: Get KYC Information Associated with the User
+      summary: Get KYC Information Associated with the User
+      description: >-
+        This endpoint retrieves the Know Your Customer (KYC) status associated with a specific user.
+        It provides detailed information regarding the user's KYC compliance, including status, associated documents.
+      operationId: get_kyc
+      parameters:
+        - $ref: "#/components/parameters/InternalUserId"
+        - $ref: "#/components/parameters/ClientKey"
+        - $ref: "#/components/parameters/ClientSecret"
+      responses:
+        '200':
+          description: 200 Response
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessfulRequest"
+                  - properties:
+                      data:
+                        type: object
+                        properties:
+                          kyc_status:
+                            type: string
+                            example: passed
+                          kyc_status_at:
+                            type: string
+                            format: date-time
+                            example: "2024-10-25T11:37:41.487480+00:00"
+                          kyc_fail_reason:
+                            type: string
+                            nullable: true
+                            example: ""
+                          ssn:
+                            type: string
+                            example: "4601"
+                          id_number:
+                            type: string
+                            example: ID-4052
+                          document_front:
+                            type: string
+                            nullable: true
+                            example: "test-document-front-url"
+                          document_back:
+                            type: string
+                            nullable: true
+                            example: null
+                          id_type:
+                            type: string
+                            example: DL
+                          country_of_issue:
+                            type: string
+                            example: US
+                          region_of_issue:
+                            type: string
+                            example: Ge
+                          expiry_date:
+                            type: string
+                            format: date
+                            example: "2025-03-03"
+                          occupation:
+                            type: string
+                            example: Architecture and engineering occupations
+                          user_info:
+                            type: object
+                            properties:
+                              occupation:
+                                type: string
+                                example: Architecture and engineering occupations
+                              ssn:
+                                type: string
+                                example: 2kYIUDPTLcETHOiMIiSAXQ==
+                              ssn_last_four:
+                                type: string
+                                example: "4601"
+                          metadata:
+                            type: object
+                            description: Any metadata that needs to be attached.
+                            nullable: true
+                            example: {
+                              key: value
+                            }
+        '400':
+          description: 400 Response
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ErrorMessage"
+                  - properties:
+                      errors:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            field:
+                              type: string
+                              enum: [kyc_status, payfare_id]
+                              example: kyc_status
+                            code:
+                              type: integer
+                              enum: [10050, 1038007, 10038002]
+                              example: 1038007
+                            message:
+                              type: string
+                              enum:
+                                - User not found
+                                - KYC process not initiated
+                                - KYC record already exists
+                              example: KYC process not initiated
+              examples:
+                UserNotFoundError:
+                  $ref: "#/components/examples/UserNotFoundError"
+                KYCProcessNotInitiatedError:
+                  description: User hasn't performed KYC yet.
+                  value: {
+                      "status": "error",
+                      "errors": [
+                          {
+                              "code": 1038007,
+                              "message": "KYC process not initiated",
+                              "field": "kyc_status"
+                          }
+                      ],
+                      "message": ""
+                  }
+                KYCRecordAlreadyExistsError:
+                  description: User has already performed KYC.
+                  value: {
+                      "status": "error",
+                      "errors": [
+                          {
+                              "code": 10038002,
+                              "message": "KYC record already exists",
+                              "field": "payfare_id"
+                          }
+                      ],
+                      "message": ""
+                  }
+        '401':
+          $ref: "#/components/responses/401InvalidAuthorization"
+  /v1/users/{payfare_id}/primary-card:
+    get:
+      x-group-name: B2B Endpoints
+      x-proxy-name: Get Primary Card of User
+      summary: Get Primary Card of User
+      description: >-
+        This endpoint retrieves the primary card associated with a specified user.
+        The primary card is the default payment method used for transactions.
+        By calling this endpoint, you can obtain essential details about
+        the user's primary card, including proxy, expiration date, and card type.
+      operationId: get_primary_card
+      parameters:
+        - $ref: "#/components/parameters/InternalUserId"
+        - $ref: "#/components/parameters/ClientKey"
+        - $ref: "#/components/parameters/ClientSecret"
+      responses:
+        '200':
+          description: 200 Response
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessfulRequest"
+                  - properties:
+                      data:
+                        type: object
+                        properties:
+                          card:
+                            type: object
+                            properties:
+                              card_id:
+                                type: string
+                                format: uuid
+                                example: db2cc32f-92bd-4206-965c-271296434717
+                              proxy:
+                                type: string
+                                example: 340002889959131
+                              brand:
+                                type: string
+                                example: Mastercard
+                              created:
+                                type: string
+                                format: date-time
+                                example: 2024-10-25T11:41:25+00:00
+                              currency:
+                                type: string
+                                example: USD
+                              exp_month:
+                                type: string
+                                example: "10"
+                              exp_year:
+                                type: string
+                                example: "2026"
+                              last4:
+                                type: string
+                                example: "9189"
+                              balance:
+                                type: integer
+                                example: 0
+                              status:
+                                type: string
+                                example: active
+                              bin:
+                                type: string
+                                example: "934000"
+                              metadata:
+                                type: object
+                                description: Any metadata that needs to be attached.
+                                nullable: true
+                                example: {
+                                  key: value
+                                }
+                              virtual:
+                                type: boolean
+                                example: true
+        '400':
+          $ref: "#/components/responses/400UserNotFound"
+        '401':
+          $ref: "#/components/responses/401InvalidAuthorization"
+  /v1/payment/{payfare_id}:
+    post:
+      x-group-name: B2B Endpoints
+      x-proxy-name: Add Payments
+      summary: Add Payments
+      description: >-
+        The Add Payments endpoint allows you to create a new payment entry associated with
+        a specific Payfare (EmFi) user identified by payfare_id.
+        This endpoint facilitates the processing of payments,
+        enabling users to add funds to their account or make transactions.
+      operationId: add_payment
+      parameters:
+        - $ref: "#/components/parameters/InternalUserId"
+        - $ref: "#/components/parameters/ClientKey"
+        - $ref: "#/components/parameters/ClientSecret"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - external_payment_id
+                - amount
+                - currency_code
+              properties:
+                external_payment_id:
+                  type: string
+                  description: The unique payout identifier from the client
+                  format: uuid
+                  example: ab333f19-22c3-4ba1-86fd-7e50f5c20ab9
+                amount:
+                  type: number
+                  description: Payout amount
+                  format: float
+                  example: 1000
+                currency_code:
+                  type: string
+                  description: ISO 4217 currency codes
+                  example: USD
+                description:
+                  type: string
+                  description: Partner defined field
+                  minLength: 0
+                  maxLength: 255
+                  example: ""
+                metadata:
+                  type: object
+                  description: Partner defined field
+                  example: {
+                    key: value
+                  }
+      responses:
+        '200':
+          description: 200 Response
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessfulRequest"
+                  - properties:
+                      data:
+                        allOf:
+                          - $ref: "#/components/schemas/PartialPaymentResponse"
+                          - properties:
+                              payout_id:
+                                type: string
+                                format: uuid
+                                example: 13e0457f-5bcf-420c-8268-d40332b3d1c2
+                              reason_codes:
+                                type: string
+                                example: "70010"
+                              status:
+                                type: string
+                                enum:
+                                  - pending
+                                  - failed
+                                  - complete
+                                  - cancelled
+                                example: pending
+                              description:
+                                type: string
+                                nullable: true
+                                example: null
+                              metadata:
+                                type: object
+                                description: Any metadata that needs to be attached.
+                                nullable: true
+                                example: {
+                                  key: value
+                                }
+        '201':
+          description: In case payout is already processed and completed
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessfulRequest"
+                  - properties:
+                      data:
+                        allOf:
+                          - $ref: "#/components/schemas/PartialPaymentResponse"
+                          - properties:
+                              payout_id:
+                                type: string
+                                format: uuid
+                                example: 13e0457f-5bcf-420c-8268-d40332b3d1c2
+                              reason_codes:
+                                type: string
+                                example: "70010"
+                              status:
+                                type: string
+                                enum:
+                                  - pending
+                                  - failed
+                                  - complete
+                                  - cancelled
+                                example: complete
+                              metadata:
+                                type: object
+                                description: Any metadata that needs to be attached.
+                                nullable: true
+                                example: {
+                                  key: value
+                                }
+              examples:
+                PaymentProcessedAndFailed:
+                  description: In case payout is already processed and failed
+                  value: {
+                    "status": "success",
+                    "data": {
+                      "payout_id": "9f5f0fa6-fe52-4dd6-9dd1-be7a6484f9f3",
+                      "net_amount": 100000,
+                      "status": "failed",
+                      "reason_codes": "70010",
+                      "created_at": "2023-11-13T16:03:44+00:00",
+                      "currency_code": "CAD",
+                      "metadata": null
+                    },
+                    "message": ""
+                  }
+        '400':
+          description: 400 Response
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ErrorMessage"
+                  - properties:
+                      errors:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            field:
+                              type: string
+                              example: ""
+                            code:
+                              type: integer
+                              enum: [
+                                10010, 10020, 10030, 10040, 70010, 70030, 70040, 70050, 70060, 70100, 70090,
+                                008001, 40050, 008008, 9999, 002024, 20126, 1011]
+                              example: 10010
+                            message:
+                              type: string
+                              enum:
+                                - Value must be unique
+                                - Required field missing
+                                - Invalid length or format
+                                - Invalid value
+                                - Invalid Status (Transaction not Allowed)
+                                - Transaction Limit Exceeded
+                                - Expired Card
+                                - Suspected Fraud
+                                - Lost Card
+                                - Max Balance
+                                - Load Limit Exceeded
+                                - Upstream Error
+                                - No card for payout
+                                - Provider Timeout
+                                - System Error
+                                - Connect Failure
+                                - Timeout
+                                - external_payment_id must be unique
+                              example: Value must be unique
+                            payout_id:
+                              type: string
+                              format: uuid
+              examples:
+                ValueMustBeUniqueError:
+                  description: Field which must be unique across the system, so a record could not be created.
+                  value: {
+                    "status": "error",
+                    "errors": [
+                      {
+                        "code": 10010,
+                        "message": "Value must be unique"
+                      }
+                    ],
+                    "message": ""
+                  }
+                RequiredFieldMissingError:
+                  description: Field which must be in the request but is missing.
+                  value: {
+                    "status": "error",
+                    "errors": [
+                      {
+                        "code": 10020,
+                        "message": "Required field missing"
+                      }
+                    ],
+                    "message": ""
+                  }
+                InvalidLengthOrFormatError:
+                  description: Field does not conform to the required formatting.
+                  value: {
+                    "status": "error",
+                    "errors": [
+                      {
+                        "code": 10030,
+                        "message": "Invalid length or format"
+                      }
+                    ],
+                    "message": ""
+                  }
+                InvalidValueError:
+                  description: Field is not one of the defined values.
+                  value: {
+                    "status": "error",
+                    "errors": [
+                      {
+                        "code": 10040,
+                        "message": "Invalid value"
+                      }
+                    ],
+                    "message": ""
+                  }
+                InvalidStatusError:
+                  description: >-
+                    Card status could be moved to an unpayable status such as 'Suspended' due to a Fraud Block.
+                    Wait for card status to change. Can be retried by EmFi or client.
+                  value: {
+                    "status": "error",
+                    "errors": [
+                      {
+                        "code": 70010,
+                        "message": "Invalid Status (Transaction not Allowed)"
+                      }
+                    ],
+                    "message": ""
+                  }
+                TransactionLimitExceededError:
+                  description: >-
+                    A load would be blocked when the frequency of the call to load a card
+                    has exceeded the set amount allotted to a driver.
+                    Can be retried when velocity limits cool.
+                    Example: 30 loads per day in a 24 hour rolling period when the limit is set to 25.
+                  value: {
+                    "status": "error",
+                    "errors": [
+                      {
+                        "code": 70030,
+                        "message": "Transaction Limit Exceeded"
+                      }
+                    ],
+                    "message": ""
+                  }
+                ExpiredCardError:
+                  description: >-
+                    Wait till the card is reissued and another card is added to the user.
+                    Can be retried by EmFi or client.
+                  value: {
+                    "status": "error",
+                    "errors": [
+                      {
+                        "code": 70040,
+                        "message": "Expired Card"
+                      }
+                    ],
+                    "message": ""
+                  }
+                SuspectedFraudError:
+                  description: >-
+                    Transaction blocked due to fraud. Retry at a later time.
+                    Every 60 min or after 24 hrs.
+                  value: {
+                    "status": "error",
+                    "errors": [
+                      {
+                        "code": 70050,
+                        "message": "Suspected Fraud"
+                      }
+                    ],
+                    "message": ""
+                  }
+                LostCardError:
+                  description: >-
+                    Retry when card status is in a payable status.
+                    Can be retried by EmFi or client.
+                  value: {
+                    "status": "error",
+                    "errors": [
+                      {
+                        "code": 70060,
+                        "message": "Lost Card"
+                      }
+                    ],
+                    "message": ""
+                  }
+                MaxBalanceError:
+                  description: Retry when funds have been moved off of card.
+                  value: {
+                    "status": "error",
+                    "errors": [
+                      {
+                        "code": 70100,
+                        "message": "Max Balance",
+                      }
+                    ],
+                    "message": ""
+                  }
+                LoadLimitExceededError:
+                  description: >-
+                    Max daily load limit exceeded in a rolling 24 hr period.
+                    Retry at a later time. Every 60 min or after 24 hrs.
+                  value: {
+                    "status": "error",
+                    "errors": [
+                      {
+                        "code": 70090,
+                        "message": "Load Limit Exceeded"
+                      }
+                    ],
+                    "message": ""
+                  }
+                UpstreamError:
+                  description: Retry every 60 min.
+                  value: {
+                    "status": "error",
+                    "errors": [
+                      {
+                        "code": 80001,
+                        "message": "Upstream Error"
+                      }
+                    ],
+                    "message": ""
+                  }
+                NoCardForPayoutError:
+                  description: User has no card assigned for payout.
+                  value: {
+                    "status": "error",
+                    "errors": [
+                      {
+                        "code": 40050,
+                        "message": "No card for payout"
+                      }
+                    ],
+                    "message": ""
+                  }
+                ProviderTimeoutError:
+                  description: Retry every 15 min. Retry with same transaction_id
+                  value: {
+                    "status": "error",
+                    "errors": [
+                      {
+                        "code": 008008,
+                        "message": "Provider Timeout"
+                      }
+                    ],
+                    "message": ""
+                  }
+                SystemError:
+                  description: Retry every 15 min. Retry with same transaction_id
+                  value: {
+                    "status": "error",
+                    "errors": [
+                      {
+                        "code": 9999,
+                        "message": "System Error"
+                      }
+                    ],
+                    "message": ""
+                  }
+                ConnectFailure:
+                  description: Retry every 15 min
+                  value: {
+                    "status": "error",
+                    "errors": [
+                      {
+                        "code": 002024,
+                        "message": "Connect Failure"
+                      }
+                    ],
+                    "message": ""
+                  }
+                DuplicatePaymentRequest:
+                  description: Duplicate payment request.
+                  value: {
+                    "status": "error",
+                    "errors": [
+                      {
+                        "code": 10011,
+                        "message": "external_payment_id must be unique",
+                        "field": "external_payment_id",
+                        "payout_id": "70216fb2-c825-4316-8511-ce3a59434d5e"
+                      }
+                    ],
+                    "message": ""
+                  }
+        '401':
+          $ref: "#/components/responses/401InvalidAuthorization"
+      deprecated: false
+  /v1/payouts/{payout_id}:
+    get:
+      x-group-name: B2B Endpoints
+      x-proxy-name: Check Payment Status
+      summary: Check Payment Status
+      description: >-
+        This endpoint allows users to retrieve the current status of
+        a specific payout using its unique identifier (payout_id).
+        By providing the payout_id, users can access detailed information
+        regarding the payout's status, including whether it is pending, completed, or failed.
+        This functionality is essential for tracking the status of payouts.
+      operationId: check_payment_status
+      parameters:
+        - $ref: "#/components/parameters/PayoutId"
+        - $ref: "#/components/parameters/ClientKey"
+        - $ref: "#/components/parameters/ClientSecret"
+      responses:
+        '200':
+          description: 200 Response
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessfulRequest"
+                  - properties:
+                      data:
+                        allOf:
+                          - $ref: "#/components/schemas/PartialPaymentResponse"
+                          - properties:
+                              payout_id:
+                                type: string
+                                description: >-
+                                  * If the payout_id is provided, then the payout status
+                                    and a list of earnings included in the payout will be returned.
+                                  * If the payout_id is not provided (i.e. null) the list of unpaid earnings
+                                    will be returned and the remaining fields will be null.
+                                format: uuid
+                                example: 13e0457f-5bcf-420c-8268-d40332b3d1c2
+                              status:
+                                type: string
+                                description: >-
+                                  <table>
+                                    <thead>
+                                      <th>Status</th>
+                                      <th>Meaning</th>
+                                    </thead>
+                                    <tr>
+                                      <td>processing</td>
+                                      <td>request has been accepted and a payout_id has been created</td>
+                                    </tr>
+                                    <tr>
+                                      <td>failed</td>
+                                      <td>The payout transaction failed.  The EmFi platform will retry up to 10 times</td>
+                                    </tr>
+                                    <tr>
+                                      <td>complete</td>
+                                      <td>The net_amount was loaded to the card</td>
+                                    </tr>
+                                    <tr>
+                                      <td>cancelled</td>
+                                      <td>The payment has been cancelled and all the associated earnings have been voided</td>
+                                    </tr>
+                                  </table>
+                                enum:
+                                  - processing
+                                  - failed
+                                  - complete
+                                  - cancelled
+                                example: processing
+                              earnings:
+                                type: object
+                                properties:
+                                  earnings_id:
+                                    type: string
+                                    description: List of earnings included in the payout
+                                    format: uuid
+                                    example: 1b380f06-46dc-40d9-a9af-5d8ae0030fde
+                                  net_amount:
+                                    type: number
+                                    example: 100
+                                  metadata:
+                                    type: object
+                                    description: Any metadata that needs to be attached.
+                                    nullable: true
+                                    example: {
+                                      key: value
+                                    }
+                                  description:
+                                    type: string
+                                    nullable: true
+                                    example: ''
+                                  external_payment_id:
+                                    type: string
+                                    format: uuid
+                                    example: ab333f19-22c3-4ba1-86fd-7e50f5c20ab9
+                                  created_at:
+                                    type: integer
+                                    example: 1532979333
+        '400':
+          description: Payout does not exist in our system.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ErrorMessage"
+                  - properties:
+                      errors:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            field:
+                              type: string
+                              example: ""
+                            code:
+                              type: integer
+                              enum: [40070]
+                              example: 40070
+                            message:
+                              type: string
+                              enum: [Payout does not exist]
+                              example: Payout does not exist
+      deprecated: false
+  /baas/users/{payfare_id}/user-session:
+    get:
+      x-group-name: BaaS Endpoints
+      x-proxy-name: Get User Session
+      summary: Get User Session
+      description: >-
+        This endpoint returns an x-bishop token that will be used for authentication by the EmFi Wallet SDK.
+      operationId: create_baas_user_session
+      parameters:
+        - $ref: "#/components/parameters/InternalUserId"
+        - $ref: "#/components/parameters/ClientKey"
+        - $ref: "#/components/parameters/ClientSecret"
+      responses:
+        '200':
+          description: >-
+            When a valid _payfare_id_ is sent, you will receive the following response.
+            Notice the x-bishop token inside the data key.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessfulRequest"
+                  - properties:
+                      data:
+                        type: object
+                        properties:
+                          x-bishop:
+                            type: string
+                            example: 952967e65ccf002829fcdbfc17b09149a3a6e760e8e25a72e52f15ecd9e7e185
+        '400':
+          $ref: "#/components/responses/400UserNotFound"
+        '401':
+          $ref: "#/components/responses/401InvalidAuthorization"
+        '403':
+          $ref: "#/components/responses/403AccessForbidden"
+  /baas/users/{payfare_id}/primary-card:
+    get:
+      x-group-name: BaaS Endpoints
+      x-proxy-name: Get Primary Card
+      summary: Get Primary Card
+      description: Use this endpoint to retrieve the user's primary card details.
+      operationId: get_primary_card
+      parameters:
+        - $ref: "#/components/parameters/InternalUserId"
+        - $ref: "#/components/parameters/ClientKey"
+        - $ref: "#/components/parameters/ClientSecret"
+      responses:
+        '200':
+          description: The details of the primary card are returned inside the **data** key.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessfulRequest"
+                  - properties:
+                      data:
+                        type: object
+                        properties:
+                          card:
+                            type: object
+                            properties:
+                              card_id:
+                                type: string
+                                description: A unique identifier (UUID) representing the card for the program.
+                                format: uuid
+                                example: 047d70e1-080e-4289-9733-18671260a932
+                              proxy:
+                                type: string
+                                description: A unique numerical identifier representing the card for the program.
+                                example: "110195062455837"
+                              brand:
+                                type: string
+                                description: The network name under which the card operates in (Visa, Mastercard, American Express)
+                                enum:
+                                  - Visa
+                                  - Mastercard
+                                  - American Express
+                                example: Visa
+                              created:
+                                type: string
+                                description: The date when the card was ordered.
+                                format: date-time
+                                example: 2023-03-25T03:04:56+00:00
+                              currency:
+                                type: string
+                                description: The currency under which the card operates in.
+                                example: USD
+                              exp_month:
+                                type: string
+                                description: The month at which the card will expire.
+                                example: "01"
+                              exp_year:
+                                type: string
+                                description: The year at which the card will expire.
+                                example: "2029"
+                              last4:
+                                type: string
+                                description: The last four digits of the card.
+                                example: "0436"
+                              balance:
+                                type: number
+                                description: The balance on the card.
+                                example: 0.00
+                              status:
+                                type: string
+                                description: >-
+                                  The status of the card which can be one of the following:
+                                  pre-active, in-transit, closed, damaged, stolen, lost, suspended, active, frozen.
+                                enum:
+                                  - pre-active
+                                  - in-transit
+                                  - closed
+                                  - damaged
+                                  - stolen
+                                  - lost
+                                  - suspended
+                                  - active
+                                  - frozen
+                                example: active
+                              bin:
+                                type: string
+                                description: The first four to six numbers on the card that identifies the issuer.
+                                example: "601999"
+                              metadata:
+                                type: object
+                                description: Metadata JSON payload that was optionally sent by the partner during card order.
+                                nullable: true
+                                example: null
+                              virtual:
+                                type: boolean
+                                description: A boolean which determines if the card is virtual or not.
+                                example: false
+                              expired:
+                                type: boolean
+                                description: A boolean which determines if the card has_expired or not.
+                                example: false
+                              expiring:
+                                type: boolean
+                                description: A boolean which determines if the card is close to the date of expiry (within 90 days).
+                                example: false
+                              reissue_limit_reached:
+                                type: boolean
+                                description: >-
+                                  A boolean that determines if the cardholder has reached the reissue limit.
+                                  EmFi imposes a rolling weekly and daily limit with regards to how many times a cardholder can reissue their card.
+                                  If this value is true, the cardholder cannot reissue their card until this value becomes false.
+                                example: false
+                              profile_recently_updated:
+                                type: boolean
+                                description: >-
+                                  A boolean which determines if the user has recently updated their profile.
+                                  If an update occurred in the last 24 hours,
+                                  it will return true and the cardholder cannot reissue their card until this value becomes false.
+                                example: false
+                              activation_date:
+                                type: string
+                                description: The datetime of when the card was activated.
+                                format: date-time
+                                nullable: true
+                                example: null
+                              reissuable:
+                                type: boolean
+                                description: A boolean which determines if the card can be reissued.
+                                example: false
+        '400':
+          $ref: "#/components/responses/400UserNotFound"
+        '422':
+          $ref: "#/components/responses/422NoCardForPayout"
+      deprecated: false
+  /baas/users/{payfare_id}/cards/{card_id}/status:
+    get:
+      x-group-name: BaaS Endpoints
+      x-proxy-name: Get Card Status
+      summary: Get Card Status
+      description: >-
+        Use this endpoint to retrieve the card status of a particular card
+        associated with the cardholder.
+      operationId: get_card_status
+      parameters:
+        - $ref: "#/components/parameters/InternalUserId"
+        - $ref: "#/components/parameters/CardId"
+        - $ref: "#/components/parameters/ClientKey"
+        - $ref: "#/components/parameters/ClientSecret"
+      responses:
+        '200':
+          description: The **status** field inside the data key represents the status of the card.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessfulRequest"
+                  - properties:
+                      data:
+                        type: object
+                        properties:
+                          status:
+                            type: string
+                            example: closed
+        '400':
+          $ref: "#/components/responses/400UserNotFound"
+        '401':
+          $ref: "#/components/responses/401InvalidAuthorization"
+        '403':
+          $ref: "#/components/responses/403AccessForbidden"
+        '422':
+          $ref: "#/components/responses/422CardUserMismatch"
+      deprecated: false
+    put:
+      x-group-name: BaaS Endpoints
+      x-proxy-name: Set Card Status
+      summary: Set Card Status
+      description: >-
+        Use this BaaS endpoint to lock and unlock the cardholder's card upon
+        their request. This same endpoint is also used to mark a card as lost,
+        stolen and damaged.
+      operationId: set_card_status
+      parameters:
+        - $ref: "#/components/parameters/InternalUserId"
+        - $ref: "#/components/parameters/CardId"
+        - $ref: "#/components/parameters/ClientKey"
+        - $ref: "#/components/parameters/ClientSecret"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status:
+                  type: string
+                  description: >-
+                    <p>The status the cardholder wishes to set the card to.</p>
+
+                    <p>The table below contains the current allowable card status changes along with their descriptions:</p>
+
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Card Status</th>
+                                <th>Description</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>active</td>
+                                <td>All transactions allowed.</td>
+                            </tr>
+                            <tr>
+                                <td>frozen</td>
+                                <td>
+                                  Withdrawals and purchases are blocked.
+                                  Cardholder has the option of switching the card into an unlocked state ("<strong>active</strong>") from this status.
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>lost</td>
+                                <td>
+                                  Use this status for when the user has marked their card as lost.
+                                  Withdrawals and purchases are blocked. Once a card is marked as <strong>lost</strong>,
+                                  EmFi does not allow the card to be reactivated.
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>damaged</td>
+                                <td>
+                                  Use this status for when the user has marked their card as damaged.
+                                  Withdrawals and purchases are blocked. Once a card is marked as <strong>damaged</strong>,
+                                  EmFi does not allow the card to be reactivated.
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>stolen</td>
+                                <td>
+                                  Use this status for when the user has marked their card as stolen.
+                                  Withdrawals and purchases are blocked.
+                                  Once a card is marked as <strong>stolen</strong>, EmFi does not allow the card to be reactivated.
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                    <blockquote>
+                        <h3>📘 Card Status Terminology</h3>
+                        <p>The <strong>frozen</strong> status is what EmFi uses to refer to a card that is commonly referred to as <strong>locked</strong>.
+                        In same way, an <strong>active</strong> card is a card that is commonly referred to as <strong>unlocked</strong>.</p>
+                    </blockquote>
+                  enum:
+                    - active
+                    - frozen
+                    - lost
+                    - damaged
+                    - stolen
+                  example: frozen
+                report_date:
+                  type: string
+                  description: >-
+                    The date on which the cardholder has requested to make this
+                    status change in (YYYY-MM-DD) format.
+                  format: date
+                  example: 2023-06-30
+      responses:
+        '200':
+          description: When the card status has successfully changed, you will receive this response.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessfulRequest"
+                  - properties:
+                      data:
+                        type: object
+                        example: {}
+        '400':
+          $ref: "#/components/responses/400UserNotFound"
+        '401':
+          $ref: "#/components/responses/401InvalidAuthorization"
+        '403':
+          $ref: "#/components/responses/403AccessForbidden"
+        '422':
+          description: 422 Responses
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ErrorMessage"
+                  - properties:
+                      errors:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            field:
+                              type: string
+                              example: card_id
+                            code:
+                              type: integer
+                              enum: [20080, 20040]
+                              example: 20080
+                            message:
+                              type: string
+                              enum:
+                                - Card user mismatch
+                                - Invalid card status transition
+                              example: Card user mismatch
+              examples:
+                InvalidCardStatusTransition:
+                  $ref: "#/components/examples/InvalidCardStatusTransitionError"
+                CardUserMismatch:
+                  value: {
+                    "status": "error",
+                    "errors": [
+                        {
+                            "code": 20080,
+                            "message": "Card user mismatch",
+                            "field": "card_id"
+                        }
+                    ],
+                    "message": ""
+                  }
+                  description: >-
+                    This error occurs when sending in a **card_id** in the URL path params
+                    that is not associated with the specified **payfare_id**
+      deprecated: false
+  /baas/users/{payfare_id}/cards/{card_id}/shipping-address:
+    get:
+      x-group-name: BaaS Endpoints
+      x-proxy-name: Get Shipping Address
+      summary: Get Shipping Address
+      description: >-
+        Use this endpoint to get the current shipping address on file for the
+        cardholder.
+      operationId: get_shipping_address_for_user
+      parameters:
+        - $ref: "#/components/parameters/InternalUserId"
+        - $ref: "#/components/parameters/CardId"
+        - $ref: "#/components/parameters/ClientKey"
+        - $ref: "#/components/parameters/ClientSecret"
+      responses:
+        '200':
+          description: >-
+            Inside **data**, access **shipping_address** to get all the details related to cardholder's shipping address.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessfulRequest"
+                  - properties:
+                      data:
+                        type: object
+                        properties:
+                          shipping_address:
+                            $ref: "#/components/schemas/Address"
+        '400':
+          $ref: "#/components/responses/400UserNotFound"
+        '401':
+          $ref: "#/components/responses/401InvalidAuthorization"
+        '403':
+          $ref: "#/components/responses/403AccessForbidden"
+        '422':
+          $ref: "#/components/responses/422CardUserMismatch"
+      deprecated: false
+    post:
+      x-group-name: BaaS Endpoints
+      x-proxy-name: Set Shipping Address
+      summary: Set Shipping Address
+      description: Use this endpoint to update the cardholder's shipping address.
+      operationId: set_shipping_address_for_user
+      parameters:
+        - $ref: "#/components/parameters/InternalUserId"
+        - $ref: "#/components/parameters/CardId"
+        - $ref: "#/components/parameters/ClientKey"
+        - $ref: "#/components/parameters/ClientSecret"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Address"
+      responses:
+        '200':
+          description: >-
+            When the shipping address is updated successfully,
+            the response that is returned will contain the updated fields along
+            with the unchanged fields inside **data** under **shipping_address**.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessfulRequest"
+                  - properties:
+                      data:
+                        type: object
+                        properties:
+                          shipping_address:
+                            $ref: "#/components/schemas/Address"
+        '400':
+          $ref: "#/components/responses/400UserNotFound"
+        '401':
+          $ref: "#/components/responses/401InvalidAuthorization"
+        '403':
+          $ref: "#/components/responses/403AccessForbidden"
+        '422':
+          $ref: "#/components/responses/422CardUserMismatch"
+      deprecated: false
+  /baas/users/{payfare_id}/card-shipping-details:
+    get:
+      x-group-name: BaaS Endpoints
+      x-proxy-name: Get Card Shipping Status
+      summary: Get Card Shipping Status
+      description: >-
+        Use this endpoint to get the shipment status of the cardholder's new
+        card.
+
+        <blockquote>
+            <h5>❗️ Delivery Confirmation</h5>
+            <p>EmFi does not have insight into whether a card was successfully delivered and received by the cardholder from the card printer.</p>
+        </blockquote>
+      operationId: get_card_shipping_details_for_user
+      parameters:
+        - $ref: "#/components/parameters/InternalUserId"
+        - $ref: "#/components/parameters/ClientKey"
+        - $ref: "#/components/parameters/ClientSecret"
+      responses:
+        '200':
+          description: >-
+            Inside the data key, you'll find the cardholder's shipping address details
+            along with the current **state** of the card shipment along with the **date** that pertains to that state.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessfulRequest"
+                  - properties:
+                      data:
+                        allOf:
+                          - $ref: "#/components/schemas/Address"
+                          - properties:
+                              first_name:
+                                type: string
+                                example: Tony
+                              last_name:
+                                type: string
+                                example: Stark
+                              state:
+                                type: string
+                                description: >-
+                                  <table>
+                                      <thead>
+                                          <tr>
+                                              <th>State</th>
+                                              <th>Description</th>
+                                          </tr>
+                                      </thead>
+                                      <tbody>
+                                          <tr>
+                                              <td>pre-shipment</td>
+                                              <td>A request to the card printer has been made to produce the card.</td>
+                                          </tr>
+                                          <tr>
+                                              <td>shipped</td>
+                                              <td>
+                                                Payfare has received confirmation from the card printer
+                                                that the card has left their facility and is on-route to the cardholder.
+                                              </td>
+                                          </tr>
+                                          <tr>
+                                              <td>expected arrival</td>
+                                              <td>
+                                                If it has been 14 days since the card was shipped,
+                                                it means that Payfare expects that the card has arrived to the cardholder.
+                                              </td>
+                                          </tr>
+                                      </tbody>
+                                  </table>
+                                enum:
+                                  - pre-shipment
+                                  - shipped
+                                  - expected arrival
+                                example: pre-shipment
+                              date:
+                                type: string
+                                format: date-time
+                                example: 2023-02-28T18:26:40+00:00
+        '400':
+          $ref: "#/components/responses/400UserNotFound"
+        '401':
+          $ref: "#/components/responses/401InvalidAuthorization"
+        '403':
+          $ref: "#/components/responses/403AccessForbidden"
+      deprecated: false
+  /baas/users/{payfare_id}/bank-accounts:
+    get:
+      x-group-name: BaaS Endpoints
+      x-proxy-name: Get Direct Deposit Information
+      summary: Get Direct Deposit Information
+      description: >-
+        Use this endpoint to retrieve the direct deposit information associated
+        with the cardholder.
+
+        <blockquote>
+            <h5>❗️ Requirement</h5>
+            <p>A successful response will only be returned if <strong>at least one payout has been completed</strong> for this user.
+            This rule was put in place by EmFi to prevent bad actors from signing up as gig workers with our partners
+            as a means of obtaining a EmFi account to leverage the direct deposit functionality
+            in order to receive large 3rd party deposits.</p>
+        </blockquote>
+
+        <blockquote>
+            <h5>📘 Recommendation</h5>
+            <p>To avoid a frictional experience for the user, we recommend the integrating partner to hide the option
+            of viewing the Direct Deposit Information until at least one "Instant Pay" has been completed.</p>
+        </blockquote>
+      operationId: get_bank_accounts
+      parameters:
+        - $ref: "#/components/parameters/InternalUserId"
+        - $ref: "#/components/parameters/ClientKey"
+        - $ref: "#/components/parameters/ClientSecret"
+      responses:
+        '200':
+          description: >-
+            <p>The routing number and the direct deposit account number are
+            <strong>sent as two fields inside the bank account key which is inside the data key</strong>.</p>
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessfulRequest"
+                  - properties:
+                      data:
+                        type: object
+                        properties:
+                          bank_account:
+                            type: object
+                            properties:
+                              dda_number:
+                                type: string
+                                example: '9898985597508008'
+                              routing_number:
+                                type: string
+                                example: '072401068'
+        '400':
+          $ref: "#/components/responses/400UserNotFound"
+        '401':
+          $ref: "#/components/responses/401InvalidAuthorization"
+        '403':
+          $ref: "#/components/responses/403AccessForbidden"
+        '404':
+          $ref: "#/components/responses/404NoCompletedPayout"
+      deprecated: false
+  /baas/users/{payfare_id}/direct-deposit-form:
+    get:
+      x-group-name: BaaS Endpoints
+      x-proxy-name: Get Direct Deposit Form
+      summary: Get Direct Deposit Form
+      description: >-
+        Use this endpoint to retrieve the direct deposit information associated
+        with the cardholder.
+
+        <blockquote>
+          <h5>❗️ Requirement</h5>
+          <p>A successful response will only be returned if <strong>at least one payout has been completed</strong> for this user.
+          This rule was put in place by EmFi to prevent bad actors from signing up as gig workers
+          with our partners as a means of obtaining a EmFi account to leverage
+          the direct deposit functionality in order to receive large 3rd party deposits.</p>
+          <h5>📘 Recommendation</h5>
+          <p>To avoid a frictional experience for the user, we recommend the integrating partner
+          to hide the option of viewing the Direct Deposit Information until at least one &quot;Instant Pay&quot; has been completed.</p>
+        </blockquote>
+      operationId: get_direct_deposit_form
+      parameters:
+        - $ref: "#/components/parameters/InternalUserId"
+        - $ref: "#/components/parameters/ClientKey"
+        - $ref: "#/components/parameters/ClientSecret"
+      responses:
+        '200':
+          description: >-
+            <p>The direct deposit form url is placed inside the data with key as <strong>url</strong>.</p>
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessfulRequest"
+                  - properties:
+                      data:
+                        type: object
+                        properties:
+                          url:
+                            type: string
+                            example: >-
+                              https://payfare-unicron-dev.s3.amazonaws.com/doordash/us/dda/c5f9a1e6-b201-478e-8bde-9a50ce7e063c/dasherdirect_c5f9a1e6-b201-478e-8bde-9a50ce7e063c_dda.pdf?AWSAccessKeyId=AKIA4Q3UOHCP4FKOFWGA&Signature=wg7nQrU1u0%2BCYEGBPDoKdJJhPTE%3D&Expires=1694532526
+        '400':
+          description: 400 Response
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ErrorMessage"
+                  - properties:
+                      errors:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            field:
+                              type: string
+                              example: payfare_id
+                            code:
+                              type: integer
+                              enum: [10050, 10026]
+                              example: 10050
+                            message:
+                              type: string
+                              enum:
+                                - User not found
+                                - Direct Deposit Form is currently being generated
+                              example: User not found
+              examples:
+                UserNotFoundError:
+                  $ref: "#/components/examples/UserNotFoundError"
+                FormCurrentlyBeingGenerated:
+                  value: {
+                    "status": "error",
+                    "errors": [
+                      {
+                        "code": 10026,
+                        "message": "Direct Deposit Form is currently being generated",
+                        "field": ""
+                      }
+                    ],
+                    "message": ""
+                  }
+                  description: >-
+                    When this error occurs, it means that the direct deposit form is currently being generated.
+        '401':
+          $ref: "#/components/responses/401InvalidAuthorization"
+        '403':
+          $ref: "#/components/responses/403AccessForbidden"
+        '404':
+          $ref: "#/components/responses/404NoCompletedPayout"
+      deprecated: false
+  /baas/users/{payfare_id}/account-statements:
+    get:
+      x-group-name: BaaS Endpoints
+      x-proxy-name: Get Account Statements
+      summary: Get Account Statements
+      description: >-
+        Use this endpoint to retrieve the direct deposit information associated
+        with the cardholder.
+      operationId: get_account_statements
+      parameters:
+        - $ref: "#/components/parameters/InternalUserId"
+        - $ref: "#/components/parameters/ClientKey"
+        - $ref: "#/components/parameters/ClientSecret"
+      responses:
+        '200':
+          description: >-
+            <p>Each statement is sent as an element inside the <strong>statements</strong> array.
+            The statement object contains a signed url which points to a PDF file
+            (expires in 900 seconds from when the request is made).
+            <strong>last4</strong> represents the last four digits of the card.
+            This can be used to help the cardholder identify which statement points
+            to the card they are looking for.
+            Finally the <strong>start_date</strong> and <strong>end_date</strong> is the statement period.</p>
+
+            <blockquote>
+              <h6>❗️ Statements Response</h6>
+              <p>The results in statements are not sorted by the statement period.
+              The sorting can be delegated to your frontend view.
+              This is due to how statements are retrieved from our storage provider (Amazon S3).</p>
+            </blockquote>
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessfulRequest"
+                  - properties:
+                      data:
+                        type: object
+                        properties:
+                          statements:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                url:
+                                  type: string
+                                  example: >-
+                                    https://payfare-unicron-dev.s3.amazonaws.com/partner/account-statements/us/961a6913-bc0e-49c4-abd7-3473c92adea0/partner_110195631015095_07012023_07312023.pdf?AWSAccessKeyId=AKIA4Q3UOHCP4FKOFWGA&Signature=jOGNqDsdTluQIuSO8e7I%2B3HxJ%2Fo%3D&Expires=1692005279
+                                last4:
+                                  type: string
+                                  example: '4689'
+                                start_date:
+                                  type: string
+                                  format: date-time
+                                  example: 2023-07-01T00:00:00
+                                end_date:
+                                  type: string
+                                  format: date-time
+                                  example: 2023-07-31T00:00:00
+        '400':
+          $ref: "#/components/responses/400UserNotFound"
+        '401':
+          $ref: "#/components/responses/401InvalidAuthorization"
+        '403':
+          $ref: "#/components/responses/403AccessForbidden"
+      deprecated: false
+  /baas/users/{payfare_id}/cards/{card_id}/reissue-card:
+    post:
+      x-group-name: BaaS Endpoints
+      x-proxy-name: Reissue Card
+      summary: Reissue Card
+      description: Use this BaaS endpoint to reissue a user's card.
+      operationId: reissue_card
+      parameters:
+        - $ref: "#/components/parameters/InternalUserId"
+        - $ref: "#/components/parameters/CardId"
+        - $ref: "#/components/parameters/ClientKey"
+        - $ref: "#/components/parameters/ClientSecret"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status:
+                  type: string
+                  description: >-
+                    The selected status of the current card by the cardholder.
+                    Values can be lost, stolen or damaged.
+                  enum:
+                    - lost
+                    - stolen
+                    - damaged
+                  example: lost
+                report_date:
+                  type: string
+                  description: >-
+                    The date of when the cardholder requested the status update
+                    in YYYY-MM-DD format.
+                  format: date
+                  example: 2023-01-21
+      responses:
+        '200':
+          description: When the card status has successfully changed, you will receive this response.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessfulRequest"
+                  - properties:
+                      data:
+                        type: object
+                        properties:
+                          ting:
+                            type: string
+                            format: uuid
+                            example: a77cf392-e069-4321-a28b-f90198946c56
+        '400':
+          $ref: "#/components/responses/400UserNotFound"
+        '401':
+          $ref: "#/components/responses/401InvalidAuthorization"
+        '403':
+          $ref: "#/components/responses/403AccessForbidden"
+        '422':
+          description: 422 Responses
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ErrorMessage"
+                  - properties:
+                      errors:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            field:
+                              type: string
+                              example: ""
+                            code:
+                              type: integer
+                              enum: [20040, 20095, 20098, 20097]
+                              example: 20040
+                            message:
+                              type: string
+                              enum:
+                                - Invalid card status transition
+                                - Card reissue in progress
+                                - Reissue limit reached
+                                - Failed to reissue card due to recent user profile update
+                              example: Invalid card status transition
+              examples:
+                InvalidCardStatusTransition:
+                  $ref: "#/components/examples/InvalidCardStatusTransitionError"
+                TooManyRequests:
+                  value: {
+                    "status": "error",
+                    "errors": [
+                      {
+                        "code": 20095,
+                        "message": "Card reissue in progress",
+                        "field": ""
+                      }
+                    ],
+                    "message": ""
+                  }
+                  description: >-
+                    This error occurs when multiple requests are made
+                    in quick succession to reissue a user's card.
+                ReissueLimitReached:
+                  value: {
+                    "status": "error",
+                    "errors": [
+                      {
+                        "code": 20098,
+                        "message": "Reissue limit reached",
+                        "field": ""
+                      }
+                    ],
+                    "message": ""
+                  }
+                  description: >-
+                    > ### ❗️ WARNING
+                    >
+                    > Do not surface this error to the end user
+                    > since a fraudster could use this to learn the ATO prevention rules.
+                    > Map these error codes to a more generic error.
+
+                    This error occurs when the user has reached their
+                    daily and weekly limit to issue their cards.
+                ProfileRcentlyUpdated:
+                  value: {
+                    "status": "error",
+                    "errors": [
+                      {
+                        "code": 20097,
+                        "message": "Failed to reissue card due to recent user profile update",
+                        "field": ""
+                      }
+                    ],
+                    "message": ""
+                  }
+                  description: >-
+                    > ### ❗️ WARNING
+                    >
+                    > Do not surface this error to the end user
+                    > since a fraudster could use this to learn the ATO prevention rules.
+                    > Map these error codes to a more generic error.
+
+                    This error occurs when the user has recently updated
+                    their profile and try to re-issue a card.
+      deprecated: false
+  /baas/users/{payfare_id}/cards/{card_id}/transactions:
+    get:
+      x-group-name: BaaS Endpoints
+      x-proxy-name: Get Transactions
+      summary: Get Transactions
+      description: >-
+        <p>Use this endpoint to retrieve transaction line items associated with the
+        cardholder between specific dates.</p>
+        <p>Note: At any given time, the maximum query range spanning
+        from the <strong>from_datetime</strong> and the <strong>to_datetime</strong> is 30 days.
+        Starting from the current day, up to a year&#39;s worth of transactions
+        can be queried with the <strong>from_datetime</strong> and <strong>to_datetime</strong> split
+        into &lt;= 30 day intervals.
+        If the <strong>from_datetime</strong> goes well beyond the year, it will be automatically capped.
+        Please note, due to compliance and regulatory rules,
+        the request to view this data must originate from the cardholder.</p>
+      operationId: get_card_transactions
+      parameters:
+        - $ref: "#/components/parameters/InternalUserId"
+        - $ref: "#/components/parameters/CardId"
+        - name: status
+          in: query
+          description: >-
+            Transaction type that you wish to pull. Sending "all" returns posted
+            and pending transactions.  Likewise, sending "posted" or "pending"
+            will return the corresponding transactions of that type.
+          schema:
+            type: string
+            enum:
+              - all
+              - posted
+              - pending
+            example: all
+        - $ref: "#/components/parameters/FromDateTime"
+        - $ref: "#/components/parameters/ToDateTime"
+        - $ref: "#/components/parameters/ClientKey"
+        - $ref: "#/components/parameters/ClientSecret"
+      responses:
+        '200':
+          description: 200 Response
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessfulRequest"
+                  - properties:
+                      data:
+                        type: object
+                        properties:
+                          transactions:
+                            type: array
+                            description: The user's transactions.
+                            items:
+                              type: object
+                              properties:
+                                transaction_id:
+                                  type: string
+                                  description: A unique identifier representing the transaction.
+                                  example: F2164684129
+                                transaction_type_id:
+                                  type: string
+                                  description: >-
+                                    <p>A numerical identifier representing the transaction type.</p>
+                                    <h3>Transaction Types</h3>
+                                    <table>
+                                      <thead>
+                                        <tr>
+                                          <th style="text-align:left">Code</th><th style="text-align:left">Type</th>
+                                        </tr>
+                                      </thead>
+                                      <tbody>
+                                        <tr>
+                                          <td style="text-align:left">00</td><td style="text-align:left">POS</td>
+                                        </tr>
+                                        <tr>
+                                          <td style="text-align:left">BP</td><td style="text-align:left">Bill Pay</td>
+                                        </tr>
+                                        <tr>
+                                          <td style="text-align:left">47</td><td style="text-align:left">ACH</td>
+                                        </tr>
+                                        <tr>
+                                          <td style="text-align:left">46</td><td style="text-align:left">ACH Reverse</td>
+                                        </tr>
+                                        <tr>
+                                          <td style="text-align:left">40</td><td style="text-align:left">Goal Transfer</td>
+                                        </tr>
+                                        <tr>
+                                          <td style="text-align:left">25</td><td style="text-align:left">Payout</td>
+                                        </tr>
+                                        <tr>
+                                          <td style="text-align:left">RC</td><td style="text-align:left">Reissue Card</td>
+                                        </tr>
+                                        <tr>
+                                          <td style="text-align:left">CW</td><td style="text-align:left">Rewards Credit</td>
+                                        </tr>
+                                        <tr>
+                                          <td style="text-align:left">01</td><td style="text-align:left">Cash Withdrawal</td>
+                                        </tr>
+                                        <tr>
+                                          <td style="text-align:left">28</td><td style="text-align:left">Prepaid Activation and Load</td>
+                                        </tr>
+                                        <tr>
+                                          <td style="text-align:left">21</td><td style="text-align:left">Load Money Onto Card</td>
+                                        </tr>
+                                        <tr>
+                                          <td style="text-align:left">W1</td><td style="text-align:left">Card Replacement Fee</td>
+                                        </tr>
+                                        <tr>
+                                          <td style="text-align:left">Q1</td><td style="text-align:left">Card Replacement Fee Reversal</td>
+                                        </tr>
+                                        <tr>
+                                          <td style="text-align:left">W2</td><td style="text-align:left">Dormancy Fee</td>
+                                        </tr>
+                                        <tr>
+                                          <td style="text-align:left">Q2</td><td style="text-align:left">Dormancy Fee Reversal</td>
+                                        </tr>
+                                        <tr>
+                                          <td style="text-align:left">X2</td><td style="text-align:left">Card to Card Transfer</td>
+                                        </tr>
+                                      </tbody>
+                                    </table>
+                                  enum:
+                                    - "00"
+                                    - BP
+                                    - "47"
+                                    - "46"
+                                    - "40"
+                                    - "25"
+                                    - RC
+                                    - CW
+                                    - "01"
+                                    - "28"
+                                    - "21"
+                                    - W1
+                                    - Q1
+                                    - W2
+                                    - Q2
+                                    - X2
+                                  example: "25"
+                                remaining_balance:
+                                  type: number
+                                  description: Sum amount of posted/cleared transactions.
+                                  format: float
+                                  example: 25.0
+                                available_balance:
+                                  type: number
+                                  description: Remaining balance minus any funds on hold (pre-auth).
+                                  format: float
+                                  example: 25.0
+                                amount:
+                                  type: number
+                                  description: >-
+                                    The transaction line item amount formatted in the card program's default currency.
+                                  format: float
+                                  example: 25.0
+                                transaction_date:
+                                  type: string
+                                  description: >-
+                                    The date of when the transaction occurred in iso format.
+                                    The timezone will always be in UTC.
+                                  format: date-time
+                                  example: 2023-08-08T18:41:02+00:00
+                                description:
+                                  type: string
+                                  description: Human readable string which describes the transaction.
+                                  example: DoorDash Direct Deposit
+                                merchant_name:
+                                  type: string
+                                  description: The name of the merchant (for POS transactions).
+                                  nullable: true
+                                  example: ""
+                                mcc_category:
+                                  type: string
+                                  description: String representation of the MCC category.
+                                  example: Other
+                                status:
+                                  type: string
+                                  description: >-
+                                    String that determines whether the transaction is posted or pending
+                                  example: Posted
+                          meta:
+                            type: object
+                            properties:
+                              has_transactions:
+                                type: boolean
+                                description: >-
+                                  Boolean field which gives quick insight into whether
+                                  there are transactions for the selected timeframe as specified.
+                                example: true
+                              closing_balance:
+                                type: number
+                                description: >-
+                                  The closing balance for the selected timeframe as specified.
+                                format: float
+                                example: 25.0
+                              opening_balance:
+                                type: number
+                                description: >-
+                                  The opening balance for the selected timeframe as specified.
+                                format: float
+                                example: 0.0
+        '400':
+          $ref: "#/components/responses/400UserNotFound"
+      deprecated: false
+  /baas/users/{payfare_id}/transaction-details/{transaction_id}:
+    get:
+      x-group-name: BaaS Endpoints
+      x-proxy-name: Get Transaction Details
+      summary: Get Transaction Details
+      description: >-
+        This endpoint returns more granular details about the transaction line
+        item.
+
+        <blockquote>
+          <h5>💰Cash Advances</h5>
+
+          Any POS transaction that has a cash advance
+          (<em>also commonly referred to as "Cash Back"</em>
+          not to be confused with cash back from rewards)
+          amount, will have values for
+          <strong>cash_withdrawal</strong> and <strong>purchase_amount</strong>.
+          Note that the sum of cash_withdrawal and purchase_amount is equal to the
+          <strong>transaction_total</strong>.
+
+          For display purposes, it is recommended that you always display
+          the <strong>transaction_total</strong> as the official amount for
+          the transaction line item.
+          The values given for <strong>cash_withdrawal</strong>
+          and <strong>purchase_amount</strong> are to be used
+          for the granular breakdown.
+
+          If the POS transaction is not associated with a cash advance,
+          then cash_withdrawal and purchase_amount will be null.
+        </blockquote>
+
+        <blockquote>
+          <h5>🔻ACH Transfers</h5>
+
+          If the transaction line item is an ACH transfer,
+          the fields <strong>ach_status</strong>, <strong>ach_transfer_id</strong>
+          and <strong>can_cancel</strong> would be populated.
+        </blockquote>
+      operationId: get_transaction_details
+      parameters:
+        - $ref: "#/components/parameters/InternalUserId"
+        - name: transaction_id
+          in: path
+          description: >-
+            The unique id of the transaction. For reward redemptions, the value
+            would be "redemption"
+          schema:
+            type: string
+            example: F32836565
+          required: true
+        - $ref: "#/components/parameters/ClientKey"
+        - $ref: "#/components/parameters/ClientSecret"
+      responses:
+        '200':
+          description: 200 Response
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessfulRequest"
+                  - properties:
+                      data:
+                        type: object
+                        properties:
+                          transaction_id:
+                            oneOf:
+                              - type: number
+                                format: int64
+                                example: 878579343
+                              - type: string
+                                enum: [redemption]
+                                example: redemption
+                            description: >-
+                              A unique string ID used to identify this transaction.
+                              This is same value that you used to query for this transaction.
+                              For all reward redemptions, transaction_id will be "redemption".
+                          partner_source:
+                            type: string
+                            description: >-
+                              For cash back rewards that are powered by the card networks (Visa or Mastercard),
+                              the value for partner source will be **savings-edge** which represents
+                              [Visa's SavingsEdge Reward Program](https://www.visasavingsedge.ca/e/members/registration.php)
+                              or **easy-savings** which represents
+                              [Mastercard's Easy Savings Reward Program](https://www.priceless.com/easy-savings).
+
+                              For all other transactions,
+                              including rewards that are funded by the integrating partner (you),
+                              the value will be your name.
+                              For example if  your company name is **"Stark Industries"**,
+                              the value will be **"stark"**.
+                            example: partner_name
+                          tranasaction_date:
+                            type: string
+                            description: >-
+                              The date time in iso format of when the transaction occurred in UTC.
+                            format: date-time
+                            example: 2023-08-08T18:41:02+00:00
+                          merchant_name:
+                            type: string
+                            description: The name of the merchant (for POS transactions).
+                            example: POKEMON STORE
+                          status:
+                            type: string
+                            description: >-
+                              The status of the transaction.
+                              Values can be **Pending**, **Posted**, **Refund** and **Service Fee**.
+                            enum:
+                              - Pending
+                              - Posted
+                              - Refund
+                              - Service Fee
+                            example: Posted
+                          category:
+                            type: string
+                            description: >-
+                              Human readable translations of MCC codes.
+                              For example the value can be:
+                              **Gas**, **Grocery**, **Dining**, **Automotive**, **Drugstores and pharmacy**, etc.
+                            example: Gas
+                          transaction_total:
+                            type: number
+                            description: The total amount of the transaction line item.
+                            format: float
+                            example: 1000.0
+                          posted_date:
+                            type: string
+                            description: >-
+                              The date time in iso format of when the transaction became posted in UTC.
+                              For non-posted transactions, this field will be null.
+                            format: date-time
+                            nullable: true
+                            example: 2023-08-08T09:27:47+00:00
+                          cash_withdrawal:
+                            type: number
+                            description: >-
+                              The cash advance amount.
+                              If no cash advance was performed by the cardholder, this field will be **null**.
+                            format: float
+                            nullable: true
+                            example: null
+                          purchase_amount:
+                            type: number
+                            description: >-
+                              The amount for the POS portion of the transaction → **transaction_total - cash_withdrawal = purchase_amount**.
+                              If no cash advance was performed by the cardholder, this field will be **null**.
+                            format: float
+                            nullable: true
+                            example: null
+                          reward_tier:
+                            type: string
+                            description: The reward tier of the user at the time of transaction.
+                            example: Platinum
+                          rewards_earned:
+                            type: number
+                            description: >-
+                              The cash back reward amount earned on this transaction if eligible.
+                              Otherwise this field will be **null**.
+                            format: float
+                            nullable: true
+                            example: 100.0
+                          reward_percentage:
+                            type: number
+                            description: >-
+                              The percentage that was applied against the purchase_amount
+                              if cash advance was performed or against the transaction_total
+                              to calculate the rewards_earned if eligible.
+                              Otherwise this field will be **null**.
+                            format: float
+                            nullable: true
+                            example: 10.0
+                          reward_id:
+                            type: string
+                            description: >-
+                              The id of cash back reward associated with this transaction if eligible.
+                              Otherwise this field will be **null**.
+                            format: uuid
+                            nullable: true
+                            example: 8836faed-9b53-472e-b9c3-ca82f7b47834
+                          ach_status:
+                            type: string
+                            description: >-
+                              The status of the ach transfer.
+                              Values can be:
+                              **status, withdrawal-fail, refund-failed, withdrawal-processing, submitted,
+                              cancelling, processing, processing-critical, refund-processing, refunded,
+                              processing-fail, initiated, withdrawal-success, withdrawal-critical**.
+                              If the transaction is not an ACH, this will be null.
+                            enum:
+                              - status
+                              - withdrawal-fail
+                              - refund-failed
+                              - withdrawal-processing
+                              - submitted
+                              - cancelling
+                              - processing
+                              - processing-critical
+                              - refund-processing
+                              - refunded
+                              - processing-fail
+                              - initiated
+                              - withdrawal-success
+                              - withdrawal-critical
+                              - null
+                            nullable: true
+                            example: null
+                          ach_transfer_id:
+                            type: string
+                            description: >-
+                              The id of the ACH transfer.  If the transaction is not an ACH, this will be null.
+                            example: null
+                          ach_can_cancel:
+                            type: boolean
+                            description: >-
+                              A boolean that determines whether or not the ACH can be cancelled.
+                              If the transaction is not an ACH, this will be null.
+                            example: false
+        '400':
+          $ref: "#/components/responses/400UserNotFound"
+      deprecated: false
+  /baas/users/{payfare_id}/cards/{card_id}/balance:
+    get:
+      x-group-name: BaaS Endpoints
+      x-proxy-name: Get Card Balance
+      summary: Get Card Balance
+      description: Use this endpoint to retrieve the user's card balance
+      operationId: get_balance
+      parameters:
+        - $ref: "#/components/parameters/InternalUserId"
+        - $ref: "#/components/parameters/CardId"
+        - $ref: "#/components/parameters/ClientKey"
+        - $ref: "#/components/parameters/ClientSecret"
+      responses:
+        '200':
+          description: 200 Response
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessfulRequest"
+                  - properties:
+                      data:
+                        type: object
+                        properties:
+                          balance:
+                            type: string
+                            example: "0.00"
+        '400':
+          $ref: "#/components/responses/400UserNotFound"
+        '422':
+          $ref: "#/components/responses/422NoCardForPayout"
+      deprecated: false
+  /baas/users/{payfare_id}/ach-payments/recipients:
+    post:
+      x-group-name: BaaS Endpoints
+      x-proxy-name: Add New ACH Recipient
+      summary: Add New ACH Recipient
+      description: Use this BaaS endpoint to add new recipient for the ACH transfers
+      operationId: add_recipient
+      parameters:
+        - $ref: "#/components/parameters/InternalUserId"
+        - $ref: "#/components/parameters/ClientKey"
+        - $ref: "#/components/parameters/ClientSecret"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - first_name
+                - last_name
+                - phone_number
+                - bank_account
+              properties:
+                first_name:
+                  type: string
+                  description: The first name of the recipient
+                  example: John
+                last_name:
+                  type: string
+                  description: The last name of the recipient
+                  example: Smith
+                phone_number:
+                  type: string
+                  description: The recipient's phone number
+                  example: '2345678701'
+                bank_account:
+                  type: object
+                  description: The bank account information for the recipient
+                  properties:
+                    account_number:
+                      type: string
+                      description: The account number of recipient
+                      example: '1000003'
+                    account_type:
+                      type: string
+                      description: The account type of recipient
+                      example: Checking
+                    bank_name:
+                      type: string
+                      description: Bank name of recipient
+                      example: Bank of US
+                    routing_number:
+                      type: string
+                      description: The routing number of recipients account
+                      example: '011001234'
+                own_account:
+                  type: boolean
+                  description: To indicate whether this is the own_account of the user
+                  example: false
+      responses:
+        '200':
+          description: 200 Response
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessfulRequest"
+                  - properties:
+                      data:
+                        type: object
+                        properties:
+                          recipient:
+                            type: object
+                            properties:
+                              id:
+                                type: string
+                                description: >-
+                                  A unique identifier identifying the recipient
+                                format: uuid
+                                example: bd992a59-cd4f-4baa-8462-a4e7e1db786c
+                              first_name:
+                                type: string
+                                description: First name of the recipient
+                                example: John
+                              last_name:
+                                type: string
+                                description: Last name of the recipient
+                                example: Smith
+                              nickname:
+                                type: string
+                                description: If any nickname is provided to recipient
+                                nullable: true
+                                example: null
+                              phone_number:
+                                type: string
+                                description: The phone number of the recipient
+                                example: '2345678701'
+                              bank_account:
+                                type: object
+                                description: The bank account information for the recipient
+                                properties:
+                                  bank_name:
+                                    type: string
+                                    description: >-
+                                      The name of the bank with which the recipient has account with
+                                    example: Bank of US
+                                  account_number:
+                                    type: string
+                                    description: The account number of the recipient
+                                    example: '1000004'
+                                  routing_number:
+                                    type: string
+                                    description: The routing number of the recipient
+                                    example: '011001234'
+                                  account_type:
+                                    type: string
+                                    description: The account type of the user
+                                    example: Checking
+                                  bank_number:
+                                    type: string
+                                    description: The encrypted account number
+                                    nullable: true
+                                    example: null
+                                  transit:
+                                    type: string
+                                    description: The encrypted place code of the account number
+                                    nullable: true
+                                    example: null
+                              own_account:
+                                type: boolean
+                                description: To indicate whether this is the own account of the user
+                                example: false
+        '400':
+          description: 400 Response
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ErrorMessage"
+                  - properties:
+                      errors:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            field:
+                              oneOf:
+                                - type: string
+                                  example: payfare_id
+                                - type: array
+                                  items:
+                                    type: string
+                                  example: [phone, phone_number]
+                            code:
+                              type: integer
+                              enum: [10050, 2078, 10000, 2057, 20016, 2058]
+                              example: 10050
+                            message:
+                              type: string
+                              enum:
+                                - User not found
+                                - Invalid format
+                                - Missing required field
+                                - Duplicate recipient
+                                - Downstream Error
+                                - Failed to add recipient
+                              example: User not found
+              examples:
+                UserNotFoundError:
+                  $ref: "#/components/examples/UserNotFoundError"
+                InvalidFormatError:
+                  $ref: "#/components/examples/InvalidFormatError"
+                MissingRequiredFieldsError:
+                  description: >-
+                    When this error occurs usually some required fields
+                    are missing from the request body.
+                  value: {
+                    "status": "error",
+                    "errors": [
+                      {
+                        "code": 10000,
+                        "message": "Missing required field",
+                        "field": "first_name"
+                      },
+                      {
+                        "code": 10000,
+                        "message": "Missing required field",
+                        "field": [
+                          "phone",
+                          "phone_number"
+                        ]
+                      }
+                    ],
+                    "message": ""
+                  }
+                DuplicateRecipientError:
+                  description: This error can occur when you try to add a duplicate recipient.
+                  value: {
+                    "status": "error",
+                    "errors": [
+                      {
+                        "code": 2057,
+                        "message": "Duplicate recipient",
+                        "field": ""
+                      }
+                    ],
+                    "message": ""
+                  }
+                DownstreamError:
+                  description: This error can occur when you there is some error validating the recipient.
+                  value: {
+                    "status": "error",
+                    "errors": [
+                      {
+                        "code": 20016,
+                        "message": "Downstream Error",
+                        "field": ""
+                      }
+                    ],
+                    "message": ""
+                  }
+                FailedToAddRecipientError:
+                  description: This error can occur when there is some error adding the recipient.
+                  value: {
+                    "status": "error",
+                    "errors": [
+                      {
+                        "code": 2058,
+                        "message": "Failed to add recipient",
+                        "field": ""
+                      }
+                    ],
+                    "message": ""
+                  }
+        '401':
+          $ref: "#/components/responses/401InvalidAuthorization"
+        '403':
+          $ref: "#/components/responses/403AccessForbidden"
+      deprecated: false
+    get:
+      x-group-name: BaaS Endpoints
+      x-proxy-name: Get ACH Recipients
+      summary: Get ACH Recipients
+      description: Use this BaaS endpoint to get all of cardholder's recipients
+      operationId: get_recipients
+      parameters:
+        - $ref: "#/components/parameters/InternalUserId"
+        - $ref: "#/components/parameters/ClientKey"
+        - $ref: "#/components/parameters/ClientSecret"
+      responses:
+        '200':
+          description: 200 Response
+          content:
+            application/json:
+              examples:
+                MultipleResults:
+                  value:
+                    {
+                        "status": "success",
+                        "data": {
+                            "recipients": [
+                                {
+                                    "first_name": "Tyler",
+                                    "last_name": "Hansen",
+                                    "nickname": "Landlord",
+                                    "phone_number": "415-000-0000",
+                                    "bank_account": {
+                                        "account_number": "123456789",
+                                        "account_type": "savings",
+                                        "bank_name": "Bank of America",
+                                        "routing_number": "34567890"
+                                    },
+                                    "id": "17a25a69-77ee-4937-889b-f44ab4a07733"
+                                },
+                                {
+                                    "first_name": "John",
+                                    "last_name": "Smith",
+                                    "nickname": "Housekeeper",
+                                    "phone_number": "415-122-0000",
+                                    "bank_account": {
+                                        "account_number": "987654321",
+                                        "account_type": "checking",
+                                        "bank_name": "Bank of America",
+                                        "routing_number": "09876543"
+                                    },
+                                    "id": "609b81df-5814-4739-be20-b036594c16ce"
+                                }
+                            ]
+                        },
+                        "message": ""
+                    }
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessfulRequest"
+                  - properties:
+                      data:
+                        type: object
+                        properties:
+                          recipients:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                id:
+                                  type: string
+                                  description: >-
+                                    A unique identifier identifying the recipient
+                                  format: uuid
+                                  example: bd992a59-cd4f-4baa-8462-a4e7e1db786c
+                                first_name:
+                                  type: string
+                                  description: First name of the recipient
+                                  example: John
+                                last_name:
+                                  type: string
+                                  description: Last name of the recipient
+                                  example: Smith
+                                nickname:
+                                  type: string
+                                  description: If any nickname is provided to recipient
+                                  nullable: true
+                                  example: JS
+                                phone_number:
+                                  type: string
+                                  description: The phone number of the recipient
+                                  example: '2345678701'
+                                bank_account:
+                                  type: object
+                                  description: The bank account information for the recipient
+                                  properties:
+                                    bank_name:
+                                      type: string
+                                      description: >-
+                                        The name of the bank with which the recipient has account with
+                                      example: Bank of US
+                                    account_number:
+                                      type: string
+                                      description: The account number of the recipient
+                                      example: '1000004'
+                                    routing_number:
+                                      type: string
+                                      description: The routing number of the recipient
+                                      example: '011001234'
+                                    account_type:
+                                      type: string
+                                      description: The account type of the user
+                                      example: Checking
+                                    bank_number:
+                                      type: string
+                                      description: The encrypted account number
+                                      nullable: true
+                                      example: null
+                                    transit:
+                                      type: string
+                                      description: The encrypted place code of the account number
+                                      nullable: true
+                                      example: null
+                                own_account:
+                                  type: boolean
+                                  description: To indicate whether this is the own account of the user
+                                  example: true
+        '400':
+          description: 400 Response
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ErrorMessage"
+                  - properties:
+                      errors:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            field:
+                              type: string
+                              example: payfare_id
+                            code:
+                              type: integer
+                              enum: [10050, 20017]
+                              example: 10050
+                            message:
+                              type: string
+                              enum:
+                                - User not found
+                                - Recipient Not Found
+                              example: User not found
+              examples:
+                UserNotFoundError:
+                  $ref: "#/components/examples/UserNotFoundError"
+                RecipientNotFoundError:
+                  description: When this error occurs, the recipient does not exist
+                  value: {
+                    "status": "error",
+                    "errors": [
+                      {
+                        "code": 20017,
+                        "message": "Recipient Not Found",
+                        "field": ""
+                      }
+                    ],
+                    "message": ""
+                  }
+        '401':
+          $ref: "#/components/responses/401InvalidAuthorization"
+        '403':
+          $ref: "#/components/responses/403AccessForbidden"
+      deprecated: false
+  /baas/users/{payfare_id}/ach-payments/recipients/{recipient_id}:
+    post:
+      x-group-name: BaaS Endpoints
+      x-proxy-name: Update ACH Recipient
+      summary: Update ACH Recipient
+      description: >-
+        Use this BaaS endpoint to update exisitng recipient for the ACH
+        transfers
+      operationId: update_recipient
+      parameters:
+        - $ref: "#/components/parameters/InternalUserId"
+        - $ref: "#/components/parameters/RecipientId"
+        - $ref: "#/components/parameters/ClientKey"
+        - $ref: "#/components/parameters/ClientSecret"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - first_name
+                - last_name
+                - phone_number
+                - bank_account
+              properties:
+                first_name:
+                  type: string
+                  description: The first name of the recipient
+                  example: John
+                last_name:
+                  type: string
+                  description: The last name of the recipient
+                  example: Smith
+                phone_number:
+                  type: string
+                  description: The recipient's phone number
+                  example: '2345678701'
+                bank_account:
+                  type: object
+                  properties:
+                    account_number:
+                      type: string
+                      description: The account number of recipient
+                      example: '1000003'
+                    account_type:
+                      type: string
+                      description: The account type of recipient
+                      example: Checking
+                    bank_name:
+                      type: string
+                      description: Bank name of recipient
+                      example: Bank of US
+                    routing_number:
+                      type: string
+                      description: The routing number of recipients account
+                      example: '011001234'
+                nickname:
+                  type: string
+                  description: Nickname of the recipient
+                  example: Jake
+      responses:
+        '200':
+          description: 200 Response
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessfulRequest"
+                  - properties:
+                      data:
+                        type: object
+                        properties:
+                          recipient:
+                            type: object
+                            properties:
+                              id:
+                                type: string
+                                description: A unique identifier identifying the recipient
+                                format: uuid
+                                example: bd992a59-cd4f-4baa-8462-a4e7e1db786c
+                              first_name:
+                                type: string
+                                description: First name of the recipient
+                                example: John
+                              last_name:
+                                type: string
+                                description: Last name of the recipient
+                                example: Smith
+                              nickname:
+                                type: string
+                                description: If any nickname is provided to recipient
+                                example: null
+                              phone_number:
+                                type: string
+                                description: The phone number of recipient
+                                example: '2345678701'
+                              bank_account:
+                                type: object
+                                description: The bank account information for the recipient
+                                properties:
+                                  bank_name:
+                                    type: string
+                                    description: The name of the bank with which the recipient has account with
+                                    example: Bank of US
+                                  account_number:
+                                    type: string
+                                    description: The account number of the recipient
+                                    example: '1000004'
+                                  routing_number:
+                                    type: string
+                                    description: The routing number of the recipient
+                                    example: '011001234'
+                                  account_type:
+                                    type: string
+                                    description: The account type of the user
+                                    example: Checking
+                                  bank_number:
+                                    type: string
+                                    description: The encrypted account number
+                                    nullable: true
+                                    example: null
+                                  transit:
+                                    type: string
+                                    description: The encrypted place code of the account number
+                                    nullable: true
+                                    example: null
+                              own_account:
+                                type: boolean
+                                description: To indicate whether this is the own account of the user
+                                example: false
+        '400':
+          description: 400 Response
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ErrorMessage"
+                  - properties:
+                      errors:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            field:
+                              type: string
+                              example: payfare_id
+                            code:
+                              type: integer
+                              enum: [10050, 2078, 20018]
+                              example: 10050
+                            message:
+                              type: string
+                              enum:
+                                - User not found
+                                - Invalid format
+                                - Failed to update recipient
+                              example: User not found
+              examples:
+                UserNotFoundError:
+                  $ref: "#/components/examples/UserNotFoundError"
+                InvalidFormatError:
+                  $ref: "#/components/examples/InvalidFormatError"
+                FailedToUpdateError:
+                  value: {
+                    "status": "error",
+                    "errors": [
+                      {
+                        "code": 20018,
+                        "message": "Failed to update recipient",
+                        "field": ""
+                      }
+                    ],
+                    "message": ""
+                  }
+        '401':
+          $ref: "#/components/responses/401InvalidAuthorization"
+        '403':
+          $ref: "#/components/responses/403AccessForbidden"
+      deprecated: false
+    get:
+      x-group-name: BaaS Endpoints
+      x-proxy-name: Get Specific ACH Recipient Details
+      summary: Get Specific ACH Recipient Details
+      description: Use this BaaS endpoint to get a single recipient for the ACH transfers
+      operationId: get_recipient
+      parameters:
+        - $ref: "#/components/parameters/InternalUserId"
+        - $ref: "#/components/parameters/RecipientId"
+        - $ref: "#/components/parameters/ClientKey"
+        - $ref: "#/components/parameters/ClientSecret"
+      responses:
+        '200':
+          description: 200 Response
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessfulRequest"
+                  - properties:
+                      data:
+                        type: object
+                        properties:
+                          recipient:
+                            type: object
+                            properties:
+                              id:
+                                type: string
+                                description: A unique identifier identifying the recipient
+                                format: uuid
+                                example: 980768ce-c691-4d08-80f2-a757598510ef
+                              first_name:
+                                type: string
+                                description: First name of the recipient
+                                example: John
+                              last_name:
+                                type: string
+                                description: Last name of the recipient
+                                example: Smith
+                              nickname:
+                                type: string
+                                description: If any nickname is provided to recipient
+                                example: null
+                              phone_number:
+                                type: string
+                                description: The phone number of recipient
+                                example: '2345678701'
+                              bank_account:
+                                type: object
+                                description: The bank account information for the recipient
+                                properties:
+                                  bank_name:
+                                    type: string
+                                    description: The name of the bank with which the recipient has account with
+                                    example: Bank of US
+                                  account_number:
+                                    type: string
+                                    description: The account number of the recipient
+                                    example: '1000001'
+                                  routing_number:
+                                    type: string
+                                    description: The routing number of the recipient
+                                    example: '011001234'
+                                  account_type:
+                                    type: string
+                                    description: The account type of the user
+                                    example: Checking
+                                  bank_number:
+                                    type: string
+                                    description: The encrypted account number
+                                    nullable: true
+                                    example: null
+                                  transit:
+                                    type: string
+                                    description: The encrypted place code of the account number
+                                    nullable: true
+                                    example: null
+                              own_account:
+                                type: boolean
+                                description: To indicate whether this is the own account of the user
+                                example: false
+        '400':
+          description: 400 Response
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ErrorMessage"
+                  - properties:
+                      errors:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            field:
+                              type: string
+                              example: payfare_id
+                            code:
+                              type: integer
+                              enum: [10050, 20017]
+                              example: 10050
+                            message:
+                              type: string
+                              enum:
+                                - User not found
+                                - Recipient Not Found
+                              example: User not found
+              examples:
+                UserNotFoundError:
+                  $ref: "#/components/examples/UserNotFoundError"
+                RecipientNotFoundError:
+                  description: When this error occurs, the recipient does not exist
+                  value: {
+                    "status": "error",
+                    "errors": [
+                      {
+                        "code": 20017,
+                        "message": "Recipient Not Found",
+                        "field": ""
+                      }
+                    ],
+                    "message": ""
+                  }
+        '401':
+          $ref: "#/components/responses/401InvalidAuthorization"
+        '403':
+          $ref: "#/components/responses/403AccessForbidden"
+      deprecated: false
+  /baas/users/{payfare_id}/ach-payments/recipients/{recipient_id}/remove:
+    post:
+      x-group-name: BaaS Endpoints
+      x-proxy-name: Delete Specific ACH Recipient
+      summary: Delete Specific ACH Recipient
+      description: >-
+        Use this BaaS endpoint to delete a single recipient for the ACH
+        transfers
+      operationId: delete_recipient
+      parameters:
+        - $ref: "#/components/parameters/InternalUserId"
+        - $ref: "#/components/parameters/RecipientId"
+        - $ref: "#/components/parameters/ClientKey"
+        - $ref: "#/components/parameters/ClientSecret"
+      responses:
+        '200':
+          description: 200 Response
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessfulRequest"
+                  - properties:
+                      data:
+                        type: object
+                        properties: {}
+        '400':
+          description: 400 Response
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ErrorMessage"
+                  - properties:
+                      errors:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            field:
+                              type: string
+                              example: payfare_id
+                            code:
+                              type: integer
+                              enum: [10050, 20017]
+                              example: 10050
+                            message:
+                              type: string
+                              enum:
+                                - User not found
+                                - Recipient Not Found
+                              example: User not found
+              examples:
+                UserNotFoundError:
+                  $ref: "#/components/examples/UserNotFoundError"
+                RecipientNotFoundError:
+                  description: When this error occurs, the recipient does not exist
+                  value: {
+                    "status": "error",
+                    "errors": [
+                      {
+                        "code": 20017,
+                        "message": "Recipient Not Found",
+                        "field": ""
+                      }
+                    ],
+                    "message": ""
+                  }
+        '401':
+          $ref: "#/components/responses/401InvalidAuthorization"
+        '403':
+          $ref: "#/components/responses/403AccessForbidden"
+      deprecated: false
+  /baas/users/{payfare_id}/ach:
+    get:
+      x-group-name: BaaS Endpoints
+      x-proxy-name: Get ACH Transfers
+      summary: Get ACH Transfers
+      description: Use this BaaS endpoint to get all the ACH transfers
+      operationId: get_transfers
+      parameters:
+        - $ref: "#/components/parameters/InternalUserId"
+        - $ref: "#/components/parameters/FromDateTime"
+        - $ref: "#/components/parameters/ToDateTime"
+        - $ref: "#/components/parameters/ClientKey"
+        - $ref: "#/components/parameters/ClientSecret"
+      responses:
+        '200':
+          description: Successful request
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessfulRequest"
+                  - properties:
+                      data:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            transfer_id:
+                              type: string
+                              description: A unique identifier identifying the transfer
+                              format: uuid
+                              example: adeaf959-5243-488e-86d1-bb33896c0c2a
+                            details_id:
+                              type: string
+                              description: A unique identifier identifying the transfer details
+                              format: uuid
+                              example: dd6199af-d926-4806-974f-8421d3fdcc72
+                            confirmation_code:
+                              type: string
+                              description: A code identifying the transfer
+                              example: 96C0C2A
+                            user_id:
+                              type: string
+                              description: A unique identifier identifying the user
+                              format: uuid
+                              example: ce206bd6-ddd0-4bfe-bba4-5dee5226db01
+                            transfer_amount:
+                              type: number
+                              description: The amount which was transferred
+                              format: float
+                              example: 10.0
+                            transfer_fee:
+                              type: number
+                              description: Transfer fee if any charged on the transfer
+                              format: float
+                              example: 0.0
+                            transfer_currency:
+                              type: string
+                              description: The currency in which the transfer happened
+                              example: USD
+                            status:
+                              type: string
+                              description: The current status of the transfer
+                              example: withdrawal-success
+                            transfer_type:
+                              type: string
+                              description: The type of transfer that happened
+                              example: next-day
+                            transfer_date:
+                              type: integer
+                              description: Julian date format for the date on which transfer happened.
+                              example: 2023307
+                            created_at:
+                              type: string
+                              description: The date at which transfer took place.
+                              format: date-time
+                              example: '2023-11-02T07:30:16+00:00'
+                            recipient_name:
+                              type: string
+                              description: The  name of the recipient to which the transfer took place
+                              example: Babu Jala
+                            account_number:
+                              type: string
+                              example: '****000'
+                            bank_number:
+                              type: string
+                              nullable: true
+                              example: ''
+                            transit:
+                              type: string
+                              nullable: true
+                              example: ''
+                            routing_number:
+                              type: string
+                              example: '011001234'
+                            updated_at:
+                              type: string
+                              format: date-time
+                              example: '2023-11-02T07:30:16+00:00'
+                            data:
+                              type: string
+                              description: Any additional metadata
+                              nullable: true
+                              example: ''
+                            recipient_id:
+                              type: string
+                              description: The identifier pf the recipient to which the transfer happened.
+                              format: uuid
+                              example: 8ab683c8-ff22-45bc-9f7b-362e19a5ef91
+        '400':
+          $ref: "#/components/responses/400UserNotFound"
+        '401':
+          $ref: "#/components/responses/401InvalidAuthorization"
+        '403':
+          $ref: "#/components/responses/403AccessForbidden"
+      deprecated: false
+  /baas/users/{payfare_id}/ach/{ach_id}:
+    get:
+      x-group-name: BaaS Endpoints
+      x-proxy-name: Get Particular ACH Transfer
+      summary: Get Particular ACH Transfer
+      description: Use this BaaS endpoint to get all the ACH transfers
+      operationId: get_transfer
+      parameters:
+        - $ref: "#/components/parameters/InternalUserId"
+        - $ref: "#/components/parameters/AchId"
+        - $ref: "#/components/parameters/ClientKey"
+        - $ref: "#/components/parameters/ClientSecret"
+      responses:
+        '200':
+          description: Successful request
+          content:
+            application/json:
+              examples:
+                Result:
+                  value:
+                    {
+                        "status": "success",
+                        "data": {
+                            "transfer_id": "231f9206-46ab-451f-9038-0a420ac9c706",
+                            "details_id": "ec9dd54b-c37c-4d2a-b8ce-3a3d6539dce2",
+                            "confirmation_code": "AC9C706",
+                            "user_id": "ce206bd6-ddd0-4bfe-bba4-5dee5226db01",
+                            "recipient_name": "John Smith",
+                            "transfer_amount": 10,
+                            "account_number": "gAAAAABlQ0o3auZdtLnO2HhyGsdgCTHd1u9vYDWLG6Oz_a25hukCn2P_-n083Kjp62DNg2DqWQV761w2nmEJHoPcXM5QCWyR6w==",
+                            "routing_number": "gAAAAABlQ0o3sv-bYxZpktnXGUHQUMC18IFiiqck94Zew3rabYayG-1L2gDBVrH8R04SHFJw3cjTSuqiu4CxGdHreLF-eHnb2Q==",
+                            "transfer_fee": 0,
+                            "transfer_currency": "USD",
+                            "status": "withdrawal-success",
+                            "transfer_type": "next-day",
+                            "transfer_date": "2023-11-03",
+                            "created_at": "2023-11-02T07:09:18+00:00"
+                        },
+                        "message": ""
+                    }
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessfulRequest"
+                  - properties:
+                      data:
+                        type: object
+                        properties:
+                          transfer_id:
+                            type: string
+                            description: A unique identifier identifying the transfer.
+                            format: uuid
+                            example: 231f9206-46ab-451f-9038-0a420ac9c706
+                          details_id:
+                            type: string
+                            description: A unique identifier identifying the transfer details.
+                            format: uuid
+                            example: ec9dd54b-c37c-4d2a-b8ce-3a3d6539dce2
+                          confirmation_code:
+                            type: string
+                            description: A code identifying the transfer.
+                            example: AC9C706
+                          user_id:
+                            type: string
+                            description: A unique identifier identifying the user.
+                            format: uuid
+                            example: ce206bd6-ddd0-4bfe-bba4-5dee5226db01
+                          recipient_name:
+                            type: string
+                            description: The name of recipient to which transfer took place.
+                            example: John Smith
+                          transfer_amount:
+                            type: number
+                            description: The amount which was transferred.
+                            format: float
+                            example: 10.0
+                          account_number:
+                            type: string
+                            description: The encrypted bank account number.
+                            example: >-
+                              gAAAAABlQ0o3auZdtLnO2HhyGsdgCTHd1u9vYDWLG6Oz_a25hukCn2P_-n083Kjp62DNg2DqWQV761w2nmEJHoPcXM5QCWyR6w==
+                          routing_number:
+                            type: string
+                            description: The encrypted bank routing number.
+                            example: >-
+                              gAAAAABlQ0o3sv-bYxZpktnXGUHQUMC18IFiiqck94Zew3rabYayG-1L2gDBVrH8R04SHFJw3cjTSuqiu4CxGdHreLF-eHnb2Q==
+                          transfer_fee:
+                            type: number
+                            description: Transfer fee if any charged on the transfer.
+                            format: float
+                            example: 0.0
+                          transfer_currency:
+                            type: string
+                            description: The currency in which the transfer happened.
+                            example: USD
+                          status:
+                            type: string
+                            description: The current status of the transfer.
+                            example: withdrawal-success
+                          transfer_type:
+                            type: string
+                            description: The type of transfer that happened
+                            example: next-day
+                          transfer_date:
+                            type: string
+                            description: The date on which transfer happened.
+                            format: date
+                            example: 2023-11-03
+                          created_at:
+                            type: string
+                            description: The date at which transfer took place.
+                            format: date-time
+                            example: 2023-11-02T07:09:18+00:00
+        '400':
+          description: 400 Response
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ErrorMessage"
+                  - properties:
+                      errors:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            field:
+                              type: string
+                              example: payfare_id
+                            code:
+                              type: integer
+                              enum: [10050, 20011]
+                              example: 10050
+                            message:
+                              type: string
+                              enum:
+                                - User not found
+                                - Transfer not found
+                              example: User not found
+              examples:
+                UserNotFoundError:
+                  $ref: "#/components/examples/UserNotFoundError"
+                TransferNotFoundError:
+                  value: {
+                    "status": "error",
+                    "errors": [
+                      {
+                        "code": 20011,
+                        "message": "Transfer not found",
+                        "field": ""
+                      }
+                    ],
+                    "message": ""
+                  }
+                  description: When this occur usually occurs means the particular transfer doesn't exist.
+        '401':
+          $ref: "#/components/responses/401InvalidAuthorization"
+        '403':
+          $ref: "#/components/responses/403AccessForbidden"
+      deprecated: false
+  /baas/users/{payfare_id}/ach-payments/recipients/{recipient_id}/send:
+    post:
+      x-group-name: BaaS Endpoints
+      x-proxy-name: Send Money ACH
+      summary: Send Money ACH
+      description: Use this BaaS endpoint to send money to other accounts
+      operationId: send_money
+      parameters:
+        - $ref: "#/components/parameters/InternalUserId"
+        - $ref: "#/components/parameters/RecipientId"
+        - $ref: "#/components/parameters/ClientKey"
+        - $ref: "#/components/parameters/ClientSecret"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - amount
+              properties:
+                amount:
+                  type: integer
+                  format: int32
+                ach_message:
+                  type: string
+      responses:
+        '200':
+          description: 200 Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+                  data:
+                    type: object
+                    properties:
+                      ach-payment:
+                        type: object
+                        properties:
+                          id:
+                            type: string
+                            format: uuid
+                            example: c6997032-c912-47e4-a6a5-62ba6c38805
+                          confirmation:
+                            type: string
+                            example: C2F41118
+                  message:
+                    type: string
+                    example: ACH Payment successfully queued.
+        '400':
+          description: 400 Response
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ErrorMessage"
+                  - properties:
+                      errors:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            field:
+                              type: string
+                              example: payfare_id
+                            code:
+                              type: integer
+                              enum: [10050, 20013, 20012]
+                              example: 10050
+                            message:
+                              type: string
+                              enum:
+                                - User not found
+                                - Transfer limit reached
+                                - Insufficient funds to transfer
+                              example: User not found
+              examples:
+                UserNotFoundError:
+                  $ref: "#/components/examples/UserNotFoundError"
+                TransferLimitReachedError:
+                  value: {
+                    "status": "error",
+                    "errors": [
+                      {
+                        "code": 20013,
+                        "message": "Transfer limit reached",
+                        "field": ""
+                      }
+                    ],
+                    "message": ""
+                  }
+                  description: When this occurs it means the daily limit for ACH transfers has been exceeded.
+                InsufficientFundsError:
+                  value: {
+                    "status": "error",
+                    "errors": [
+                      {
+                        "code": 20012,
+                        "message": "Insufficient funds to transfer",
+                        "field": ""
+                      }
+                    ],
+                    "message": ""
+                  }
+                  description: When this occurs, it means you don't have sufficient funds to make the transfer.
+        '401':
+          $ref: "#/components/responses/401InvalidAuthorization"
+        '403':
+          $ref: "#/components/responses/403AccessForbidden"
+      deprecated: false
+  /baas/users/{payfare_id}/ach-transfers/{ach_id}/cancel:
+    post:
+      x-group-name: BaaS Endpoints
+      x-proxy-name: Cancel ACH
+      summary: Cancel ACH
+      description: Use this BaaS endpoint cancel the ACH transfer.
+      operationId: cancel_transfer
+      parameters:
+        - $ref: "#/components/parameters/InternalUserId"
+        - $ref: "#/components/parameters/AchId"
+        - $ref: "#/components/parameters/ClientKey"
+        - $ref: "#/components/parameters/ClientSecret"
+      responses:
+        '200':
+          description: 200 Response
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessfulRequest"
+                  - properties:
+                      data:
+                        type: object
+                        properties: {}
+        '400':
+          description: 400 Response
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ErrorMessage"
+                  - properties:
+                      errors:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            field:
+                              type: string
+                              example: payfare_id
+                            code:
+                              type: integer
+                              enum: [10050, 20014]
+                              example: 10050
+                            message:
+                              type: string
+                              enum:
+                                - User not found
+                                - Unable to update status
+                              example: User not found
+              examples:
+                UserNotFoundError:
+                  $ref: "#/components/examples/UserNotFoundError"
+                UnableToUpdateStatusError:
+                  value:
+                    {
+                      "status": "error",
+                      "errors": [
+                          {
+                              "field": "ach_id",
+                              "code": 20014,
+                              "message": "Unable to update status"
+                          }
+                      ],
+                      "message": ""
+                    }
+                  description: When this occurs it means there was some error while cancelling the transfer.
+        '401':
+          $ref: "#/components/responses/401InvalidAuthorization"
+        '403':
+          $ref: "#/components/responses/403AccessForbidden"
+      deprecated: false
+  /baas/users/{payfare_id}/atm-locations:
+    get:
+      x-group-name: BaaS Endpoints
+      x-proxy-name: ATM Finder
+      summary: ATM Finder
+      description: >-
+        Use this BaaS endpoint to get the ATM locations near the specified
+        longitude and latitude.
+      operationId: find_atms
+      parameters:
+        - $ref: "#/components/parameters/InternalUserId"
+        - name: lat
+          in: query
+          description: The latitude of the place to find nearest atms
+          required: true
+          schema:
+            type: number
+            format: float
+            example: 38.9
+        - name: lng
+          in: query
+          description: The longitude of the place to find nearest atms
+          required: true
+          schema:
+            type: number
+            format: float
+            example: 20.2
+        - name: radius
+          in: query
+          description: The radius till which nearest atms should be found
+          schema:
+            type: number
+            format: float
+            example: 100
+        - $ref: "#/components/parameters/ClientKey"
+        - $ref: "#/components/parameters/ClientSecret"
+      responses:
+        '200':
+          description: Successful request
+          content:
+            application/json:
+              examples:
+                MultipleResults:
+                  value:
+                    {
+                        "status": "success",
+                        "data": {
+                            "locations": [
+                                {
+                                    "atm_network": "allpoint",
+                                    "terminal_id": "VZ000521",
+                                    "loc_name": "CVS",
+                                    "address": "7190 University Pkwy",
+                                    "city": "Sarasota",
+                                    "region": "FL",
+                                    "country": "US",
+                                    "postal_code": "34240",
+                                    "latitude": 27.3867828,
+                                    "longitude": -82.4377653,
+                                    "location": {
+                                        "lat": 27.3867828,
+                                        "lon": -82.4377653
+                                    },
+                                    "filler": false,
+                                    "fee_amt": 0,
+                                    "fee_currency_code": "USD"
+                                },
+                                {
+                                    "atm_network": "allpoint",
+                                    "terminal_id": "VS005229",
+                                    "loc_name": "CVS",
+                                    "address": "5403 University Pkwy",
+                                    "city": "University Park",
+                                    "region": "FL",
+                                    "country": "US",
+                                    "postal_code": "34201",
+                                    "latitude": 27.3890711,
+                                    "longitude": -82.463153,
+                                    "location": {
+                                        "lat": 27.3890711,
+                                        "lon": -82.463153
+                                    },
+                                    "filler": false,
+                                    "fee_amt": 0,
+                                    "fee_currency_code": "USD"
+                                }
+                            ]
+                        },
+                        "message": ""
+                    }
+                NoResults:
+                  value:
+                    {
+                        "status": "success",
+                        "data": {
+                            "locations": []
+                        },
+                        "message": ""
+                    }
+                  description: When no ATM locations are there near the provided latitude and longitude.
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessfulRequest"
+                  - properties:
+                      data:
+                        type: object
+                        properties:
+                          locations:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                atm_network:
+                                  type: string
+                                  description: The network which the ATM belongs to
+                                  example: allpoint
+                                terminal_id:
+                                  type: string
+                                  description: The terminal id of the ATM
+                                  example: VZ000521
+                                loc_name:
+                                  type: string
+                                  description: The vendor in which the ATM is located
+                                  example: CVS
+                                address:
+                                  type: string
+                                  description: The address of the ATM.
+                                  example: 7190 University Pkwy
+                                city:
+                                  type: string
+                                  description: The city where the ATM is situated
+                                  example: Sarasota
+                                region:
+                                  type: string
+                                  description: The region where the ATM is situated
+                                  example: FL
+                                country:
+                                  type: string
+                                  example: US
+                                postal_code:
+                                  type: string
+                                  description: The postal code of the area where the ATM is situated
+                                  example: '34240'
+                                latitude:
+                                  type: number
+                                  description: The latitude where ATM is located
+                                  format: float
+                                  example: 27.3867828
+                                longitude:
+                                  type: number
+                                  description: The longitude where ATM is located
+                                  format: float
+                                  example: -82.4377653
+                                location:
+                                  type: object
+                                  description: A dictionary that holds the latitude and longitude values
+                                  properties:
+                                    lat:
+                                      type: number
+                                      format: float
+                                      example: 27.3867828
+                                    lon:
+                                      type: number
+                                      format: float
+                                      example: -82.4377653
+                                filler:
+                                  type: boolean
+                                  example: false
+                                fee_amt:
+                                  type: integer
+                                  description: The fee amount for the added ATM messages
+                                  example: 0
+                                fee_currency_code:
+                                  type: string
+                                  description: The currency code for the fee amount
+                                  example: USD
+        '400':
+          $ref: "#/components/responses/400UserNotFound"
+        '401':
+          $ref: "#/components/responses/401InvalidAuthorization"
+        '403':
+          $ref: "#/components/responses/403AccessForbidden"
+      deprecated: false
+x-readme:
+  headers: []
+  explorer-enabled: true
+  proxy-enabled: true
+x-readme-fauxas: true

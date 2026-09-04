@@ -14,6 +14,11 @@
 // Auth: anonymous callable. Rate-limit at the call site if needed.
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import {
+  buildAppAuthConfirmUrl,
+  extractHashedToken,
+  getPublicAppOrigin,
+} from "../_shared/authConfirmLink.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -87,26 +92,35 @@ Deno.serve(async (req) => {
       return json(status, { error: msg });
     }
 
-    // Step 2 — generate the confirmation link (server-side, no
-    // Supabase stock email is sent because we'll send our own).
+    // Step 2 — generate a confirmation token (no stock Supabase email).
+    // Email CTA must land on our app /auth/confirm, not /auth/v1/verify.
     const safeRedirect = typeof redirect_to === "string" && redirect_to.startsWith("/")
       ? redirect_to
       : "/onboarding/account-type";
-    const confirmUrl = `${SUPABASE_URL.replace(/\/$/, "")}/auth/confirm?type=signup&next=${encodeURIComponent(safeRedirect)}`;
+    const appOrigin = getPublicAppOrigin();
+    const redirectTo = `${appOrigin}/auth/confirm?type=signup&next=${encodeURIComponent(safeRedirect)}`;
 
     const { data: link, error: linkErr } = await admin.auth.admin.generateLink({
       type: "signup",
       email,
-      options: { redirectTo: confirmUrl },
+      options: { redirectTo },
     });
 
-    if (linkErr || !link?.properties?.action_link) {
+    const tokenHash = extractHashedToken(link?.properties);
+    if (linkErr || !tokenHash) {
       // Clean up the half-created user so they don't end up in a
       // unconfirmable state.
       await admin.auth.admin.deleteUser(created.user.id);
       console.error("[send-signup-confirmation] generateLink:", linkErr?.message);
       return json(500, { error: "Failed to generate confirmation link" });
     }
+
+    const actionLink = buildAppAuthConfirmUrl({
+      tokenHash,
+      type: "signup",
+      next: safeRedirect,
+      appOrigin,
+    });
 
     // Step 2.5 — apply the extended profile fields (street, city, phone,
     // etc.) so the user lands on the next page with their data already
@@ -148,7 +162,7 @@ Deno.serve(async (req) => {
         to: email,
         data: {
           name: fullName,
-          action_link: link.properties.action_link,
+          action_link: actionLink,
           expires_in_hours: 24,
         },
       }),

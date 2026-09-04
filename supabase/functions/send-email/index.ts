@@ -1,6 +1,8 @@
 // Send transactional emails via Resend.
 // Body: { type: 'welcome' | 'transfer_completed' | 'kyc_update' | 'kyb_update' | 'topup_completed' | 'payment_link' | 'password_reset' | 'signup_confirmation' | 'email_change', to: string, data?: Record<string, any> }
 
+import { brandAuthActionLink, getPublicAppOrigin } from "../_shared/authConfirmLink.ts";
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
@@ -147,10 +149,10 @@ function emailLayout(opts: {
 
 /** Returns the public logo + app URL for the environment. */
 function brandUrls() {
-  const appUrl = Deno.env.get("PUBLIC_APP_URL") || "https://efin.money";
+  const appUrl = getPublicAppOrigin();
   // In dev, public/ files are served by Vite at the same origin; in prod
-  // they're served by the static host at PUBLIC_APP_URL.
-  const logoUrl = `${appUrl.replace(/\/$/, "")}/email-logo.png`;
+  // they're served by the static host at PUBLIC_APP_URL / APP_URL.
+  const logoUrl = `${appUrl}/email-logo.png`;
   return { appUrl, logoUrl };
 }
 
@@ -444,7 +446,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    const { type, to, data = {} } = await req.json();
+    const { type, to, data: rawData = {} } = await req.json();
     if (!type || !to) {
       return new Response(JSON.stringify({ error: "type and to are required" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -453,6 +455,11 @@ Deno.serve(async (req) => {
 
     const { appUrl, logoUrl } = brandUrls();
 
+    // Safety net: never put stock Supabase /auth/v1/verify URLs in outbound mail.
+    const data = { ...rawData };
+    if (typeof data.action_link === "string" && data.action_link) {
+      data.action_link = brandAuthActionLink(data.action_link, { appOrigin: appUrl });
+    }
     let subject = "";
     let bodyHtml = "";
     let preheader = "";

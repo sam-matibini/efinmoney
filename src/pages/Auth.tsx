@@ -196,10 +196,11 @@ const Auth = () => {
     if (!signedUpEmail) return;
     setResending(true);
     try {
+      const appOrigin = (import.meta.env.VITE_APP_URL || "https://www.efin.money").replace(/\/+$/, "");
       const { error } = await supabase.auth.resend({
         type: "signup",
         email: signedUpEmail,
-        options: { emailRedirectTo: window.location.origin },
+        options: { emailRedirectTo: `${appOrigin}/auth/confirm` },
       });
       if (error) toast.error(error.message);
       else toast.success("Verification email sent again.");

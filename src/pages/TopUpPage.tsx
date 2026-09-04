@@ -44,6 +44,7 @@ import NombaTopUpCard from "@/components/payments/NombaTopUpCard";
 import LenhubFlutterTopUpCard from "@/components/payments/LenhubFlutterTopUpCard";
 import PaytotaTopUpCard from "@/components/payments/PaytotaTopUpCard";
 import DodoTopUpCard from "@/components/payments/DodoTopUpCard";
+import EpayTopUpCard from "@/components/payments/EpayTopUpCard";
 import SquareTopUpCard, { verifySquareCheckout } from "@/components/payments/SquareTopUpCard";
 import BamboraTopUpCard from "@/components/payments/BamboraTopUpCard";
 import BamboraEftTopUpCard from "@/components/payments/BamboraEftTopUpCard";
@@ -1075,6 +1076,21 @@ const TopUpPage = () => {
         content: (
           <SectionBoundary name="DodoTopUp">
             <DodoTopUpCard walletId={walletId} walletCurrency={currency} initialAmount={amount} embedded onComplete={invalidateWallets} />
+          </SectionBoundary>
+        ),
+      });
+    }
+
+    // ePay CAD test rail — always listed when feature on (staff / boss smoke test)
+    if (ccyUpper === "CAD" && productFeatures.epay) {
+      payMethods.push({
+        id: "epay",
+        tone: "card",
+        label: "ePay (test)",
+        description: "CAD credit · charged in USD on ePay",
+        content: (
+          <SectionBoundary name="EpayTopUp">
+            <EpayTopUpCard walletId={walletId} walletCurrency={currency} initialAmount={amount} embedded onComplete={invalidateWallets} />
           </SectionBoundary>
         ),
       });

@@ -3,6 +3,7 @@
 // with branded eFinMoney templates. The verification link points at our own
 // /auth/confirm page so we can show a success screen and auto sign the user in.
 import { Webhook } from "https://esm.sh/standardwebhooks@1.0.0";
+import { buildAppAuthConfirmUrl, getPublicAppOrigin } from "../_shared/authConfirmLink.ts";
 
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY") || "";
 const HOOK_SECRET = (Deno.env.get("SEND_EMAIL_HOOK_SECRET") || "").replace(/^v1,whsec_/, "");
@@ -128,21 +129,29 @@ Deno.serve(async (req) => {
   const ed = event.email_data;
   if (!to || !ed?.token_hash) return jsonError(400, "Malformed hook payload");
 
-  let origin = ed.site_url;
+  // Always brand to the public app origin — never trust Site URL / redirect_to
+  // when Auth is still configured with a stale Vercel preview host.
+  const appOrigin = getPublicAppOrigin();
   let nextPath = "/";
   try {
     const u = new URL(ed.redirect_to);
-    origin = u.origin;
-    nextPath = u.pathname || "/";
+    if (u.pathname.includes("/auth/confirm")) {
+      nextPath = u.searchParams.get("next") || "/";
+    } else if (u.pathname.startsWith("/")) {
+      nextPath = `${u.pathname}${u.search || ""}` || "/";
+    }
   } catch {
-    /* keep site_url fallback */
+    /* keep default */
   }
 
-  const confirmUrl =
-    `${origin}/auth/confirm?token_hash=${encodeURIComponent(ed.token_hash)}` +
-    `&type=${encodeURIComponent(ed.email_action_type)}&next=${encodeURIComponent(nextPath)}`;
+  const confirmUrl = buildAppAuthConfirmUrl({
+    tokenHash: ed.token_hash,
+    type: ed.email_action_type,
+    next: nextPath,
+    appOrigin,
+  });
 
-  const staffInvite = nextPath === "/admin/onboarding";
+  const staffInvite = nextPath === "/admin/onboarding" || nextPath.startsWith("/admin/onboarding");
   const { subject, html } = buildEmail(ed.email_action_type, confirmUrl, ed.token, { staffInvite });
 
   const res = await fetch("https://api.resend.com/emails", {

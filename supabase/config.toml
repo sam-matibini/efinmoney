@@ -480,6 +480,18 @@ verify_jwt = false
 [functions.bambora-batch-reconcile]
 verify_jwt = false
 
+# ePay Cashier Gateway pay-in + async notify.
+# Secrets: EPAY_ACCOUNT, EPAY_MERCHANT_NAME, EPAY_SIGN_MODE=rsa|api_key,
+# EPAY_PAYIN_PRIVATE_KEY / EPAY_PAYOUT_PRIVATE_KEY (rsa),
+# EPAY_PLATFORM_PAYIN_PUBLIC_KEY / EPAY_PLATFORM_PAYOUT_PUBLIC_KEY (rsa verify),
+# EPAY_PAYIN_API_KEY / EPAY_PAYOUT_API_KEY (api_key mode),
+# optional EPAY_BASE_URL, EPAY_PROXY_URL
+[functions.epay-collection]
+verify_jwt = false
+
+[functions.epay-webhook]
+verify_jwt = false
+
 [functions.emfi-probe]
 verify_jwt = false
 

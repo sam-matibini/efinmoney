@@ -12,6 +12,11 @@
 // changed here — Supabase does that on link click via verifyOtp.
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import {
+  buildAppAuthConfirmUrl,
+  extractHashedToken,
+  getPublicAppOrigin,
+} from "../_shared/authConfirmLink.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -75,7 +80,8 @@ Deno.serve(async (req) => {
     const safeNext = typeof next === "string" && next.startsWith("/") && !next.startsWith("//")
       ? next
       : "/profile";
-    const confirmUrl = `${SUPABASE_URL.replace(/\/$/, "")}/auth/confirm?type=email_change&next=${encodeURIComponent(safeNext)}`;
+    const appOrigin = getPublicAppOrigin();
+    const confirmUrl = `${appOrigin}/auth/confirm?type=email_change&next=${encodeURIComponent(safeNext)}`;
 
     const { data: link, error: linkErr } = await admin.auth.admin.generateLink({
       type: "email_change_current",
@@ -84,10 +90,18 @@ Deno.serve(async (req) => {
       options: { redirectTo: confirmUrl },
     });
 
-    if (linkErr || !link?.properties?.action_link) {
+    const tokenHash = extractHashedToken(link?.properties);
+    if (linkErr || !tokenHash) {
       console.error("[send-email-change] generateLink:", linkErr?.message);
       return json(500, { error: "Failed to generate confirmation link" });
     }
+
+    const actionLink = buildAppAuthConfirmUrl({
+      tokenHash,
+      type: "email_change",
+      next: safeNext,
+      appOrigin,
+    });
 
     // 4. Send the branded email to the NEW address.
     const sendRes = await fetch(`${SUPABASE_URL}/functions/v1/send-email`, {
@@ -101,7 +115,7 @@ Deno.serve(async (req) => {
         to: new_email,
         data: {
           new_email,
-          action_link: link.properties.action_link,
+          action_link: actionLink,
           expires_in_hours: 24,
         },
       }),
