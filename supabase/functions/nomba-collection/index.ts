@@ -79,8 +79,9 @@ Deno.serve(async (req) => {
     } = body as Record<string, unknown>;
 
     const requestedCredit = Number(credit_amount ?? amount);
-    if (!Number.isFinite(requestedCredit) || requestedCredit < 1) {
-      return json({ error: "Amount must be at least 1" }, 400);
+    const minCredit = 1;
+    if (!Number.isFinite(requestedCredit) || requestedCredit < minCredit) {
+      return json({ error: `Amount must be at least ${minCredit}` }, 400);
     }
     if (!target_wallet_id || typeof target_wallet_id !== "string") {
       return json({ error: "Target wallet required" }, 400);
@@ -104,6 +105,10 @@ Deno.serve(async (req) => {
     const customerEmail = String(email || userEmail || "").trim();
     if (!customerEmail || !customerEmail.includes("@")) {
       return json({ error: "A valid email is required for checkout" }, 400);
+    }
+
+    if (walletCurrency === "CAD" && requestedCredit < 2) {
+      return json({ error: "Minimum CAD top-up is C$2.00" }, 400);
     }
 
     let corridor: NombaCorridor;

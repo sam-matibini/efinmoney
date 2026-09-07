@@ -184,7 +184,7 @@ export default function NombaTopUpCard({ walletId, walletCurrency, onComplete, i
               onChange={(e) => setAmount(e.target.value)}
             />
             <p className="text-xs text-muted-foreground">
-              Minimum {formatCredited(min, currency)} · Includes eFin processing fee (1.9% + {currency === "CAD" ? "C$0.30" : currency === "NGN" ? "₦100" : "$0.30"})
+              Minimum {formatCredited(min, currency)} · Includes eFin processing fee (1.9% + {currency === "CAD" ? "C$0.30" : currency === "NGN" ? "₦10" : "$0.30"})
             </p>
           </div>
         )}

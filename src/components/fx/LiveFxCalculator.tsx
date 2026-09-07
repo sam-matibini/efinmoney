@@ -162,14 +162,14 @@ const LiveFxCalculator = ({
   const marketRate = useMemo(() => midRateFromUsdMap(from, to, usdMapEffective), [from, to, usdMapEffective]);
   const marketMidRate = useMemo(() => midRateFromUsdMap(from, to, usdMapMarket), [from, to, usdMapMarket]);
 
-  /** Rate used for quotes — parent DB rate wins, then Nomba NGN, then live market cross-rate. */
+  /** Rate used for quotes — parent DB rate wins, then live market cross-rate, then Nomba NGN fallback. */
   const resolvedQuoteRate = useMemo(() => {
     if (displayRate != null && displayRate > 0) return displayRate;
-    if (nombaQuote?.effective_rate && nombaQuote.effective_rate > 0) return nombaQuote.effective_rate;
     if (marketRate != null && marketRate > 0) return marketRate;
+    if (nombaQuote?.effective_rate && nombaQuote.effective_rate > 0) return nombaQuote.effective_rate;
     return null;
   }, [displayRate, nombaQuote?.effective_rate, marketRate]);
-  const usingNombaRate = !displayRate && !!nombaQuote?.effective_rate;
+  const usingNombaRate = !displayRate && !(marketRate != null && marketRate > 0) && !!nombaQuote?.effective_rate;
 
   const flatFeeInFrom = (usdFee: number): number => {
     if (!usdFee) return 0;

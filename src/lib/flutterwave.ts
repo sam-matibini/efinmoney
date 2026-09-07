@@ -66,7 +66,7 @@ export const MIN_AMOUNTS: Record<string, number> = {
   LRD: 500,
   MWK: 500,
   BIF: 500,
-  CAD: 1,
+  CAD: 2,
   GBP: 1,
   EUR: 1,
   ZAR: 10,

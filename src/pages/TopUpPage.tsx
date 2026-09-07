@@ -118,15 +118,7 @@ function availableIntlMethods(currency: string): IntlTopupMethod[] {
     if (productFeatures.dodo) methods.push("dodo");
     if (productFeatures.square && c !== "CAD") methods.push("square");
     if (productFeatures.paypal && c !== "CAD") methods.push("paypal");
-    if (
-      c === "CAD" &&
-      (productFeatures.plaid ||
-        productFeatures.fincraInterac ||
-        productFeatures.flovideInterac ||
-        productFeatures.flovide)
-    ) {
-      methods.push("interac");
-    }
+    // Interac removed — CAD top-up is Nomba card only.
     if (productFeatures.wise) methods.push("wise");
     if (productFeatures.flutterwave && FLW_WESTERN_TOPUP_CURRENCIES.includes(c) && c !== "CAD") {
       methods.push("flutterwave");

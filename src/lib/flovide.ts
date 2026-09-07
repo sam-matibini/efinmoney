@@ -4,6 +4,7 @@ import { productFeatures } from "@/lib/productFeatures";
 import type { NigeriaBank, NombaExchangeQuote } from "@/lib/nombaNigeria";
 import {
   getNigeriaBanks as getNombaBanks,
+  getNombaExchangeRate,
   isNgnPair,
 } from "@/lib/nombaNigeria";
 
@@ -152,42 +153,31 @@ export async function resolveCorridorAccount(
   };
 }
 
-/** Prefer Flovide rates for Flovide corridors; Nomba for NGN pairs; else null. */
+/**
+ * Partner FX overlay for send / exchange UI.
+ *
+ * Customer mid-market rates come from `fx_rates` (OpenExchangeRates / er-api),
+ * refreshed by `refresh-fx-rates`. Partner quotes only when they are the
+ * settlement rail — Nomba for NGN pairs.
+ *
+ * Flovide FX is intentionally not used here: it was overriding correct
+ * CAD↔Africa mid-market quotes on Send.
+ */
 export async function getFlovideOrNombaRate(
   from: string,
   to: string,
 ): Promise<NombaExchangeQuote | null> {
   const f = from.toUpperCase();
   const t = to.toUpperCase();
-  const flovidePair =
-    productFeatures.flovide
-    && ["CAD", "USD", "GBP", "EUR", "NGN", "GHS", "KES", "UGX"].includes(f)
-    && ["CAD", "USD", "GBP", "EUR", "NGN", "GHS", "KES", "UGX"].includes(t);
 
-  if (flovidePair) {
+  if (isNgnPair(f, t) && productFeatures.nombaNigeria) {
     try {
-      const json = await authFetch(
-        `flovide-rates?from=${encodeURIComponent(f)}&to=${encodeURIComponent(t)}&amount=100`,
-        { method: "GET" },
-      );
-      if (json?.effective_rate) {
-        return {
-          from: f,
-          to: t,
-          pair: `${f}:${t}`,
-          mid_rate: String(json.mid_rate || json.effective_rate),
-          effective_rate: Number(json.effective_rate),
-          source: "flovide",
-        };
-      }
+      return await getNombaExchangeRate(f, t);
     } catch {
-      /* fall through */
+      return null;
     }
   }
 
-  if (f === "NGN" || t === "NGN") {
-    return null;
-  }
   return null;
 }
 

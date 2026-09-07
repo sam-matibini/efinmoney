@@ -94,7 +94,6 @@ import {
   clearPendingNombaTxn,
   getNombaPayStatus,
   initiateNombaCollection,
-  isNombaTopupCurrency,
   nombaMinAmount,
   readPendingNombaTxn,
   savePendingNombaTxn,
@@ -115,7 +114,6 @@ import {
   savePendingSwychrTxn,
   verifySwychrPayin,
 } from "@/lib/swychrPay";
-import { quoteDirectNombaTopup, quoteCadNombaTopup } from "@/lib/nombaTopupQuote";
 import { productFeatures } from "@/lib/productFeatures";
 import { FINCRA_CAD_INTERAC_ALIAS } from "@/lib/fincraCad";
 import {
@@ -155,17 +153,6 @@ const CARD_RESUME_COPY: Record<CardResumeStage, { title: string; sub: string }> 
     sub: "Payment confirmed — delivering the transfer now",
   },
 };
-
-/** Dev/test FX overrides (white-label Send quotes). Remove when live rates are locked. */
-const TEST_SEND_FX: Record<string, number> = {
-  "USD:NGN": 250,
-  "CAD:NGN": 250,
-};
-
-function testSendFxRate(from: string, to: string): number | null {
-  if (!import.meta.env.DEV) return null;
-  return TEST_SEND_FX[`${from.toUpperCase()}:${to.toUpperCase()}`] ?? null;
-}
 
 const cardBrandClass = (brand?: string | null) => {
   switch ((brand ?? "").toLowerCase()) {
@@ -531,16 +518,7 @@ const SendPage = () => {
   const { data: nombaFxQuote } = useQuery({
     queryKey: ["corridor-fx", sourceCurrency, targetCountry.code],
     queryFn: () => getFlovideOrNombaRate(sourceCurrency, targetCountry.code),
-    enabled:
-      !isSameCurrency
-      && (
-        isNgnPair(sourceCurrency, targetCountry.code)
-        || (
-          ["CAD", "USD", "GBP", "EUR", "NGN", "GHS", "KES", "UGX"].includes(sourceCurrency)
-          && ["CAD", "USD", "GBP", "EUR", "NGN", "GHS", "KES", "UGX"].includes(targetCountry.code)
-        )
-      )
-      && testSendFxRate(sourceCurrency, targetCountry.code) == null,
+    enabled: !isSameCurrency && isNgnPair(sourceCurrency, targetCountry.code),
     staleTime: 60_000,
   });
   const nombaRate = nombaFxQuote?.effective_rate && nombaFxQuote.effective_rate > 0
@@ -580,16 +558,15 @@ const SendPage = () => {
       : baseFee + cardFee)
     : 0;
 
-  const testRate = testSendFxRate(sourceCurrency, targetCountry.code);
   const directDbRate =
     fxRate && Number(fxRate.effective_rate) > 0 ? Number(fxRate.effective_rate) : null;
   const derivedRate = derivedFxRate && Number(derivedFxRate) > 0 ? Number(derivedFxRate) : null;
-  // Prefer Nomba for NGN pairs, else fx_rates / derived — apply price-quote margin once
+  // Mid-market fx_rates first; Nomba only as NGN fallback.
   const rawRate = isSameCurrency
     ? 1
-    : testRate ?? nombaRate ?? resolvedDbRate ?? directDbRate ?? derivedRate ?? 0;
+    : resolvedDbRate ?? directDbRate ?? derivedRate ?? nombaRate ?? 0;
   const fxMarginBps = Number(priceQuote?.fx_margin_bps ?? 0);
-  const effectiveRate = rawRate > 0 && !testRate && fxMarginBps > 0
+  const effectiveRate = rawRate > 0 && fxMarginBps > 0
     ? rawRate * (1 - fxMarginBps / 10_000)
     : rawRate;
   const rateAvailable = isSameCurrency || effectiveRate > 0;
@@ -663,18 +640,6 @@ const SendPage = () => {
     || productFeatures.swychr
     || productFeatures.flutterwave
   );
-
-  const cardCheckoutQuote = useMemo(() => {
-    if (fundingSource !== "card" || parsedAmount <= 0) return null;
-    if (cardSendProvider !== "nomba") return null;
-    if (sourceCurrency.toUpperCase() === "CAD" && fxRates?.length) {
-      return quoteCadNombaTopup(totalCharge, fxRates);
-    }
-    if (isNombaTopupCurrency(sourceCurrency) && sourceCurrency.toUpperCase() !== "CAD") {
-      return quoteDirectNombaTopup(totalCharge, sourceCurrency);
-    }
-    return null;
-  }, [fundingSource, totalCharge, sourceCurrency, fxRates, cardSendProvider]);
 
   // Prefer a valid card-collect wallet + destination when paying by card
   useEffect(() => {
@@ -1393,19 +1358,18 @@ const SendPage = () => {
   }, []);
 
   const applyBeneficiary = useCallback((b: Beneficiary) => {
-
     setRecipientName(b.eft_account_holder || b.name);
     if (b.phone) setRecipientPhone(b.phone.replace(/[^\d+]/g, "").slice(0, 15));
     if (b.email || b.interac_email) setRecipientEmail(b.interac_email || b.email || "");
     setPickedBeneficiaryId(b.id);
     setPendingBeneficiary(b);
-    // Prefill bank details immediately when present (effect below also reconciles
-    // bank_code via name match once the banks list loads).
+    // Reset bank selection — effect below matches code/name against the live list.
+    setNgnBankCode("");
+    setGhBankCode("");
+    // Prefill account immediately; bank code is resolved after the banks list
+    // loads (see pendingBeneficiary effect) so Select never gets a stale code.
     if (b.bank_account) {
       setNgnAccountNumber(String(b.bank_account).replace(/\D/g, "").slice(0, 10));
-    }
-    if (b.bank_code) {
-      setNgnBankCode(String(b.bank_code));
     }
     if (b.country_code === "GHS" || b.country_code === "GH") {
       if (b.bank_account) {
@@ -1463,19 +1427,30 @@ const SendPage = () => {
         const acct = String(b.bank_account).replace(/\D/g, "").slice(0, 10);
         if (ngnAccountNumber !== acct) setNgnAccountNumber(acct);
       }
-      if (b.bank_code) {
-        if (ngnBankCode !== b.bank_code) setNgnBankCode(b.bank_code);
-      } else if (b.bank_name && !ngnBankCode) {
-        if (ngnBanks.length === 0) {
-          allApplied = false; // wait for banks list
-        } else {
-          const wanted = b.bank_name.trim().toLowerCase();
-          const match =
-            ngnBanks.find((x) => x.name.toLowerCase() === wanted) ||
-            ngnBanks.find((x) => x.name.toLowerCase().includes(wanted)) ||
-            ngnBanks.find((x) => wanted.includes(x.name.toLowerCase()));
-          if (match) setNgnBankCode(match.code);
-          else allApplied = false;
+
+      // Resolve bank once the list is loaded. Prefer code match, then name —
+      // contacts often store a stale/provider-specific bank_code that isn't in
+      // the live Flovide/Nomba list, which leaves Radix Select blank.
+      if (ngnBanks.length === 0 && (b.bank_code || b.bank_name)) {
+        allApplied = false;
+      } else if (ngnBanks.length > 0) {
+        const code = b.bank_code ? String(b.bank_code).trim() : "";
+        const byCode = code
+          ? ngnBanks.find((x) => x.code === code || x.code === code.replace(/^0+/, ""))
+          : undefined;
+        const wanted = (b.bank_name || "").trim().toLowerCase();
+        const byName = wanted
+          ? ngnBanks.find((x) => x.name.toLowerCase() === wanted)
+            || ngnBanks.find((x) => x.name.toLowerCase().includes(wanted))
+            || ngnBanks.find((x) => wanted.includes(x.name.toLowerCase()))
+          : undefined;
+        const match = byCode || byName;
+        if (match) {
+          if (ngnBankCode !== match.code) setNgnBankCode(match.code);
+        } else if (code || wanted) {
+          // Stale code with no name match — clear so the user can pick.
+          if (ngnBankCode) setNgnBankCode("");
+          allApplied = false;
         }
       }
     } else if (targetCountry.code === "GHS" && (b.bank_account || b.bank_code)) {
@@ -2214,22 +2189,19 @@ const SendPage = () => {
   const cardFundingAvailable = productFeatures.nombaNigeria || productFeatures.lenhubFlutter
     || productFeatures.paytota || productFeatures.swychr || productFeatures.flutterwave;
 
-  const interacFundingAvailable = !!cadWallet && (
-    productFeatures.fincraInterac
-    || productFeatures.flovide
-    || productFeatures.flovideInterac
-    || productFeatures.plaid
-  );
+  // TEMP: Interac pay-in hidden until the CAD Interac rail is live again.
+  const interacFundingAvailable = false;
   const interacUsesFincra = productFeatures.fincraInterac;
   const interacUsesFlovide = !interacUsesFincra && (productFeatures.flovide || productFeatures.flovideInterac);
   const wisePayWallet = wallets?.find((w) => isWisePayCurrency(w.currency_code));
 
+  useEffect(() => {
+    if (fundingSource === "interac") setFundingSource("wallet");
+  }, [fundingSource]);
+
   const fundingMethodOptions: PaymentMethodOption<FundingSource>[] = [
     ...(cardFundingAvailable
       ? [{ id: "card" as const, label: "Card", sublabel: "Debit or credit", icon: CreditCard, tone: "card" as const }]
-      : []),
-    ...(productFeatures.plaid
-      ? [{ id: "bank" as const, label: "Bank", sublabel: "Linked account", icon: Landmark, tone: "bank" as const }]
       : []),
     ...(interacFundingAvailable
       ? [{
@@ -2252,14 +2224,17 @@ const SendPage = () => {
 
   const fundingOptions = ([
     { v: "wallet" as const, icon: Wallet, label: "Wallet" },
-    ...(productFeatures.plaid ? [{ v: "bank" as const, icon: Landmark, label: "Bank" }] : []),
     ...((productFeatures.nombaNigeria || productFeatures.lenhubFlutter || productFeatures.paytota || productFeatures.swychr || productFeatures.flutterwave)
       ? [{ v: "card" as const, icon: CreditCard, label: "Card" }]
       : []),
   ]);
 
   useEffect(() => {
-    if (fundingSource === "bank" || fundingSource === "card") {
+    if (fundingSource === "bank") {
+      setFundingSource("wallet");
+      return;
+    }
+    if (fundingSource === "card") {
       setShowOtherFunding(true);
     }
   }, [fundingSource]);
@@ -2840,7 +2815,10 @@ const SendPage = () => {
                                       <>
                                         <motion.div custom={2} variants={fieldVariants} initial="hidden" animate="show" className="space-y-2">
                                           <Label>Recipient Bank</Label>
-                                          <Select value={ngnBankCode} onValueChange={setNgnBankCode}>
+                                          <Select
+                                            value={ngnBanks.some((b) => b.code === ngnBankCode) ? ngnBankCode : undefined}
+                                            onValueChange={setNgnBankCode}
+                                          >
                                             <SelectTrigger>
                                               <SelectValue placeholder={ngnBanks.length ? "Select Nigerian bank" : "Loading banks..."} />
                                             </SelectTrigger>
@@ -3088,11 +3066,7 @@ const SendPage = () => {
                                         currency={sourceCurrency}
                                         symbol={sourceSymbol}
                                         cardProviderReady={!!cardSendProvider}
-                                        cardChargeNote={
-                                          cardCheckoutQuote
-                                            ? `Card charge ≈ ${cardCheckoutQuote.checkoutCurrency} ${cardCheckoutQuote.checkoutAmount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}${cardSendProvider === "nomba" && sourceCurrency === "CAD" ? " · CAD charged in USD" : ""}`
-                                            : null
-                                        }
+                                        cardChargeNote={null}
                                         cardMinNote={
                                           cardSendProvider
                                             ? `Minimum card send is ${cardSendMinAmount(cardSendProvider, sourceCurrency)} ${sourceCurrency}.`

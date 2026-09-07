@@ -82,10 +82,12 @@ const ExchangeModal = ({ children }: ExchangeModalProps) => {
   const dbRate = fromCode && toCode
     ? resolveEffectiveRate(fromCode, toCode, fxRates ?? [])
     : null;
-  const effectiveRate = nombaQuote?.effective_rate && nombaQuote.effective_rate > 0
-    ? nombaQuote.effective_rate
-    : (dbRate ?? 1);
-  const rateFromNomba = !!nombaQuote?.effective_rate;
+  const effectiveRate = dbRate && dbRate > 0
+    ? dbRate
+    : (nombaQuote?.effective_rate && nombaQuote.effective_rate > 0
+      ? nombaQuote.effective_rate
+      : 1);
+  const rateFromNomba = !(dbRate && dbRate > 0) && !!nombaQuote?.effective_rate;
 
   const fee = parseFloat(amount) > 0 ? parseFloat(amount) * 0.005 : 0;
   const receivedAmount = parseFloat(amount) > 0 

@@ -14,7 +14,7 @@ function envFlag(name: string, defaultValue: boolean): boolean {
 export const productFeatures = {
   nombaNigeria: envFlag("VITE_FEATURE_NOMBA_NIGERIA", true),
   ghanaPay: envFlag("VITE_FEATURE_GHANA_PAY", false),
-  plaid: envFlag("VITE_FEATURE_PLAID", true),
+  plaid: envFlag("VITE_FEATURE_PLAID", false),
   canadaDomestic: envFlag("VITE_FEATURE_CANADA_DOMESTIC", false),
   stripe: false,
   /** Company Flutterwave — Africa collect + payout (NGN/GHS/KES/UGX/RWF/TZS/ZMW) + USD/CAD. */
@@ -37,12 +37,12 @@ export const productFeatures = {
   paytotaPayout: envFlag("VITE_FEATURE_PAYTOTA_PAYOUT", true),
   /** Fincra hosted checkout — western + Africa collect (NGN/GHS/KES/…). */
   fincra: envFlag("VITE_FEATURE_FINCRA", true),
-  /** Fincra CAD Interac Autodeposit (@fincra.ca) — fallback when Flovide unavailable. */
-  fincraInterac: envFlag("VITE_FEATURE_FINCRA_INTERAC", true),
+  /** Fincra CAD Interac Autodeposit — off; CAD top-up is Nomba card. */
+  fincraInterac: envFlag("VITE_FEATURE_FINCRA_INTERAC", false),
   /** Flovide (OhentPay) — banks, resolve, FX, NGN/KES/GHS/UGX/CAD payouts. */
   flovide: envFlag("VITE_FEATURE_FLOVIDE", true),
-  /** Flovide CAD Interac Autodeposit collect (efin@flovide.com). */
-  flovideInterac: envFlag("VITE_FEATURE_FLOVIDE_INTERAC", true),
+  /** Flovide CAD Interac Autodeposit — off; CAD top-up is Nomba card. */
+  flovideInterac: envFlag("VITE_FEATURE_FLOVIDE_INTERAC", false),
   /** Wise bank-deposit top-up (shared receive account + unique payment reference). */
   wise: envFlag("VITE_FEATURE_WISE", true),
   /** Square Checkout — card top-up for USD/EUR/GBP (CAD uses Nomba). */

@@ -83,12 +83,19 @@ const FxTradingPanel = () => {
 
   const effectiveRate = useMemo(() => {
     if (!fromCode || !toCode) return null;
+    // Mid-market fx_rates first so corridors stay consistent with each other.
+    const db = resolveEffectiveRate(fromCode, toCode, fxRates ?? []);
+    if (db && db > 0) return db;
     if (nombaQuote?.effective_rate && nombaQuote.effective_rate > 0) {
       return nombaQuote.effective_rate;
     }
-    return resolveEffectiveRate(fromCode, toCode, fxRates ?? []);
+    return null;
   }, [fromCode, toCode, fxRates, nombaQuote?.effective_rate]);
-  const rateFromNomba = !!nombaQuote?.effective_rate;
+  const rateFromNomba = useMemo(() => {
+    if (!fromCode || !toCode) return false;
+    const db = resolveEffectiveRate(fromCode, toCode, fxRates ?? []);
+    return !(db && db > 0) && !!nombaQuote?.effective_rate;
+  }, [fromCode, toCode, fxRates, nombaQuote?.effective_rate]);
   const recvDecimals = 2;
 
   const quoteReceive = useCallback(
