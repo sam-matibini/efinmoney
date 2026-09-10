@@ -4,7 +4,17 @@
 
 `new row violates row-level security policy for table "ledger_entries"`
 
-**Surfaces:** Transfer between wallets (`src/components/modals/WalletTransferModal.tsx`) and Live exchange (`src/pages/ExchangePage.tsx`). Both call `executeWalletFxSwap` in `src/lib/walletTransfer.ts`.
+**Root cause:** RLS is enabled on `ledger_entries`. The JWT role is `authenticated`. The only INSERT policy is staff-only (`finance` / `admin`), so the row fails `WITH CHECK`. Do **not** add `WITH CHECK (true)` in production.
+
+**Apply P0 now:** run `supabase/scripts/p0-fix-ledger-entries-rls.sql` in the production SQL Editor. That script:
+
+1. `GRANT INSERT ON ledger_entries TO authenticated`
+2. Creates `ledger_insert_policy` (own-wallet `WITH CHECK` only)
+3. Keeps staff INSERT
+4. Makes FX-clearing auto-balance `SECURITY DEFINER`
+5. Seeds USDC/USDT 21xx accounts and updates `execute_fx_swap`
+
+**Surfaces:** Transfer between wallets (`src/components/modals/WalletTransferModal.tsx`) and Live exchange (`src/pages/ExchangePage.tsx`). Both call `executeWalletFxSwap` in `src/lib/walletTransfer.ts` (RPC only — no client `ledger_entries` insert).
 
 Work these phases in order. Do not skip P0 for P1.
 
