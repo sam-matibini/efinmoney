@@ -14496,6 +14496,7 @@ export type Database = {
       detect_eftr_candidates: { Args: never; Returns: number }
       dispatch_due_broadcasts: { Args: never; Returns: undefined }
       edge_function_url: { Args: { p_function: string }; Returns: string }
+      ensure_customer_wallet_liability: { Args: { p_ccy: string }; Returns: string }
       ensure_fx_clearing_account: { Args: { p_ccy: string }; Returns: string }
       ensure_network_fee_account: { Args: { p_ccy: string }; Returns: string }
       ensure_partner_payable_account: {

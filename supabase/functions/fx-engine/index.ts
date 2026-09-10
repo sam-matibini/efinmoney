@@ -487,6 +487,13 @@ serve(async (req) => {
       const fee = from_amount * resolved.fee_rate;
       const toAmount = (from_amount - fee) * effectiveRate;
 
+      await Promise.all([
+        (serviceClient as any).rpc("ensure_customer_wallet_liability", { p_ccy: from_currency }),
+        (serviceClient as any).rpc("ensure_customer_wallet_liability", { p_ccy: to_currency }),
+      ]).catch((ensureErr: unknown) => {
+        console.warn("ensure_customer_wallet_liability", ensureErr);
+      });
+
       const { data: journalId, error: swapError } = await supabase.rpc('execute_fx_swap', {
         p_user_id: userId,
         p_from_wallet_id: from_wallet_id,
