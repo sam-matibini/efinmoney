@@ -11,7 +11,7 @@ import { useFxRates } from "@/hooks/useFxRates";
 import { resolveEffectiveRate } from "@/lib/fx";
 import { fxQuoteLabel, type QuoteConvention } from "@/lib/fxQuote";
 import { getFlovideOrNombaRate, isNgnPair } from "@/lib/flovide";
-import { supabase } from "@/integrations/supabase/client";
+import { invokeEdgeFunction } from "@/lib/invokeEdgeFunction";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 
@@ -127,23 +127,14 @@ const ExchangeModal = ({ children }: ExchangeModalProps) => {
     setIsLoading(true);
 
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      const response = await supabase.functions.invoke('fx-engine', {
-        body: {
-          action: 'execute',
-          from_wallet_id: fromWallet.wallet_id,
-          to_wallet_id: toWallet.wallet_id,
-          from_currency: fromWallet.currency_code,
-          to_currency: toWallet.currency_code,
-          from_amount: parseFloat(amount),
-        },
+      await invokeEdgeFunction("fx-engine", {
+        action: "execute",
+        from_wallet_id: fromWallet.wallet_id,
+        to_wallet_id: toWallet.wallet_id,
+        from_currency: fromWallet.currency_code,
+        to_currency: toWallet.currency_code,
+        from_amount: parseFloat(amount),
       });
-
-      const serverError = (response.data as { error?: string })?.error;
-      if (response.error || serverError) {
-        throw new Error(serverError || response.error?.message || 'Exchange failed');
-      }
 
       setStep(2);
       queryClient.invalidateQueries({ queryKey: ['wallets'] });
@@ -154,7 +145,7 @@ const ExchangeModal = ({ children }: ExchangeModalProps) => {
       }, 3000);
     } catch (error) {
       console.error('Exchange error:', error);
-      toast.error("Exchange failed. Please try again.");
+      toast.error(error instanceof Error ? error.message : "Exchange failed. Please try again.");
     } finally {
       setIsLoading(false);
     }

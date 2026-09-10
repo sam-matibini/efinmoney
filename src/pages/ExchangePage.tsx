@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useWallets } from "@/hooks/useWallets";
 import { useFxRates, useFxRatesLastUpdated } from "@/hooks/useFxRates";
-import { supabase } from "@/integrations/supabase/client";
+import { invokeEdgeFunction } from "@/lib/invokeEdgeFunction";
 import { toast } from "sonner";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { RefreshCw, ArrowUpDown, TrendingUp, CheckCircle, Bitcoin, DollarSign, Sparkles } from "lucide-react";
@@ -37,7 +37,9 @@ const friendlyFxError = (raw: string | undefined | null): string => {
     return "Your source wallet is unavailable. Please refresh and try again.";
   if (m.includes("destination wallet"))
     return "Your destination wallet is unavailable. Please refresh and try again.";
-  if (m.includes("service temporarily unavailable"))
+  if (m.includes("not set up for live exchange"))
+    return raw || "This currency is not set up for live exchange yet.";
+  if (m.includes("service temporarily unavailable") || m.includes("non-2xx") || m.includes("edge function"))
     return "Exchange is temporarily unavailable. Please try again in a moment.";
   return raw || "Exchange failed. Please try again.";
 };
@@ -210,22 +212,14 @@ const FxTradingPanel = () => {
     setIsLoading(true);
 
     try {
-      const response = await supabase.functions.invoke('fx-engine', {
-        body: {
-          action: 'execute',
-          from_wallet_id: fromWallet.wallet_id,
-          to_wallet_id: toWallet.wallet_id,
-          from_currency: fromWallet.currency_code,
-          to_currency: toWallet.currency_code,
-          from_amount: parsedSend,
-        },
+      await invokeEdgeFunction("fx-engine", {
+        action: "execute",
+        from_wallet_id: fromWallet.wallet_id,
+        to_wallet_id: toWallet.wallet_id,
+        from_currency: fromWallet.currency_code,
+        to_currency: toWallet.currency_code,
+        from_amount: parsedSend,
       });
-
-      const serverError = (response.data as any)?.error;
-      if (response.error || serverError) {
-        const msg = serverError || response.error?.message || 'Exchange failed';
-        throw new Error(msg);
-      }
 
       setSuccess(true);
       queryClient.invalidateQueries({ queryKey: ['wallets'] });

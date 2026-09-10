@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
+import { resolveEffectiveRate } from "../_shared/fxRatesCore.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -120,6 +121,77 @@ type ResolvedRate = {
   fee_rate: number;
 };
 
+type LiveFxRow = {
+  from_currency: string;
+  to_currency: string;
+  rate: number;
+  markup_rate: number;
+  effective_rate: number;
+};
+
+function liveRateFilter(): string {
+  return `valid_until.is.null,valid_until.gt.${new Date().toISOString()}`;
+}
+
+function toResolved(
+  row: LiveFxRow,
+  feeRate: number,
+  invert: boolean,
+): ResolvedRate {
+  const effective = Number(row.effective_rate);
+  const market = Number(row.rate);
+  if (invert) {
+    return {
+      effective_rate: 1 / effective,
+      market_rate: market > 0 ? 1 / market : 0,
+      markup_rate: Number(row.markup_rate) || 0,
+      fee_rate: feeRate,
+    };
+  }
+  return {
+    effective_rate: effective,
+    market_rate: market,
+    markup_rate: Number(row.markup_rate) || 0,
+    fee_rate: feeRate,
+  };
+}
+
+/** Latest currently-valid row for an exact pair. Live refresh rows set valid_until; do not require NULL. */
+async function fetchLatestLivePair(
+  supabase: ReturnType<typeof createClient>,
+  from: string,
+  to: string,
+): Promise<LiveFxRow | null> {
+  const { data, error } = await supabase
+    .from("fx_rates")
+    .select("from_currency, to_currency, rate, markup_rate, effective_rate")
+    .eq("from_currency", from)
+    .eq("to_currency", to)
+    .or(liveRateFilter())
+    .order("valid_from", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    console.error("fx_rates pair lookup failed", { from, to, error });
+    return null;
+  }
+  if (!data || Number(data.effective_rate) <= 0) return null;
+  return data as LiveFxRow;
+}
+
+function dedupeLatestPairs(rows: LiveFxRow[]): LiveFxRow[] {
+  const seen = new Set<string>();
+  const latest: LiveFxRow[] = [];
+  for (const row of rows) {
+    const key = `${row.from_currency}->${row.to_currency}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    latest.push(row);
+  }
+  return latest;
+}
+
 /**
  * Wallet-to-wallet FX swap fee comes from the central rate card
  * (efinmoney_pricing, payment_method = 'fx_swap'), never a constant.
@@ -147,7 +219,8 @@ async function resolveFxFeeRate(
 }
 
 async function resolveFxRate(
-  supabase: ReturnType<typeof createClient>,
+  rateClient: ReturnType<typeof createClient>,
+  feeClient: ReturnType<typeof createClient>,
   from_currency: string,
   to_currency: string,
 ): Promise<ResolvedRate | null> {
@@ -155,42 +228,41 @@ async function resolveFxRate(
     return { effective_rate: 1, market_rate: 1, markup_rate: 0, fee_rate: 0 };
   }
 
-  const feeRate = await resolveFxFeeRate(supabase, from_currency, to_currency);
+  const feeRate = await resolveFxFeeRate(feeClient, from_currency, to_currency);
 
-  const { data: rateData } = await supabase
-    .from('fx_rates')
-    .select('*')
-    .eq('from_currency', from_currency)
-    .eq('to_currency', to_currency)
-    .is('valid_until', null)
-    .maybeSingle();
+  const direct = await fetchLatestLivePair(rateClient, from_currency, to_currency);
+  if (direct) return toResolved(direct, feeRate, false);
 
-  if (rateData) {
-    return {
-      effective_rate: Number(rateData.effective_rate),
-      market_rate: Number(rateData.rate),
-      markup_rate: Number(rateData.markup_rate),
-      fee_rate: feeRate,
-    };
+  const reverse = await fetchLatestLivePair(rateClient, to_currency, from_currency);
+  if (reverse) return toResolved(reverse, feeRate, true);
+
+  // Same fallback the Exchange UI uses: inverse already tried, then USD cross.
+  const { data: liveRows, error } = await rateClient
+    .from("fx_rates")
+    .select("from_currency, to_currency, rate, markup_rate, effective_rate")
+    .or(liveRateFilter())
+    .order("valid_from", { ascending: false })
+    .limit(2000);
+
+  if (error) {
+    console.error("fx_rates live fetch failed", error);
+    return null;
   }
 
-  const { data: reverseRate } = await supabase
-    .from('fx_rates')
-    .select('*')
-    .eq('from_currency', to_currency)
-    .eq('to_currency', from_currency)
-    .is('valid_until', null)
-    .maybeSingle();
+  const rates = dedupeLatestPairs((liveRows ?? []) as LiveFxRow[]);
+  const effective = resolveEffectiveRate(from_currency, to_currency, rates);
+  if (!effective || effective <= 0) return null;
 
-  if (!reverseRate) return null;
-
-  const effective = Number(reverseRate.effective_rate);
-  if (!effective) return null;
+  const market = resolveEffectiveRate(
+    from_currency,
+    to_currency,
+    rates.map((r) => ({ ...r, effective_rate: Number(r.rate) })),
+  );
 
   return {
-    effective_rate: 1 / effective,
-    market_rate: 1 / Number(reverseRate.rate),
-    markup_rate: Number(reverseRate.markup_rate),
+    effective_rate: effective,
+    market_rate: market && market > 0 ? market : effective,
+    markup_rate: 0,
     fee_rate: feeRate,
   };
 }
@@ -299,7 +371,7 @@ serve(async (req) => {
 
       const { from_currency, to_currency, amount } = validation.data;
 
-      const resolved = await resolveFxRate(supabase, from_currency, to_currency);
+      const resolved = await resolveFxRate(serviceClient, supabase, from_currency, to_currency);
       if (!resolved) {
         return new Response(
           JSON.stringify({ error: 'Exchange rate not available for this pair' }),
@@ -403,7 +475,7 @@ serve(async (req) => {
         );
       }
 
-      const resolved = await resolveFxRate(supabase, from_currency, to_currency);
+      const resolved = await resolveFxRate(serviceClient, supabase, from_currency, to_currency);
       if (!resolved) {
         return new Response(
           JSON.stringify({ error: 'Exchange rate not available for this pair' }),
@@ -426,9 +498,16 @@ serve(async (req) => {
 
       if (swapError) {
         console.error('FX swap error:', swapError);
-        const msg = swapError.message?.includes('Insufficient')
+        const raw = String(swapError.message || '');
+        const msg = /insufficient/i.test(raw)
           ? 'Insufficient wallet balance'
-          : 'Failed to execute transfer. Please try again.';
+          : /not authenticated/i.test(raw)
+            ? 'Please sign in again to complete this exchange.'
+            : /unauthorized/i.test(raw)
+              ? 'You cannot exchange from these wallets.'
+              : /ledger|account not found|null value/i.test(raw)
+                ? 'This currency is not set up for live exchange yet. Please try another pair or contact support.'
+                : 'Failed to execute transfer. Please try again.';
         return new Response(
           JSON.stringify({ error: msg }),
           { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

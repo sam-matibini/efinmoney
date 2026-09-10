@@ -1,4 +1,5 @@
 import { resolveEffectiveRate } from "@/lib/fxRatesCore";
+import { edgeFunctionErrorMessage } from "@/lib/invokeEdgeFunction";
 
 export const WALLET_TRANSFER_FEE_RATE = 0.005;
 
@@ -46,13 +47,5 @@ export function computeTransferQuote(
 }
 
 export async function invokeTransferError(error: unknown): Promise<string> {
-  if (error && typeof error === 'object' && 'context' in error) {
-    try {
-      const body = await (error as { context: { json: () => Promise<{ error?: string }> } }).context.json();
-      if (body?.error) return body.error;
-    } catch {
-      /* ignore */
-    }
-  }
-  return error instanceof Error ? error.message : 'Transfer failed';
+  return edgeFunctionErrorMessage(error);
 }
