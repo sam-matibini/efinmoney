@@ -108,9 +108,14 @@ const ExchangeModal = ({ children }: ExchangeModalProps) => {
   };
 
   const handleSwapCurrencies = () => {
-    const temp = fromWalletId;
-    setFromWalletId(toWalletId);
-    setToWalletId(temp);
+    const fromId = fromWallet?.wallet_id ?? fromWalletId;
+    const toId = toWallet?.wallet_id ?? toWalletId;
+    if (!fromId || !toId || fromId === toId) {
+      toast.error("Add another currency wallet to switch this pair.");
+      return;
+    }
+    setFromWalletId(toId);
+    setToWalletId(fromId);
   };
 
   const handleSubmit = async () => {

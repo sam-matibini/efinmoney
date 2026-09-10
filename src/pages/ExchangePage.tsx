@@ -69,10 +69,37 @@ const FxTradingPanel = () => {
   const { data: fxRates } = useFxRates();
   const queryClient = useQueryClient();
 
-  const fiatWallets = wallets?.filter(w => !['BTC', 'USDT', 'USDC'].includes(w.currency_code)) ?? [];
+  const fiatWallets = useMemo(
+    () => wallets?.filter((w) => !["BTC", "USDT", "USDC"].includes(w.currency_code)) ?? [],
+    [wallets],
+  );
+
+  useEffect(() => {
+    if (fiatWallets.length === 0) return;
+    setFromWalletId((id) => {
+      if (id && fiatWallets.some((w) => w.wallet_id === id)) return id;
+      return fiatWallets.find((w) => w.currency_code === "CAD")?.wallet_id
+        ?? fiatWallets[0].wallet_id;
+    });
+  }, [fiatWallets]);
+
+  useEffect(() => {
+    if (fiatWallets.length < 2) return;
+    const fromId = fromWalletId || fiatWallets[0]?.wallet_id;
+    setToWalletId((id) => {
+      if (id && id !== fromId && fiatWallets.some((w) => w.wallet_id === id)) return id;
+      return fiatWallets.find((w) => w.wallet_id !== fromId && w.currency_code === "GHS")?.wallet_id
+        ?? fiatWallets.find((w) => w.wallet_id !== fromId)?.wallet_id
+        ?? "";
+    });
+  }, [fiatWallets, fromWalletId]);
 
   const fromWallet = fiatWallets.find(w => w.wallet_id === fromWalletId) ?? fiatWallets[0];
-  const toWallet = fiatWallets.find(w => w.wallet_id === toWalletId) ?? fiatWallets.find(w => w.wallet_id !== fromWallet?.wallet_id) ?? fiatWallets[1];
+  const toWallet = fiatWallets.find(w => w.wallet_id === toWalletId)
+    ?? fiatWallets.find(w => w.wallet_id !== fromWallet?.wallet_id)
+    ?? fiatWallets[1];
+  const selectedFromId = fromWallet?.wallet_id ?? "";
+  const selectedToId = toWallet?.wallet_id ?? "";
 
   const fromCode = fromWallet?.currency_code ?? "";
   const toCode = toWallet?.currency_code ?? "";
@@ -161,14 +188,16 @@ const FxTradingPanel = () => {
   };
 
   const handleSwap = () => {
-    const temp = fromWalletId;
-    setFromWalletId(toWalletId);
-    setToWalletId(temp);
+    const fromId = fromWallet?.wallet_id;
+    const toId = toWallet?.wallet_id;
+    if (!fromId || !toId || fromId === toId) {
+      toast.error("Add another currency wallet to switch this pair.");
+      return;
+    }
+    setFromWalletId(toId);
+    setToWalletId(fromId);
     setSwapRotation((r) => r + 180);
-    const tempSend = sendAmount;
-    setSendAmount(recvAmount);
-    setRecvAmount(tempSend);
-    setLastEdited(lastEdited === "send" ? "receive" : "send");
+    setLastEdited("send");
   };
 
   const handleExchange = async () => {
@@ -319,12 +348,12 @@ const FxTradingPanel = () => {
           <CardContent className="relative space-y-5 pt-2">
             <div className="space-y-2.5 rounded-xl bg-muted/40 p-4 ring-1 ring-border/60">
               <Label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">You pay</Label>
-            <Select value={fromWalletId || fromWallet?.wallet_id || ""} onValueChange={setFromWalletId}>
+            <Select value={selectedFromId} onValueChange={setFromWalletId}>
                 <SelectTrigger className="h-11 border-border/60 bg-background/80">
                 <SelectValue placeholder="Select wallet" />
               </SelectTrigger>
               <SelectContent>
-                {fiatWallets?.filter(w => w.wallet_id !== toWalletId).map((w) => (
+                {fiatWallets.filter(w => w.wallet_id !== selectedToId).map((w) => (
                   <SelectItem key={w.wallet_id} value={w.wallet_id}>
                       <span className="inline-flex items-center gap-2">
                         <CurrencyFlag code={w.currency_code} size="sm" />
@@ -356,15 +385,16 @@ const FxTradingPanel = () => {
             )}
           </div>
 
-            <div className="-my-1 flex justify-center">
+            <div className="relative z-20 -my-3 flex justify-center">
             <motion.button
               type="button"
               onClick={handleSwap}
               animate={{ rotate: swapRotation }}
               transition={{ type: "spring", stiffness: 260, damping: 18 }}
-              whileTap={{ scale: 0.9 }}
-                className="z-10 flex h-11 w-11 items-center justify-center rounded-full border border-primary/20 bg-primary/10 text-primary shadow-sm hover:bg-primary/15"
-              aria-label="Swap currencies"
+              whileHover={{ scale: 1.06 }}
+              whileTap={{ scale: 0.92 }}
+                className="pointer-events-auto flex h-11 w-11 cursor-pointer items-center justify-center rounded-full border border-primary/30 bg-background text-primary shadow-md hover:bg-primary/10"
+              aria-label="Switch pay and receive currencies"
             >
                 <ArrowUpDown className="h-4 w-4" />
             </motion.button>
@@ -372,12 +402,12 @@ const FxTradingPanel = () => {
 
             <div className="space-y-2.5 rounded-xl bg-gradient-to-br from-primary/[0.07] to-muted/30 p-4 ring-1 ring-primary/15">
               <Label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">You receive</Label>
-            <Select value={toWalletId || toWallet?.wallet_id || ""} onValueChange={setToWalletId}>
+            <Select value={selectedToId} onValueChange={setToWalletId}>
                 <SelectTrigger className="h-11 border-border/60 bg-background/80">
                 <SelectValue placeholder="Select wallet" />
               </SelectTrigger>
               <SelectContent>
-                {fiatWallets.filter(w => w.wallet_id !== fromWalletId).map((w) => (
+                {fiatWallets.filter(w => w.wallet_id !== selectedFromId).map((w) => (
                   <SelectItem key={w.wallet_id} value={w.wallet_id}>
                       <span className="inline-flex items-center gap-2">
                         <CurrencyFlag code={w.currency_code} size="sm" />
