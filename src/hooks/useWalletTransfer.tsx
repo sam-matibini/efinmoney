@@ -1,6 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
-import { invokeTransferError } from '@/lib/walletTransfer';
+import { invokeTransferError, executeWalletFxSwap } from '@/lib/walletTransfer';
 import { useAuth } from './useAuth';
 
 export type WalletTransferInput = {
@@ -9,6 +8,8 @@ export type WalletTransferInput = {
   from_currency: string;
   to_currency: string;
   from_amount: number;
+  effective_rate?: number | null;
+  fee_amount?: number;
 };
 
 export function useWalletTransfer() {
@@ -17,12 +18,11 @@ export function useWalletTransfer() {
 
   return useMutation({
     mutationFn: async (input: WalletTransferInput) => {
-      const { data, error } = await supabase.functions.invoke('fx-engine', {
-        body: { action: 'execute', ...input },
-      });
-      if (error) throw new Error(await invokeTransferError(error));
-      if ((data as { error?: string })?.error) throw new Error((data as { error: string }).error);
-      return data as { success: boolean; message?: string; transaction?: unknown };
+      try {
+        return await executeWalletFxSwap(input);
+      } catch (error) {
+        throw new Error(await invokeTransferError(error));
+      }
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['wallets', user?.id] });

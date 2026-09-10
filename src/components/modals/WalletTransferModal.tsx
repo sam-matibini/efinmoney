@@ -87,6 +87,8 @@ export default function WalletTransferModal({ children, defaultFromWalletId }: P
         from_currency: fromWallet.currency_code,
         to_currency: toWallet.currency_code,
         from_amount: parsedAmount,
+        effective_rate: quote.effective_rate,
+        fee_amount: quote.fee,
       });
       setSuccess(true);
       toast.success('Transfer completed');

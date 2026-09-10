@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useWallets } from "@/hooks/useWallets";
 import { useFxRates, useFxRatesLastUpdated } from "@/hooks/useFxRates";
-import { invokeEdgeFunction } from "@/lib/invokeEdgeFunction";
+import { executeWalletFxSwap } from "@/lib/walletTransfer";
 import { toast } from "sonner";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { RefreshCw, ArrowUpDown, TrendingUp, CheckCircle, Bitcoin, DollarSign, Sparkles } from "lucide-react";
@@ -212,13 +212,14 @@ const FxTradingPanel = () => {
     setIsLoading(true);
 
     try {
-      await invokeEdgeFunction("fx-engine", {
-        action: "execute",
+      await executeWalletFxSwap({
         from_wallet_id: fromWallet.wallet_id,
         to_wallet_id: toWallet.wallet_id,
         from_currency: fromWallet.currency_code,
         to_currency: toWallet.currency_code,
         from_amount: parsedSend,
+        effective_rate: effectiveRate,
+        fee_amount: fee,
       });
 
       setSuccess(true);

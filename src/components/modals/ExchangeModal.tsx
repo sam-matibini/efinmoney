@@ -11,7 +11,7 @@ import { useFxRates } from "@/hooks/useFxRates";
 import { resolveEffectiveRate } from "@/lib/fx";
 import { fxQuoteLabel, type QuoteConvention } from "@/lib/fxQuote";
 import { getFlovideOrNombaRate, isNgnPair } from "@/lib/flovide";
-import { invokeEdgeFunction } from "@/lib/invokeEdgeFunction";
+import { executeWalletFxSwap } from "@/lib/walletTransfer";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 
@@ -127,13 +127,14 @@ const ExchangeModal = ({ children }: ExchangeModalProps) => {
     setIsLoading(true);
 
     try {
-      await invokeEdgeFunction("fx-engine", {
-        action: "execute",
+      await executeWalletFxSwap({
         from_wallet_id: fromWallet.wallet_id,
         to_wallet_id: toWallet.wallet_id,
         from_currency: fromWallet.currency_code,
         to_currency: toWallet.currency_code,
         from_amount: parseFloat(amount),
+        effective_rate: effectiveRate,
+        fee_amount: fee,
       });
 
       setStep(2);
