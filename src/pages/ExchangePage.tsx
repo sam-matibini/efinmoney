@@ -14,6 +14,7 @@ import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { RefreshCw, ArrowUpDown, TrendingUp, CheckCircle, Bitcoin, DollarSign, Sparkles } from "lucide-react";
 import { CryptoTradingPanel } from "@/components/crypto/CryptoTradingPanel";
 import { resolveEffectiveRate } from "@/lib/fx";
+import { fxQuoteLabel, type QuoteConvention } from "@/lib/fxQuote";
 import { getFlovideOrNombaRate, isNgnPair } from "@/lib/flovide";
 import { CurrencyFlag } from "@/components/ui/FlagImage";
 import FeatureGate from "@/components/common/FeatureGate";
@@ -55,6 +56,7 @@ const FxTradingPanel = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [swapRotation, setSwapRotation] = useState(0);
+  const [quoteConvention, setQuoteConvention] = useState<QuoteConvention>("indirect");
   const successTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -231,10 +233,15 @@ const FxTradingPanel = () => {
         ? `Maximum exchange is ${MAX_AMOUNT.toLocaleString()}.`
         : null;
 
-  const rateLabel = useMemo(() => {
+  const rateQuote = useMemo(() => {
     if (!fromWallet || !toWallet || !effectiveRate) return null;
-    return `1 ${fromWallet.currency_code} = ${effectiveRate.toFixed(4)} ${toWallet.currency_code}`;
-  }, [fromWallet, toWallet, effectiveRate]);
+    return fxQuoteLabel(
+      fromWallet.currency_code,
+      toWallet.currency_code,
+      effectiveRate,
+      quoteConvention,
+    );
+  }, [fromWallet, toWallet, effectiveRate, quoteConvention]);
 
   if (success) {
     return (
@@ -263,18 +270,51 @@ const FxTradingPanel = () => {
         <Card className="relative overflow-hidden border-border/60 shadow-lg">
           <div className="pointer-events-none absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-primary/[0.06] to-transparent" />
           <CardHeader className="relative pb-2">
-            <div className="flex items-center justify-between gap-3">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <CardTitle className="flex items-center gap-2 font-display text-base">
                 <Sparkles className="h-4 w-4 text-primary" />
                 Live exchange
               </CardTitle>
-              {rateLabel && (
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-2.5 py-1 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">
-                  <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" />
-                  {rateLabel}
-                </span>
+              {rateQuote && (
+                <div className="flex flex-wrap items-center justify-end gap-2">
+                  <div
+                    className="inline-flex rounded-full bg-background p-0.5 ring-1 ring-border"
+                    role="group"
+                    aria-label="FX quotation convention"
+                  >
+                    <button
+                      type="button"
+                      onClick={() => setQuoteConvention("indirect")}
+                      className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${
+                        quoteConvention === "indirect"
+                          ? "bg-primary text-primary-foreground"
+                          : "text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      Indirect
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setQuoteConvention("direct")}
+                      className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${
+                        quoteConvention === "direct"
+                          ? "bg-primary text-primary-foreground"
+                          : "text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      Direct
+                    </button>
+                  </div>
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-2.5 py-1 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">
+                    <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" />
+                    {rateQuote.label}
+                  </span>
+                </div>
               )}
             </div>
+            {rateQuote && (
+              <p className="mt-2 text-[11px] leading-4 text-muted-foreground">{rateQuote.hint}</p>
+            )}
           </CardHeader>
           <CardContent className="relative space-y-5 pt-2">
             <div className="space-y-2.5 rounded-xl bg-muted/40 p-4 ring-1 ring-border/60">
@@ -294,8 +334,8 @@ const FxTradingPanel = () => {
                 ))}
               </SelectContent>
             </Select>
-            <div className="relative">
-                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-lg font-medium text-muted-foreground">
+            <div className="flex h-14 items-center gap-2 rounded-md border border-border/60 bg-background px-4 focus-within:ring-2 focus-within:ring-primary/30">
+                <span className="shrink-0 whitespace-nowrap text-lg font-medium text-muted-foreground">
                   {fromWallet?.symbol || "$"}
               </span>
               <Input
@@ -304,7 +344,8 @@ const FxTradingPanel = () => {
                 placeholder="0.00"
                   value={sendAmount}
                   onChange={(e) => onSendChange(e.target.value)}
-                  className="h-14 border-border/60 bg-background pl-10 font-display text-2xl font-bold tabular-nums focus-visible:ring-primary/30"
+                  aria-label="You pay amount"
+                  className="h-14 min-w-0 flex-1 border-0 bg-transparent p-0 font-display text-2xl font-bold tabular-nums shadow-none focus-visible:ring-0"
               />
             </div>
               <p className="text-xs text-muted-foreground">
@@ -347,8 +388,8 @@ const FxTradingPanel = () => {
                 ))}
               </SelectContent>
             </Select>
-              <div className="relative">
-                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-lg font-medium text-muted-foreground">
+              <div className="flex h-14 items-center gap-2 rounded-md border border-border/60 bg-background/90 px-4 focus-within:ring-2 focus-within:ring-primary/30">
+                <span className="shrink-0 whitespace-nowrap text-lg font-medium text-muted-foreground">
                   {toWallet?.symbol || "$"}
                 </span>
                 <Input
@@ -357,20 +398,21 @@ const FxTradingPanel = () => {
                   placeholder="0.00"
                   value={recvAmount}
                   onChange={(e) => onRecvChange(e.target.value)}
-                  className="h-14 border-border/60 bg-background/90 pl-10 font-display text-2xl font-bold tabular-nums focus-visible:ring-primary/30"
+                  aria-label="You receive amount"
+                  className="h-14 min-w-0 flex-1 border-0 bg-transparent p-0 font-display text-2xl font-bold tabular-nums shadow-none focus-visible:ring-0"
                 />
               </div>
           </div>
 
             {parsedSend > 0 && (
               <div className="space-y-2 rounded-xl border border-border/60 bg-muted/30 p-4 text-sm">
-              <div className="flex justify-between">
-                  <span className="text-muted-foreground">Exchange rate</span>
-                  <span className="font-medium tabular-nums flex items-center gap-2">
+              <div className="flex justify-between gap-3">
+                  <span className="text-muted-foreground">{quoteConvention === "direct" ? "Direct quote" : "Indirect quote"}</span>
+                  <span className="font-medium tabular-nums flex min-w-0 items-center justify-end gap-2">
                   {effectiveRate
                     ? (
                       <>
-                        {`1 ${fromWallet?.currency_code} = ${effectiveRate.toFixed(4)} ${toWallet?.currency_code}`}
+                        <span className="truncate">{rateQuote?.label}</span>
                         {rateFromNomba && (
                           <span className="text-[10px] uppercase tracking-wide text-emerald-600 font-semibold">Live</span>
                         )}
@@ -383,9 +425,9 @@ const FxTradingPanel = () => {
                 <span className="text-muted-foreground">Fee (0.5%)</span>
                   <span className="tabular-nums">{fromWallet?.symbol}{fee.toFixed(2)}</span>
                 </div>
-                <div className="flex justify-between border-t border-border/60 pt-2 font-semibold">
-                  <span>You receive</span>
-                  <span className="text-primary tabular-nums">{toWallet?.symbol}{fmtRecv(receivedAmount)}</span>
+                <div className="flex justify-between border-t border-border/60 pt-2 font-semibold gap-3">
+                  <span className="shrink-0">You receive</span>
+                  <span className="min-w-0 truncate text-right text-primary tabular-nums">{toWallet?.symbol}{fmtRecv(receivedAmount)}</span>
               </div>
             </div>
           )}
