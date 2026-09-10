@@ -72,7 +72,9 @@ function canUseQuotedRateFallback(message: string): boolean {
     m.includes("service temporarily unavailable") ||
     m.includes("account_id") ||
     m.includes("null value") ||
-    m.includes("not set up for live exchange")
+    m.includes("not set up for live exchange") ||
+    m.includes("row-level security") ||
+    m.includes("ledger_entries")
   );
 }
 
@@ -82,7 +84,8 @@ function isMissingLedgerAccount(message: string): boolean {
     m.includes("account_id") ||
     m.includes("null value") ||
     m.includes("ledger account not found") ||
-    m.includes("not set up for live exchange")
+    m.includes("not set up for live exchange") ||
+    m.includes("row-level security")
   );
 }
 
@@ -123,10 +126,9 @@ async function postFxSwapLedger(input: ExecuteWalletFxSwapInput & { userId: stri
     throw new Error("Invalid exchange amount after fees.");
   }
 
-  const [fromAccountId, toAccountId, feeRow] = await Promise.all([
+  const [fromAccountId, toAccountId] = await Promise.all([
     resolveSwapAccountId(input.from_currency),
     resolveSwapAccountId(input.to_currency),
-    supabase.from("ledger_accounts").select("id").eq("code", "4100").maybeSingle(),
   ]);
 
   if (!fromAccountId || !toAccountId) {
@@ -170,21 +172,6 @@ async function postFxSwapLedger(input: ExecuteWalletFxSwapInput & { userId: stri
       created_by: input.userId,
     },
   ];
-
-  const feeAccountId = feeRow.data?.id;
-  if (fee > 0 && feeAccountId) {
-    rows.push({
-      journal_id: journalId,
-      account_id: feeAccountId,
-      wallet_id: null,
-      currency_code: input.from_currency,
-      debit_amount: 0,
-      credit_amount: fee,
-      description: "FX Fee Revenue",
-      reference_type: "fx",
-      created_by: input.userId,
-    });
-  }
 
   const { error } = await supabase.from("ledger_entries").insert(rows);
   if (error) throw new Error(error.message);

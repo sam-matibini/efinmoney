@@ -39,6 +39,8 @@ const friendlyFxError = (raw: string | undefined | null): string => {
     return "Your destination wallet is unavailable. Please refresh and try again.";
   if (m.includes("not set up for live exchange") || m.includes("account_id") || m.includes("null value"))
     return "This currency is not set up for live exchange yet. Please try again in a moment.";
+  if (m.includes("row-level security") || m.includes("ledger_entries"))
+    return "Exchange could not be posted to your wallets. Please try again in a moment.";
   if (m.includes("service temporarily unavailable") || m.includes("non-2xx") || m.includes("edge function"))
     return "Exchange is temporarily unavailable. Please try again in a moment.";
   return raw || "Exchange failed. Please try again.";
