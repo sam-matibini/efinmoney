@@ -78,117 +78,11 @@ function canUseQuotedRateFallback(message: string): boolean {
   );
 }
 
-function isMissingLedgerAccount(message: string): boolean {
-  const m = message.toLowerCase();
-  return (
-    m.includes("account_id") ||
-    m.includes("null value") ||
-    m.includes("ledger account not found") ||
-    m.includes("not set up for live exchange") ||
-    m.includes("row-level security")
-  );
-}
-
-async function ensureCustomerWalletLiability(currency: string): Promise<string | null> {
-  const { data, error } = await supabase.rpc("ensure_customer_wallet_liability", {
-    p_ccy: currency,
-  });
-  if (error || !data) return null;
-  return String(data);
-}
-
-async function resolveSwapAccountId(currency: string): Promise<string | null> {
-  const ensured = await ensureCustomerWalletLiability(currency);
-  if (ensured) return ensured;
-
-  const { data: rows } = await supabase
-    .from("ledger_accounts")
-    .select("id, code, name")
-    .eq("currency_code", currency)
-    .eq("is_active", true)
-    .like("code", "21%")
-    .limit(20);
-  const preferred =
-    rows?.find((a) => /customer wallet/i.test(a.name)) ?? rows?.[0];
-  if (preferred?.id) return preferred.id;
-
-  const { data: clearing } = await supabase.rpc("ensure_fx_clearing_account", {
-    p_ccy: currency,
-  });
-  return clearing ? String(clearing) : null;
-}
-
-async function postFxSwapLedger(input: ExecuteWalletFxSwapInput & { userId: string }): Promise<string> {
-  const rate = Number(input.effective_rate);
-  const fee = Number(input.fee_amount ?? 0);
-  const toAmount = (input.from_amount - fee) * rate;
-  if (!Number.isFinite(toAmount) || toAmount <= 0) {
-    throw new Error("Invalid exchange amount after fees.");
-  }
-
-  const [fromAccountId, toAccountId] = await Promise.all([
-    resolveSwapAccountId(input.from_currency),
-    resolveSwapAccountId(input.to_currency),
-  ]);
-
-  if (!fromAccountId || !toAccountId) {
-    throw new Error(
-      `Ledger account not found for ${!fromAccountId ? input.from_currency : input.to_currency}`,
-    );
-  }
-
-  const journalId = crypto.randomUUID();
-  const rows: Array<{
-    journal_id: string;
-    account_id: string;
-    wallet_id: string | null;
-    currency_code: string;
-    debit_amount: number;
-    credit_amount: number;
-    description: string;
-    reference_type: string;
-    created_by: string;
-  }> = [
-    {
-      journal_id: journalId,
-      account_id: fromAccountId,
-      wallet_id: input.from_wallet_id,
-      currency_code: input.from_currency,
-      debit_amount: input.from_amount,
-      credit_amount: 0,
-      description: "FX Swap - Debit",
-      reference_type: "fx",
-      created_by: input.userId,
-    },
-    {
-      journal_id: journalId,
-      account_id: toAccountId,
-      wallet_id: input.to_wallet_id,
-      currency_code: input.to_currency,
-      debit_amount: 0,
-      credit_amount: toAmount,
-      description: "FX Swap - Credit",
-      reference_type: "fx",
-      created_by: input.userId,
-    },
-  ];
-
-  const { error } = await supabase.from("ledger_entries").insert(rows);
-  if (error) throw new Error(error.message);
-  return journalId;
-}
-
 /**
- * Execute a wallet FX swap via fx-engine. If the deployed engine still rejects
- * live rates or a missing USDC/USDT liability account_id, complete the swap
- * with execute_fx_swap / a ledger post using a resolved account id.
+ * Execute a wallet FX swap via fx-engine, then execute_fx_swap (SECURITY DEFINER).
+ * Ledger writes must go through the RPC so they are not blocked by consumer RLS.
  */
 export async function executeWalletFxSwap(input: ExecuteWalletFxSwapInput): Promise<unknown> {
-  await Promise.all([
-    ensureCustomerWalletLiability(input.from_currency),
-    ensureCustomerWalletLiability(input.to_currency),
-  ]);
-
   try {
     return await invokeEdgeFunction("fx-engine", {
       action: "execute",
@@ -207,24 +101,16 @@ export async function executeWalletFxSwap(input: ExecuteWalletFxSwapInput): Prom
 
     const { data: sessionData, error: userError } = await supabase.auth.getUser();
     if (userError || !sessionData.user) throw err;
-    const userId = sessionData.user.id;
 
     const { error } = await supabase.rpc("execute_fx_swap", {
-      p_user_id: userId,
+      p_user_id: sessionData.user.id,
       p_from_wallet_id: input.from_wallet_id,
       p_to_wallet_id: input.to_wallet_id,
       p_from_amount: input.from_amount,
       p_effective_rate: rate,
       p_fee_amount: input.fee_amount ?? 0,
     });
-    if (!error) return { success: true };
-
-    const rpcMessage = error.message || message;
-    if (!isMissingLedgerAccount(rpcMessage) && !isMissingLedgerAccount(message)) {
-      throw new Error(rpcMessage);
-    }
-
-    const journalId = await postFxSwapLedger({ ...input, userId });
-    return { success: true, journal_id: journalId };
+    if (error) throw new Error(error.message || message);
+    return { success: true };
   }
 }
