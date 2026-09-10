@@ -72,7 +72,7 @@ const FxTradingPanel = () => {
   const queryClient = useQueryClient();
 
   const fiatWallets = useMemo(
-    () => wallets?.filter((w) => !["BTC", "USDT", "USDC"].includes(w.currency_code)) ?? [],
+    () => wallets?.filter((w) => !["BTC", "ETH", "SOL", "BNB", "XRP"].includes(w.currency_code)) ?? [],
     [wallets],
   );
 

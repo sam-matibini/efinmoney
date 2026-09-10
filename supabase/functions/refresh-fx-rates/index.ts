@@ -111,6 +111,61 @@ Deno.serve(async (req) => {
       });
     }
 
+    // USD stables (USDC/USDT) are not in OpenExchangeRates ISO lists. Peg them to
+    // USD and emit CORE×stable corridors so CAD↔USDC wallet transfers have a row.
+    const STABLES = ["USDC", "USDT"];
+    const nowIso = now.toISOString();
+    for (const stable of STABLES) {
+      if (!tableCodes.has(stable)) continue;
+      rows.push({
+        from_currency: "USD",
+        to_currency: stable,
+        rate: 1,
+        markup_rate: 0,
+        effective_rate: 1,
+        source: `${source}+usd-peg`,
+        valid_from: nowIso,
+        valid_until: validUntil,
+      });
+      rows.push({
+        from_currency: stable,
+        to_currency: "USD",
+        rate: 1,
+        markup_rate: 0,
+        effective_rate: 1,
+        source: `${source}+usd-peg`,
+        valid_from: nowIso,
+        valid_until: validUntil,
+      });
+      for (const fiat of CORE) {
+        if (fiat === "USD") continue;
+        const fiatPerUsd = Number(rates[fiat]);
+        if (!fiatPerUsd || fiatPerUsd <= 0) continue;
+        const fiatToStable = 1 / fiatPerUsd;
+        const stableToFiat = fiatPerUsd;
+        rows.push({
+          from_currency: fiat,
+          to_currency: stable,
+          rate: fiatToStable,
+          markup_rate: MARKUP,
+          effective_rate: fiatToStable * (1 - MARKUP),
+          source: `${source}+usd-peg`,
+          valid_from: nowIso,
+          valid_until: validUntil,
+        });
+        rows.push({
+          from_currency: stable,
+          to_currency: fiat,
+          rate: stableToFiat,
+          markup_rate: MARKUP,
+          effective_rate: stableToFiat * (1 - MARKUP),
+          source: `${source}+usd-peg`,
+          valid_from: nowIso,
+          valid_until: validUntil,
+        });
+      }
+    }
+
     // fx_rates is UNIQUE (from_currency, to_currency, valid_from) and every row
     // in a run shares valid_from, so the same pair must not appear twice. The
     // batch. Deduplicate by pair, keeping the last writer.

@@ -4,10 +4,23 @@ export interface RateRow {
   effective_rate: number;
 }
 
+/** USD-pegged stables. Quote 1:1 with USD when a direct pair is missing. */
+export const USD_STABLES = ["USDC", "USDT"] as const;
+
+export const isUsdPeg = (code: string): boolean => {
+  const c = code.toUpperCase();
+  return c === "USD" || c === "USDC" || c === "USDT";
+};
+
+export const usdPegCanonical = (code: string): string =>
+  isUsdPeg(code) ? "USD" : code.toUpperCase();
+
 /** Build a lookup of latest from→USD rates from a list of fx_rates rows. */
 export const buildUsdRateMap = (rates: RateRow[]): Map<string, number> => {
   const map = new Map<string, number>();
   map.set("USD", 1);
+  map.set("USDC", 1);
+  map.set("USDT", 1);
   for (const r of rates) {
     if (r.to_currency === "USD" && !map.has(r.from_currency)) {
       map.set(r.from_currency, Number(r.effective_rate));
@@ -18,15 +31,18 @@ export const buildUsdRateMap = (rates: RateRow[]): Map<string, number> => {
       map.set(r.to_currency, 1 / Number(r.effective_rate));
     }
   }
+  for (const stable of USD_STABLES) {
+    const usd = map.get("USD") ?? 1;
+    if (!map.has(stable)) map.set(stable, usd);
+  }
   return map;
 };
 
-/** Resolve from→to effective rate from fx_rates rows (direct, inverse, or USD cross). */
-export const resolveEffectiveRate = (
+function resolvePair(
   from: string,
   to: string,
   rates: RateRow[],
-): number | null => {
+): number | null {
   if (from === to) return 1;
   if (!rates.length) return null;
 
@@ -65,4 +81,25 @@ export const resolveEffectiveRate = (
   if (fUsd && tUsd) return fUsd / tUsd;
 
   return null;
+}
+
+/** Resolve from→to effective rate from fx_rates rows (direct, inverse, USD-stable peg, or USD cross). */
+export const resolveEffectiveRate = (
+  from: string,
+  to: string,
+  rates: RateRow[],
+): number | null => {
+  const fromC = from.toUpperCase();
+  const toC = to.toUpperCase();
+  if (fromC === toC) return 1;
+  if (isUsdPeg(fromC) && isUsdPeg(toC)) return 1;
+
+  const exact = resolvePair(fromC, toC, rates);
+  if (exact && exact > 0) return exact;
+
+  const fromKey = usdPegCanonical(fromC);
+  const toKey = usdPegCanonical(toC);
+  if (fromKey === toKey) return 1;
+  if (fromKey === fromC && toKey === toC) return null;
+  return resolvePair(fromKey, toKey, rates);
 };
