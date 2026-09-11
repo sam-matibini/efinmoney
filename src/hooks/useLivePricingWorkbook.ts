@@ -14,17 +14,24 @@ import { useFxRates } from "@/hooks/useFxRates";
 import {
   assembleDynamicWorkbook,
   applyCorrections,
+  cardFromPublishedRow,
+  correctionsFromPublished,
+  diffCard,
   emptyCorrections,
   hasCorrections,
+  mergeCorrections,
+  newManualCorridor,
   type CardPatch,
   type PricingCorrections,
+  type PublishedRateCardRow,
 } from "@/lib/pricing/assembleDynamicWorkbook";
 import {
   getCorrections,
+  releaseAdminLiveBase,
   setCorrections,
   setLiveBase,
 } from "@/lib/pricing/workbookStore";
-import type { CorridorRateCard, PricingWorkbook } from "@/lib/pricing/types";
+import type { CorridorRateCard, PayoutMethod, PricingWorkbook } from "@/lib/pricing/types";
 import { payoutMethodFromInput } from "@/lib/pricing/rateCard";
 
 const db = supabase as unknown as { from: (table: string) => ReturnType<typeof supabase.from> };
@@ -61,33 +68,6 @@ function cardToDbRow(card: CorridorRateCard) {
   };
 }
 
-function patchFromSaved(live: CorridorRateCard, saved: Partial<CorridorRateCard> & { costs?: Partial<CorridorRateCard["costs"]> }): CardPatch | null {
-  const patch: CardPatch = {};
-  const keys: (keyof CardPatch)[] = [
-    "efin_fx_spread",
-    "efin_transfer_fee_pct",
-    "transfer_fee",
-    "minimum_fee",
-    "maximum_fee",
-    "recommended_position",
-    "active",
-    "partner",
-  ];
-  for (const key of keys) {
-    if (saved[key] != null && saved[key] !== live[key]) (patch as Record<string, unknown>)[key] = saved[key];
-  }
-  if (saved.costs) {
-    const costPatch: CardPatch["costs"] = {};
-    for (const [k, v] of Object.entries(saved.costs)) {
-      if (v != null && v !== (live.costs as Record<string, number>)[k]) {
-        (costPatch as Record<string, number>)[k] = Number(v);
-      }
-    }
-    if (Object.keys(costPatch).length) patch.costs = costPatch;
-  }
-  return Object.keys(patch).length ? patch : null;
-}
-
 function efinToPatch(row: EfinPricing): { channel: "wallet" | "external"; idHint: Partial<CorridorRateCard>; patch: CardPatch } {
   const channel = row.payment_method === "fx_swap" ? "wallet" : "external";
   const method = payoutMethodFromInput(row.payment_method, channel);
@@ -108,6 +88,62 @@ function efinToPatch(row: EfinPricing): { channel: "wallet" | "external"; idHint
   };
 }
 
+function useSoftTable<T>(key: string, table: string, columns = "*") {
+  return useQuery({
+    queryKey: [key],
+    queryFn: async (): Promise<T[]> => {
+      const { data, error } = await db.from(table).select(columns);
+      if (error) return [];
+      return (data ?? []) as T[];
+    },
+    retry: false,
+    refetchInterval: 60_000,
+  });
+}
+
+export function useCheckoutPricingHydrator() {
+  const currencies = useCurrencies();
+  const dbCards = useSoftTable<PublishedRateCardRow>("corridor_rate_cards", "corridor_rate_cards");
+  const volumes = useSoftTable<{
+    id: string;
+    min_monthly_volume: number;
+    max_monthly_volume: number | null;
+    fx_spread_discount: number | null;
+    transfer_fee_discount: number | null;
+    label: string;
+    custom: boolean;
+  }>("volume_discount_tiers", "volume_discount_tiers");
+  const payouts = useSoftTable<{
+    payout_method: PayoutMethod;
+    label: string;
+    minimum_fee: number;
+    fee_currency: string;
+  }>("payout_method_minimums", "payout_method_minimums");
+
+  const liveBase = useMemo(() => {
+    const published = (dbCards.data ?? [])
+      .filter((row) => row.active !== false)
+      .map(cardFromPublishedRow);
+    return assembleDynamicWorkbook({
+      currencies: currencies.data ?? [],
+      volumes: volumes.data ?? [],
+      payouts: payouts.data ?? [],
+      publishedCards: published,
+    });
+  }, [currencies.data, dbCards.data, volumes.data, payouts.data]);
+
+  useEffect(() => {
+    setLiveBase(liveBase, "checkout");
+  }, [liveBase]);
+
+  return liveBase;
+}
+
+export function LivePricingHydrator() {
+  useCheckoutPricingHydrator();
+  return null;
+}
+
 export function useLivePricingWorkbook() {
   const qc = useQueryClient();
   const partners = usePaymentPartners();
@@ -117,16 +153,22 @@ export function useLivePricingWorkbook() {
   const currencies = useCurrencies();
   const fxRates = useFxRates();
   const efin = useEfinPricing(false);
-
-  const dbCards = useQuery({
-    queryKey: ["corridor_rate_cards"],
-    queryFn: async () => {
-      const { data, error } = await db.from("corridor_rate_cards").select("*").eq("active", true);
-      if (error) return [];
-      return data ?? [];
-    },
-    retry: false,
-  });
+  const dbCards = useSoftTable<PublishedRateCardRow>("corridor_rate_cards", "corridor_rate_cards");
+  const volumes = useSoftTable<{
+    id: string;
+    min_monthly_volume: number;
+    max_monthly_volume: number | null;
+    fx_spread_discount: number | null;
+    transfer_fee_discount: number | null;
+    label: string;
+    custom: boolean;
+  }>("volume_discount_tiers", "volume_discount_tiers");
+  const payouts = useSoftTable<{
+    payout_method: PayoutMethod;
+    label: string;
+    minimum_fee: number;
+    fee_currency: string;
+  }>("payout_method_minimums", "payout_method_minimums");
 
   const liveBase = useMemo(
     () =>
@@ -136,49 +178,31 @@ export function useLivePricingWorkbook() {
         partnerPricing: partnerPricing.data ?? [],
         partnerFx: partnerFx.data ?? [],
         currencies: currencies.data ?? [],
+        volumes: volumes.data ?? [],
+        payouts: payouts.data ?? [],
       }),
-    [partners.data, corridors.data, partnerPricing.data, partnerFx.data, currencies.data],
+    [partners.data, corridors.data, partnerPricing.data, partnerFx.data, currencies.data, volumes.data, payouts.data],
   );
 
   const [draft, setDraft] = useState<PricingCorrections>(() => getCorrections());
   const [saving, setSaving] = useState(false);
+  const [lastRefreshed, setLastRefreshed] = useState(() => new Date());
   const hydrated = useRef(false);
 
   useEffect(() => {
-    setLiveBase(liveBase);
+    setLiveBase(liveBase, "admin");
+    setLastRefreshed(new Date());
+    return () => releaseAdminLiveBase();
   }, [liveBase]);
 
   useEffect(() => {
     if (hydrated.current) return;
     if (partners.isLoading || corridors.isLoading || efin.isLoading || dbCards.isLoading) return;
     hydrated.current = true;
-    const next = emptyCorrections();
-    const savedRows = (dbCards.data ?? []) as Array<Record<string, unknown>>;
-    for (const row of savedRows) {
-      const id = String(row.corridor_id || "");
-      const channel = row.channel === "wallet" ? "wallets" : "corridors";
-      const live = (channel === "wallets" ? liveBase.wallets : liveBase.corridors).find((c) => c.corridor_id === id);
-      if (!live) continue;
-      const patch = patchFromSaved(live, {
-        efin_fx_spread: Number(row.efin_fx_spread),
-        efin_transfer_fee_pct: Number(row.efin_transfer_fee_pct),
-        transfer_fee: Number(row.transfer_fee),
-        minimum_fee: Number(row.minimum_fee),
-        maximum_fee: Number(row.maximum_fee),
-        recommended_position: row.recommended_position as CorridorRateCard["recommended_position"],
-        partner: (row.partner as string) ?? null,
-        costs: {
-          partner_cost_pct: Number(row.partner_cost_pct),
-          partner_fixed_fee: Number(row.partner_fixed_fee),
-          payment_cost_pct: Number(row.payment_cost_pct),
-          payment_fixed_fee: Number(row.payment_fixed_fee),
-          liquidity_cost_pct: Number(row.liquidity_cost_pct),
-          risk_cost_pct: Number(row.risk_cost_pct),
-          required_margin: Number(row.required_margin),
-        },
-      });
-      if (patch) next[channel][id] = patch;
-    }
+    const published = (dbCards.data ?? [])
+      .filter((row) => row.active !== false)
+      .map(cardFromPublishedRow);
+    let next = correctionsFromPublished(liveBase, published);
     for (const row of efin.data ?? []) {
       const mapped = efinToPatch(row);
       const pool = mapped.channel === "wallet" ? liveBase.wallets : liveBase.corridors;
@@ -190,36 +214,46 @@ export function useLivePricingWorkbook() {
       );
       if (!live) continue;
       const bucket = mapped.channel === "wallet" ? next.wallets : next.corridors;
-      bucket[live.corridor_id] = { ...(bucket[live.corridor_id] ?? {}), ...mapped.patch };
+      const patch = diffCard(live, { ...live, ...mapped.patch });
+      if (patch) bucket[live.corridor_id] = { ...(bucket[live.corridor_id] ?? {}), ...patch };
     }
-    const local = getCorrections();
-    const merged: PricingCorrections = {
-      corridors: { ...next.corridors, ...local.corridors },
-      wallets: { ...next.wallets, ...local.wallets },
-      volumes: { ...next.volumes, ...local.volumes },
-      payouts: { ...next.payouts, ...local.payouts },
-    };
-    setDraft(merged);
-    setCorrections(merged);
+    next = mergeCorrections(next, getCorrections());
+    setDraft(next);
+    setCorrections(next);
   }, [liveBase, dbCards.data, efin.data, partners.isLoading, corridors.isLoading, efin.isLoading, dbCards.isLoading]);
 
   const workbook = useMemo(() => applyCorrections(liveBase, draft), [liveBase, draft]);
 
   useEffect(() => {
-    setLiveBase(liveBase);
+    setLiveBase(liveBase, "admin");
     setCorrections(draft);
   }, [liveBase, draft]);
 
   const loading = partners.isLoading || corridors.isLoading || currencies.isLoading;
-
   const liveCorridorCount = liveBase.corridors.filter((c) => c.origin === "live").length;
+  const liveWalletCount = liveBase.wallets.filter((c) => c.origin === "live").length;
   const livePartners = [...new Set(liveBase.corridors.filter((c) => c.origin === "live").map((c) => c.partner).filter(Boolean))];
 
   const patchCard = (kind: "corridors" | "wallets", id: string, patch: CardPatch) => {
     setDraft((prev) => ({
       ...prev,
-      [kind]: { ...prev[kind], [id]: { ...(prev[kind][id] ?? {}), ...patch, costs: { ...(prev[kind][id]?.costs ?? {}), ...(patch.costs ?? {}) } } },
+      [kind]: {
+        ...prev[kind],
+        [id]: { ...(prev[kind][id] ?? {}), ...patch, costs: { ...(prev[kind][id]?.costs ?? {}), ...(patch.costs ?? {}) } },
+      },
     }));
+  };
+
+  const revertCard = (kind: "corridors" | "wallets", id: string) => {
+    setDraft((prev) => {
+      const bucket = { ...prev[kind] };
+      delete bucket[id];
+      return {
+        ...prev,
+        [kind]: bucket,
+        extras: (prev.extras ?? []).filter((row) => row.corridor_id !== id),
+      };
+    });
   };
 
   const patchVolume = (id: string, patch: PricingCorrections["volumes"][string]) => {
@@ -230,10 +264,20 @@ export function useLivePricingWorkbook() {
     setDraft((prev) => ({ ...prev, payouts: { ...prev.payouts, [method]: { ...(prev.payouts[method] ?? {}), ...patch } } }));
   };
 
+  const addManualRow = (input: { source: string; dest: string; method: PayoutMethod; channel: "wallet" | "external" }) => {
+    const card = newManualCorridor(input);
+    setDraft((prev) => {
+      const extras = [...(prev.extras ?? []).filter((row) => row.corridor_id !== card.corridor_id), card];
+      return { ...prev, extras };
+    });
+    return card;
+  };
+
   const resetToLive = () => {
     const empty = emptyCorrections();
     setDraft(empty);
     setCorrections(empty);
+    hydrated.current = false;
   };
 
   const save = async () => {
@@ -244,6 +288,7 @@ export function useLivePricingWorkbook() {
       const dirtyIds = new Set([
         ...Object.keys(draft.corridors),
         ...Object.keys(draft.wallets),
+        ...(draft.extras ?? []).map((row) => row.corridor_id),
       ]);
       const dirtyCards = [...merged.corridors, ...merged.wallets].filter((c) => dirtyIds.has(c.corridor_id));
 
@@ -305,6 +350,8 @@ export function useLivePricingWorkbook() {
 
       await qc.invalidateQueries({ queryKey: ["corridor_rate_cards"] });
       await qc.invalidateQueries({ queryKey: ["efinmoney_pricing"] });
+      await qc.invalidateQueries({ queryKey: ["volume_discount_tiers"] });
+      await qc.invalidateQueries({ queryKey: ["payout_method_minimums"] });
       return { ok: true as const, db: true };
     } catch (error) {
       setCorrections(draft);
@@ -314,6 +361,32 @@ export function useLivePricingWorkbook() {
     }
   };
 
+  const refetch = async () => {
+    await Promise.all([
+      partners.refetch(),
+      corridors.refetch(),
+      partnerPricing.refetch(),
+      partnerFx.refetch(),
+      currencies.refetch(),
+      fxRates.refetch(),
+      dbCards.refetch(),
+      volumes.refetch(),
+      payouts.refetch(),
+    ]);
+    setLastRefreshed(new Date());
+  };
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      void partners.refetch();
+      void corridors.refetch();
+      void partnerPricing.refetch();
+      void partnerFx.refetch();
+      void currencies.refetch();
+    }, 60_000);
+    return () => window.clearInterval(timer);
+  }, [partners.refetch, corridors.refetch, partnerPricing.refetch, partnerFx.refetch, currencies.refetch]);
+
   return {
     workbook,
     liveBase,
@@ -322,26 +395,22 @@ export function useLivePricingWorkbook() {
     saving,
     dirty: hasCorrections(draft),
     liveCorridorCount,
+    liveWalletCount,
     livePartners,
     fxRates: fxRates.data ?? [],
+    lastRefreshed,
+    isCardDirty: (kind: "corridors" | "wallets", id: string) =>
+      Boolean(draft[kind][id]) || Boolean(draft.extras?.some((row) => row.corridor_id === id)),
     patchCard,
+    revertCard,
+    addManualRow,
     patchVolume,
     patchPayout,
     resetToLive,
     save,
-    refetch: () => {
-      void partners.refetch();
-      void corridors.refetch();
-      void partnerPricing.refetch();
-      void partnerFx.refetch();
-      void currencies.refetch();
-      void fxRates.refetch();
-    },
+    refetch,
   };
 }
 
-/** Keep checkout quotes on the live partner/corridor card. */
-export function LivePricingHydrator() {
-  useLivePricingWorkbook();
-  return null;
-}
+export type LivePricingWorkbook = ReturnType<typeof useLivePricingWorkbook>;
+export type { PricingWorkbook };

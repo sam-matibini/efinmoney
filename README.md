@@ -5,7 +5,9 @@
 Cost-recovery pricing and the competitive CAD rate card live in
 [docs/pricing-cost-recovery.md](docs/pricing-cost-recovery.md).
 
-- Admin: **Settings → Pricing & Rates** (`/admin/pricing?tab=pricing-rates`)
+- Admin: **Settings → Pricing & Fees** (`/admin/pricing?tab=pricing-rates`)
+- Rates rebuild from integrated partners, corridors, FX and currencies
+- Correct any cell in the workbook, then **Save corrections**
 - Excel: `public/docs/eFinMoney-Rates-and-Pricing-Summary.xlsx` or `npm run export:rate-card`
 - Engine checks: `npm run test:pricing`
 

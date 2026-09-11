@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 import { resolveEffectiveRate } from "../_shared/fxRatesCore.ts";
 import { quoteTransfer } from "../_shared/pricing/costRecoveryEngine.ts";
+import { hydrateEnginePricing } from "../_shared/pricing/hydrateEnginePricing.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -334,7 +335,7 @@ serve(async (req) => {
       global: { headers: { Authorization: authHeader } }
     });
     
-    // Service role client for rate limiting
+    // Service role client for rate limiting and live pricing
     const serviceClient = createClient(supabaseUrl, supabaseServiceKey);
 
     const token = authHeader.replace('Bearer ', '');
@@ -348,6 +349,7 @@ serve(async (req) => {
     }
 
     const userId = claimsData.user.id;
+    await hydrateEnginePricing(serviceClient as never);
     
     // Parse body first to check for action
     let body: Record<string, unknown> = {};

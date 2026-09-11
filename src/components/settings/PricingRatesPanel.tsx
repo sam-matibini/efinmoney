@@ -1,5 +1,5 @@
-import { useMemo, useState } from "react";
-import { Download, RefreshCw, RotateCcw, Save } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Download, Plus, RefreshCw, RotateCcw, Save, Undo2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,7 +12,7 @@ import { quoteTransfer } from "@/lib/pricing/costRecoveryEngine";
 import { ADMIN_CONFIGURATION_FIELDS, PRICING_LAYERS } from "@/lib/pricing/rateCard";
 import { downloadRateCardWorkbook } from "@/lib/pricing/exportRateCardWorkbook";
 import { useLivePricingWorkbook } from "@/hooks/useLivePricingWorkbook";
-import type { CorridorRateCard, RecommendedPosition } from "@/lib/pricing/types";
+import type { PayoutMethod, RecommendedPosition } from "@/lib/pricing/types";
 
 const SHEETS = [
   { id: "summary", label: "Summary" },
@@ -35,6 +35,17 @@ const POSITIONS: RecommendedPosition[] = [
   "Ecosystem",
 ];
 
+const METHODS: PayoutMethod[] = [
+  "BANK",
+  "MOBILE_MONEY",
+  "WALLET",
+  "CASH_PICKUP",
+  "CARD_PAYOUT",
+  "STABLECOIN",
+  "CORPORATE",
+  "WALLET_BANK",
+];
+
 const cellClass =
   "h-8 w-full min-w-[4.5rem] rounded-sm border border-transparent bg-transparent px-1.5 text-sm tabular-nums hover:border-border focus:border-primary focus:bg-background focus:outline-none";
 
@@ -42,7 +53,7 @@ function money(n: number, ccy = "CAD") {
   return ccy === "USD" ? `US$${n.toFixed(2)}` : `C$${n.toFixed(2)}`;
 }
 
-function OriginBadge({ origin }: { origin?: CorridorRateCard["origin"] }) {
+function OriginBadge({ origin }: { origin?: "live" | "template" | "corrected" }) {
   if (origin === "live") return <Badge className="bg-emerald-600/15 text-emerald-700 hover:bg-emerald-600/15">Live</Badge>;
   if (origin === "corrected") return <Badge variant="secondary">Corrected</Badge>;
   return <Badge variant="outline">Template</Badge>;
@@ -56,6 +67,16 @@ export default function PricingRatesPanel() {
   const [source, setSource] = useState("CAD");
   const [dest, setDest] = useState("USDC");
   const [mid, setMid] = useState("0.7213");
+  const [addSource, setAddSource] = useState("CAD");
+  const [addDest, setAddDest] = useState("");
+  const [addMethod, setAddMethod] = useState<PayoutMethod>("BANK");
+
+  useEffect(() => {
+    const row = pricing.fxRates.find((r) => r.from_currency === source && r.to_currency === dest);
+    const inverse = pricing.fxRates.find((r) => r.from_currency === dest && r.to_currency === source);
+    if (row && Number(row.rate) > 0) setMid(String(Number(row.rate)));
+    else if (inverse && Number(inverse.rate) > 0) setMid(String(1 / Number(inverse.rate)));
+  }, [source, dest, pricing.fxRates]);
 
   const quote = useMemo(
     () =>
@@ -64,7 +85,7 @@ export default function PricingRatesPanel() {
           sourceCurrency: source,
           destinationCurrency: dest,
           amount: Number(amount) || 0,
-          channel: dest === source ? "wallet" : dest.length > 3 || dest === "USDC" || dest === "USDT" ? "wallet" : "external",
+          channel: dest === source || dest.length > 3 || dest === "USDC" || dest === "USDT" ? "wallet" : "external",
           payoutMethod: dest === "USDC" || dest === "USDT" ? "WALLET_TO_WALLET" : "BANK",
           midMarketRate: Number(mid) || null,
         },
@@ -81,8 +102,24 @@ export default function PricingRatesPanel() {
 
   const onSave = async () => {
     const result = await pricing.save();
-    if (result.db) toast.success("Pricing corrections saved to the rate card");
+    if (result.db) toast.success("Pricing corrections saved. Checkout and wallet quotes will use the updated card.");
     else toast.success("Corrections saved in this workspace. Apply the corridor rate-card SQL to persist them in the database.");
+  };
+
+  const addRow = (channel: "wallet" | "external") => {
+    const destCode = addDest.trim().toUpperCase();
+    if (!/^[A-Z]{3,4}$/.test(destCode)) {
+      toast.error("Enter a 3–4 letter destination currency");
+      return;
+    }
+    const card = pricing.addManualRow({
+      source: addSource.trim().toUpperCase() || "CAD",
+      dest: destCode,
+      method: channel === "wallet" ? "WALLET_TO_WALLET" : addMethod,
+      channel,
+    });
+    toast.success(`Added ${card.source_currency} → ${card.destination_currency}. Adjust the fees, then save.`);
+    setAddDest("");
   };
 
   return (
@@ -93,22 +130,43 @@ export default function PricingRatesPanel() {
           <p className="text-sm text-muted-foreground">
             {pricing.loading
               ? "Loading live partners, corridors and currencies…"
-              : `${pricing.workbook.corridors.length} corridors · ${pricing.liveCorridorCount} from live partners${
+              : `${pricing.workbook.corridors.length} corridors · ${pricing.liveCorridorCount} live partners${
                   pricing.livePartners.length ? ` (${pricing.livePartners.slice(0, 4).join(", ")})` : ""
-                } · ${pricing.workbook.wallets.length} wallet rates`}
+                } · ${pricing.workbook.wallets.length} wallet rates · ${pricing.liveWalletCount} live`}
+          </p>
+          <p className="text-xs text-muted-foreground">
+            Auto-refreshes from partners, corridors, FX and currencies every 60s
+            {pricing.lastRefreshed ? ` · last ${pricing.lastRefreshed.toLocaleTimeString()}` : ""}
+            {pricing.dirty ? " · unsaved corrections" : ""}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button variant="outline" size="sm" className="gap-1.5" onClick={() => pricing.refetch()}>
+          <Button variant="outline" size="sm" className="gap-1.5" onClick={() => void pricing.refetch()}>
             <RefreshCw className="h-4 w-4" /> Refresh live data
           </Button>
-          <Button variant="outline" size="sm" className="gap-1.5" onClick={() => { pricing.resetToLive(); toast.message("Reverted to live partner/corridor pricing"); }}>
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-1.5"
+            onClick={() => {
+              pricing.resetToLive();
+              toast.message("Reverted to live partner/corridor pricing");
+            }}
+          >
             <RotateCcw className="h-4 w-4" /> Reset to live
           </Button>
-          <Button variant="outline" size="sm" className="gap-1.5" onClick={() => { downloadRateCardWorkbook(); toast.success("Excel workbook downloaded"); }}>
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-1.5"
+            onClick={() => {
+              downloadRateCardWorkbook();
+              toast.success("Excel workbook downloaded");
+            }}
+          >
             <Download className="h-4 w-4" /> Excel
           </Button>
-          <Button size="sm" className="gap-1.5" onClick={onSave} disabled={pricing.saving}>
+          <Button size="sm" className="gap-1.5" onClick={() => void onSave()} disabled={pricing.saving || !pricing.dirty}>
             <Save className="h-4 w-4" /> {pricing.saving ? "Saving…" : "Save corrections"}
           </Button>
         </div>
@@ -118,9 +176,9 @@ export default function PricingRatesPanel() {
         {sheet === "summary" && (
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">
-              Customer rates update automatically when partners, corridors, currencies or partner cost sheets change.
-              Use the other sheets to correct FX spread, minimums and fees. Saved corrections stay in place when new
-              corridors appear.
+              Customer rates rebuild automatically from integrated partners, enabled corridors, partner cost sheets,
+              live FX and active currencies. Use the other sheets to correct spreads, minimums and fees. Saved
+              corrections stay in place when new corridors appear.
             </p>
             <div className="grid gap-3 md:grid-cols-3">
               {PRICING_LAYERS.map((layer) => (
@@ -147,53 +205,79 @@ export default function PricingRatesPanel() {
 
         {sheet === "corridor" && (
           <div className="space-y-3">
-            <Input placeholder="Filter corridor, currency or partner" value={filter} onChange={(e) => setFilter(e.target.value)} className="max-w-sm" />
+            <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
+              <Input placeholder="Filter corridor, currency or partner" value={filter} onChange={(e) => setFilter(e.target.value)} className="max-w-sm" />
+              <div className="flex flex-wrap items-center gap-2">
+                <Input className="w-20" value={addSource} onChange={(e) => setAddSource(e.target.value.toUpperCase())} placeholder="From" />
+                <Input className="w-24" value={addDest} onChange={(e) => setAddDest(e.target.value.toUpperCase())} placeholder="To" />
+                <select className={cn(cellClass, "w-40 border-border")} value={addMethod} onChange={(e) => setAddMethod(e.target.value as PayoutMethod)}>
+                  {METHODS.map((m) => (
+                    <option key={m} value={m}>{m}</option>
+                  ))}
+                </select>
+                <Button size="sm" variant="outline" className="gap-1.5" onClick={() => addRow("external")}>
+                  <Plus className="h-4 w-4" /> Add corridor
+                </Button>
+              </div>
+            </div>
             <div className="overflow-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
-                    {["Corridor", "Delivery", "Partner", "FX spread %", "Transfer fee %", "Min fee", "Position", "Source", "On"].map((h) => (
+                    {["Corridor", "Partner", "FX spread %", "Fee %", "Min fee", "Max fee", "Position", "Source", "On", ""].map((h) => (
                       <TableHead key={h}>{h}</TableHead>
                     ))}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {corridors.map((c) => (
-                    <TableRow key={c.corridor_id}>
-                      <TableCell className="whitespace-nowrap font-medium">
-                        {c.source_currency} → {c.destination_currency}
-                        <div className="text-xs text-muted-foreground">{c.delivery}</div>
-                      </TableCell>
-                      <TableCell>{c.delivery}</TableCell>
-                      <TableCell>
-                        <input className={cellClass} value={c.partner ?? ""} onChange={(e) => pricing.patchCard("corridors", c.corridor_id, { partner: e.target.value || null })} />
-                      </TableCell>
-                      <TableCell>
-                        <Pct value={c.efin_fx_spread} onChange={(n) => pricing.patchCard("corridors", c.corridor_id, { efin_fx_spread: n })} />
-                      </TableCell>
-                      <TableCell>
-                        <Pct value={c.efin_transfer_fee_pct} onChange={(n) => pricing.patchCard("corridors", c.corridor_id, { efin_transfer_fee_pct: n })} />
-                      </TableCell>
-                      <TableCell>
-                        <Num value={c.minimum_fee} onChange={(n) => pricing.patchCard("corridors", c.corridor_id, { minimum_fee: n, transfer_fee: n })} />
-                      </TableCell>
-                      <TableCell>
-                        <select
-                          className={cellClass}
-                          value={c.recommended_position}
-                          onChange={(e) => pricing.patchCard("corridors", c.corridor_id, { recommended_position: e.target.value as RecommendedPosition })}
-                        >
-                          {POSITIONS.map((p) => (
-                            <option key={p}>{p}</option>
-                          ))}
-                        </select>
-                      </TableCell>
-                      <TableCell><OriginBadge origin={c.origin} /></TableCell>
-                      <TableCell>
-                        <Switch checked={c.active} onCheckedChange={(on) => pricing.patchCard("corridors", c.corridor_id, { active: on })} />
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                  {corridors.map((c) => {
+                    const dirty = pricing.isCardDirty("corridors", c.corridor_id);
+                    return (
+                      <TableRow key={c.corridor_id} className={dirty ? "bg-amber-50/70 dark:bg-amber-950/20" : undefined}>
+                        <TableCell className="whitespace-nowrap font-medium">
+                          {c.source_currency} → {c.destination_currency}
+                          <div className="text-xs text-muted-foreground">{c.delivery} · {c.payout_method}</div>
+                        </TableCell>
+                        <TableCell>
+                          <input className={cellClass} value={c.partner ?? ""} onChange={(e) => pricing.patchCard("corridors", c.corridor_id, { partner: e.target.value || null })} />
+                        </TableCell>
+                        <TableCell>
+                          <Pct value={c.efin_fx_spread} onChange={(n) => pricing.patchCard("corridors", c.corridor_id, { efin_fx_spread: n })} />
+                        </TableCell>
+                        <TableCell>
+                          <Pct value={c.efin_transfer_fee_pct} onChange={(n) => pricing.patchCard("corridors", c.corridor_id, { efin_transfer_fee_pct: n })} />
+                        </TableCell>
+                        <TableCell>
+                          <Num value={c.minimum_fee} onChange={(n) => pricing.patchCard("corridors", c.corridor_id, { minimum_fee: n, transfer_fee: n })} />
+                        </TableCell>
+                        <TableCell>
+                          <Num value={c.maximum_fee} onChange={(n) => pricing.patchCard("corridors", c.corridor_id, { maximum_fee: n })} />
+                        </TableCell>
+                        <TableCell>
+                          <select
+                            className={cellClass}
+                            value={c.recommended_position}
+                            onChange={(e) => pricing.patchCard("corridors", c.corridor_id, { recommended_position: e.target.value as RecommendedPosition })}
+                          >
+                            {POSITIONS.map((p) => (
+                              <option key={p}>{p}</option>
+                            ))}
+                          </select>
+                        </TableCell>
+                        <TableCell><OriginBadge origin={c.origin} /></TableCell>
+                        <TableCell>
+                          <Switch checked={c.active} onCheckedChange={(on) => pricing.patchCard("corridors", c.corridor_id, { active: on })} />
+                        </TableCell>
+                        <TableCell>
+                          {dirty && (
+                            <Button size="icon" variant="ghost" className="h-8 w-8" title="Revert this row" onClick={() => pricing.revertCard("corridors", c.corridor_id)}>
+                              <Undo2 className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
             </div>
@@ -201,35 +285,60 @@ export default function PricingRatesPanel() {
         )}
 
         {sheet === "wallet" && (
-          <div className="overflow-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  {["Transaction", "FX spread %", "Transfer fee", "Min fee", "Source"].map((h) => (
-                    <TableHead key={h}>{h}</TableHead>
-                  ))}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {pricing.workbook.wallets.map((c) => (
-                  <TableRow key={c.corridor_id}>
-                    <TableCell className="font-medium">
-                      {c.source_currency === "*" ? "Same currency" : `${c.source_currency} → ${c.destination_currency}`}
-                    </TableCell>
-                    <TableCell>
-                      <Pct value={c.efin_fx_spread} onChange={(n) => pricing.patchCard("wallets", c.corridor_id, { efin_fx_spread: n })} />
-                    </TableCell>
-                    <TableCell>
-                      <Num value={c.transfer_fee} onChange={(n) => pricing.patchCard("wallets", c.corridor_id, { transfer_fee: n, minimum_fee: n })} />
-                    </TableCell>
-                    <TableCell>
-                      <Num value={c.minimum_fee} onChange={(n) => pricing.patchCard("wallets", c.corridor_id, { minimum_fee: n })} />
-                    </TableCell>
-                    <TableCell><OriginBadge origin={c.origin} /></TableCell>
+          <div className="space-y-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <Input className="w-20" value={addSource} onChange={(e) => setAddSource(e.target.value.toUpperCase())} placeholder="From" />
+              <Input className="w-24" value={addDest} onChange={(e) => setAddDest(e.target.value.toUpperCase())} placeholder="To" />
+              <Button size="sm" variant="outline" className="gap-1.5" onClick={() => addRow("wallet")}>
+                <Plus className="h-4 w-4" /> Add wallet rate
+              </Button>
+            </div>
+            <div className="overflow-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    {["Transaction", "FX spread %", "Fee %", "Min fee", "Max fee", "Source", "On", ""].map((h) => (
+                      <TableHead key={h}>{h}</TableHead>
+                    ))}
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {pricing.workbook.wallets.map((c) => {
+                    const dirty = pricing.isCardDirty("wallets", c.corridor_id);
+                    return (
+                      <TableRow key={c.corridor_id} className={dirty ? "bg-amber-50/70 dark:bg-amber-950/20" : undefined}>
+                        <TableCell className="font-medium">
+                          {c.source_currency === "*" ? "Same currency" : `${c.source_currency} → ${c.destination_currency}`}
+                        </TableCell>
+                        <TableCell>
+                          <Pct value={c.efin_fx_spread} onChange={(n) => pricing.patchCard("wallets", c.corridor_id, { efin_fx_spread: n })} />
+                        </TableCell>
+                        <TableCell>
+                          <Pct value={c.efin_transfer_fee_pct} onChange={(n) => pricing.patchCard("wallets", c.corridor_id, { efin_transfer_fee_pct: n })} />
+                        </TableCell>
+                        <TableCell>
+                          <Num value={c.minimum_fee} onChange={(n) => pricing.patchCard("wallets", c.corridor_id, { minimum_fee: n, transfer_fee: n })} />
+                        </TableCell>
+                        <TableCell>
+                          <Num value={c.maximum_fee} onChange={(n) => pricing.patchCard("wallets", c.corridor_id, { maximum_fee: n })} />
+                        </TableCell>
+                        <TableCell><OriginBadge origin={c.origin} /></TableCell>
+                        <TableCell>
+                          <Switch checked={c.active} onCheckedChange={(on) => pricing.patchCard("wallets", c.corridor_id, { active: on })} />
+                        </TableCell>
+                        <TableCell>
+                          {dirty && (
+                            <Button size="icon" variant="ghost" className="h-8 w-8" title="Revert this row" onClick={() => pricing.revertCard("wallets", c.corridor_id)}>
+                              <Undo2 className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
           </div>
         )}
 
@@ -244,7 +353,7 @@ export default function PricingRatesPanel() {
             </TableHeader>
             <TableBody>
               {pricing.workbook.volumes.map((t) => (
-                <TableRow key={t.id}>
+                <TableRow key={t.id} className={pricing.draft.volumes[t.id] ? "bg-amber-50/70 dark:bg-amber-950/20" : undefined}>
                   <TableCell>{t.label}</TableCell>
                   <TableCell>
                     {t.custom ? "Custom" : (
@@ -273,7 +382,7 @@ export default function PricingRatesPanel() {
             </TableHeader>
             <TableBody>
               {pricing.workbook.payouts.map((p) => (
-                <TableRow key={p.payout_method}>
+                <TableRow key={p.payout_method} className={pricing.draft.payouts[p.payout_method] ? "bg-amber-50/70 dark:bg-amber-950/20" : undefined}>
                   <TableCell>{p.label}</TableCell>
                   <TableCell>
                     <Num value={p.minimum_fee} onChange={(n) => pricing.patchPayout(p.payout_method, { minimum_fee: n })} />
@@ -287,7 +396,7 @@ export default function PricingRatesPanel() {
         {sheet === "engine" && (
           <div className="overflow-auto">
             <p className="mb-3 text-sm text-muted-foreground">
-              Layer 1 costs come from contracted partner pricing. Correct them here when a rate sheet changes.
+              Layer 1 costs come from contracted partner pricing and refresh with the partner rate sheet. Correct a cell when the contracted cost is wrong.
             </p>
             <Table>
               <TableHeader>
@@ -299,7 +408,7 @@ export default function PricingRatesPanel() {
               </TableHeader>
               <TableBody>
                 {pricing.workbook.corridors.map((c) => (
-                  <TableRow key={c.corridor_id}>
+                  <TableRow key={c.corridor_id} className={pricing.isCardDirty("corridors", c.corridor_id) ? "bg-amber-50/70 dark:bg-amber-950/20" : undefined}>
                     <TableCell className="whitespace-nowrap">{c.corridor_id}</TableCell>
                     <TableCell><Pct value={c.costs.partner_cost_pct} onChange={(n) => pricing.patchCard("corridors", c.corridor_id, { costs: { partner_cost_pct: n } })} /></TableCell>
                     <TableCell><Num value={c.costs.partner_fixed_fee} onChange={(n) => pricing.patchCard("corridors", c.corridor_id, { costs: { partner_fixed_fee: n } })} /></TableCell>
@@ -363,25 +472,45 @@ export default function PricingRatesPanel() {
 }
 
 function Pct({ value, onChange }: { value: number; onChange: (n: number) => void }) {
+  const display = Number.isFinite(value) ? (value * 100).toFixed(2) : "0";
+  const [text, setText] = useState(display);
+  const [focused, setFocused] = useState(false);
+  useEffect(() => {
+    if (!focused) setText(display);
+  }, [display, focused]);
   return (
     <input
       className={cellClass}
-      type="number"
-      step="0.01"
-      value={Number.isFinite(value) ? (value * 100).toFixed(2) : "0"}
-      onChange={(e) => onChange((Number(e.target.value) || 0) / 100)}
+      inputMode="decimal"
+      value={text}
+      onFocus={() => setFocused(true)}
+      onChange={(e) => setText(e.target.value)}
+      onBlur={() => {
+        setFocused(false);
+        onChange((Number(text) || 0) / 100);
+      }}
     />
   );
 }
 
 function Num({ value, onChange }: { value: number; onChange: (n: number) => void }) {
+  const display = Number.isFinite(value) ? String(value) : "0";
+  const [text, setText] = useState(display);
+  const [focused, setFocused] = useState(false);
+  useEffect(() => {
+    if (!focused) setText(display);
+  }, [display, focused]);
   return (
     <input
       className={cellClass}
-      type="number"
-      step="0.01"
-      value={Number.isFinite(value) ? value : 0}
-      onChange={(e) => onChange(Number(e.target.value) || 0)}
+      inputMode="decimal"
+      value={text}
+      onFocus={() => setFocused(true)}
+      onChange={(e) => setText(e.target.value)}
+      onBlur={() => {
+        setFocused(false);
+        onChange(Number(text) || 0);
+      }}
     />
   );
 }

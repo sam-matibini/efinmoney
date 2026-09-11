@@ -117,6 +117,38 @@ const corrected = applyCorrections(assembled, {
 const xof = corrected.corridors.find((c) => c.destination_currency === "XOF");
 assert("admin correction overlays live corridor min fee", !!xof && xof.minimum_fee === 4.25 && xof.origin === "corrected");
 
+const zarLive = assembleDynamicWorkbook({
+  partners: [{ id: "p2", name: "Ozow", status: "active" }],
+  corridors: [
+    {
+      partner_id: "p2",
+      enabled: true,
+      direction: "payout",
+      source_currency: "CAD",
+      dest_currency: "ZAR",
+      payment_method: "bank",
+      est_minutes: 1440,
+    },
+  ],
+  partnerPricing: [
+    {
+      partner_id: "p2",
+      source_currency: "CAD",
+      dest_currency: "ZAR",
+      payment_method: "bank",
+      percentage_fee: 1.2,
+      fixed_fee: 0.4,
+      fx_markup_bps: 180,
+    },
+  ],
+  currencies: [{ code: "CAD" }, { code: "ZAR" }, { code: "GHS", is_active: true }],
+});
+const zarWallet = zarLive.wallets.find((c) => c.corridor_id === "WALLET_CAD_ZAR");
+const zarCorridor = zarLive.corridors.find((c) => c.destination_currency === "ZAR" && c.origin === "live");
+assert("live CAD→ZAR overwrites the template corridor", !!zarCorridor);
+assert("wallet CAD→ZAR updates from the live remittance corridor", !!zarWallet && zarWallet.origin === "live");
+assert("new GHS wallet row appears from active currencies", zarLive.wallets.some((c) => c.destination_currency === "GHS"));
+
 if (process.exitCode) {
   console.error("cost-recovery checks failed");
 } else {

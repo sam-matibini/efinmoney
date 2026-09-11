@@ -1,7 +1,11 @@
 # eFinMoney cost-recovery pricing
 
-Starting commercial rates (effective 2026-09-10) live in the Pricing & Rates
-table. Checkout must not hard-code `0.5%`.
+Customer rates rebuild from integrated partners, enabled corridors, partner
+cost sheets, live FX and active currencies. Administrators correct the
+Pricing & Fees workbook; saved overlays stay in place when new corridors
+appear.
+
+Checkout must not hard-code `0.5%`.
 
 ## Formula
 
@@ -28,7 +32,7 @@ A C$3 CAD→USDC wallet conversion is C$0.50, not C$0.01.
 
 ## Excel workbook
 
-Download from Admin → Pricing & Rates, or:
+Download from Settings → Pricing & Fees, or:
 
 ```sh
 npm run export:rate-card

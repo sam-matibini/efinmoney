@@ -27,6 +27,7 @@ export function defaultWorkbook(): PricingWorkbook {
 let liveBase: PricingWorkbook = defaultWorkbook();
 let corrections: PricingCorrections = emptyCorrections();
 let hydratedLocal = false;
+let liveBaseSource: "checkout" | "admin" = "checkout";
 
 function readLocalCorrections(): PricingCorrections {
   if (typeof localStorage === "undefined") return emptyCorrections();
@@ -39,6 +40,7 @@ function readLocalCorrections(): PricingCorrections {
       wallets: parsed.wallets ?? {},
       volumes: parsed.volumes ?? {},
       payouts: parsed.payouts ?? {},
+      extras: parsed.extras ?? [],
     };
   } catch {
     return emptyCorrections();
@@ -61,8 +63,14 @@ export function getCorrections(): PricingCorrections {
   return clone(corrections);
 }
 
-export function setLiveBase(next: PricingWorkbook) {
+export function setLiveBase(next: PricingWorkbook, source: "checkout" | "admin" = "checkout") {
+  if (source === "checkout" && liveBaseSource === "admin") return;
+  liveBaseSource = source;
   liveBase = clone(next);
+}
+
+export function releaseAdminLiveBase() {
+  if (liveBaseSource === "admin") liveBaseSource = "checkout";
 }
 
 export function setCorrections(next: PricingCorrections) {
