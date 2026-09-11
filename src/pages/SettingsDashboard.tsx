@@ -39,7 +39,7 @@ const SettingsDashboard = () => {
           <Tabs defaultValue="pricing" className="space-y-4">
             <div className="overflow-x-auto pb-2">
               <TabsList className="inline-flex w-auto min-w-full lg:min-w-0">
-                <TabsTrigger value="pricing">Pricing & Rates</TabsTrigger>
+                <TabsTrigger value="pricing">Pricing & Fees</TabsTrigger>
                 <TabsTrigger value="legacy-fees">Legacy fees</TabsTrigger>
                 <TabsTrigger value="currencies">Currencies</TabsTrigger>
                 <TabsTrigger value="modules">Module Access</TabsTrigger>

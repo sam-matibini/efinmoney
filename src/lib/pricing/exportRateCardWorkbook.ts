@@ -1,15 +1,8 @@
 import * as XLSX from "xlsx";
 import { quoteTransfer } from "./costRecoveryEngine.ts";
-import {
-  ADMIN_CONFIGURATION_FIELDS,
-  CUSTOMER_CORRIDOR_RATES,
-  PAYOUT_MINIMUMS,
-  PRICING_LAYERS,
-  RATE_CARD_EFFECTIVE_FROM,
-  VOLUME_DISCOUNT_TIERS,
-  WALLET_RATES,
-} from "./rateCard.ts";
+import { ADMIN_CONFIGURATION_FIELDS, PRICING_LAYERS, RATE_CARD_EFFECTIVE_FROM } from "./rateCard.ts";
 import type { CorridorRateCard } from "./types.ts";
+import { getWorkbook } from "./workbookStore.ts";
 
 export type WorkbookSheet = { name: string; rows: Array<Array<string | number | boolean | null>> };
 
@@ -73,6 +66,7 @@ function corridorRows(cards: CorridorRateCard[]) {
 }
 
 export function buildRateCardSheets(): WorkbookSheet[] {
+  const wb = getWorkbook();
   const cadUsdc3 = quoteTransfer({
     sourceCurrency: "CAD",
     destinationCurrency: "USDC",
@@ -134,21 +128,21 @@ export function buildRateCardSheets(): WorkbookSheet[] {
     },
     {
       name: "Customer Corridor Rates",
-      rows: corridorRows(CUSTOMER_CORRIDOR_RATES),
+      rows: corridorRows(wb.corridors),
     },
     {
       name: "Wallet Rates",
       rows: [
         ["Internal wallet transfers are priced below external remittance so funds stay in the eFinMoney ecosystem."],
         [],
-        ...corridorRows(WALLET_RATES),
+        ...corridorRows(wb.wallets),
       ],
     },
     {
       name: "Volume Discounts",
       rows: [
         ["Monthly Customer Volume", "FX Spread Discount", "Transfer Fee Discount", "Notes"],
-        ...VOLUME_DISCOUNT_TIERS.map((t) => [
+        ...wb.volumes.map((t) => [
           t.label,
           t.fx_spread_discount == null ? "Custom" : pct(t.fx_spread_discount),
           t.transfer_fee_discount == null ? "Custom" : pct(t.transfer_fee_discount),
@@ -162,7 +156,7 @@ export function buildRateCardSheets(): WorkbookSheet[] {
       name: "Payout Minimums",
       rows: [
         ["Payout Method", "Minimum Fee", "Currency"],
-        ...PAYOUT_MINIMUMS.map((p) => [p.label, money(p.minimum_fee, p.fee_currency), p.fee_currency]),
+        ...wb.payouts.map((p) => [p.label, money(p.minimum_fee, p.fee_currency), p.fee_currency]),
         [],
         ["Wallet-to-wallet has the lowest marginal cost and the lowest minimum to encourage in-ecosystem transfers."],
       ],

@@ -1,4 +1,5 @@
 import { customerRateFromMid, quoteTransfer } from "../src/lib/pricing/costRecoveryEngine.ts";
+import { assembleDynamicWorkbook, applyCorrections } from "../src/lib/pricing/assembleDynamicWorkbook.ts";
 
 function assert(name: string, ok: boolean, detail?: unknown) {
   if (!ok) {
@@ -79,6 +80,42 @@ const volume = quoteTransfer({
   midMarketRate: mid,
 });
 assert("C$25k volume discounts the 0.50% fee", volume.transferFeePct < 0.005 && volume.transferFee < 2.5);
+
+const assembled = assembleDynamicWorkbook({
+  partners: [{ id: "p1", name: "Nomba", status: "active" }],
+  corridors: [
+    {
+      partner_id: "p1",
+      enabled: true,
+      direction: "payout",
+      source_currency: "CAD",
+      dest_currency: "XOF",
+      payment_method: "mobile_money",
+      est_minutes: 5,
+    },
+  ],
+  partnerPricing: [
+    {
+      partner_id: "p1",
+      source_currency: "CAD",
+      dest_currency: "XOF",
+      payment_method: "mobile_money",
+      percentage_fee: 0.8,
+      fixed_fee: 0.9,
+    },
+  ],
+  currencies: [{ code: "CAD" }, { code: "XOF" }, { code: "USDC" }],
+});
+assert("live CAD→XOF corridor is assembled", assembled.corridors.some((c) => c.destination_currency === "XOF" && c.origin === "live"));
+assert("wallet CAD→XOF is added from the live corridor", assembled.wallets.some((c) => c.destination_currency === "XOF"));
+const corrected = applyCorrections(assembled, {
+  corridors: { CAD_XOF_MOBILE_MONEY: { minimum_fee: 4.25 } },
+  wallets: {},
+  volumes: {},
+  payouts: {},
+});
+const xof = corrected.corridors.find((c) => c.destination_currency === "XOF");
+assert("admin correction overlays live corridor min fee", !!xof && xof.minimum_fee === 4.25 && xof.origin === "corrected");
 
 if (process.exitCode) {
   console.error("cost-recovery checks failed");

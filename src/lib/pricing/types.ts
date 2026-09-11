@@ -53,6 +53,8 @@ export interface CorridorRateCard {
   effective_from: string;
   effective_to: string | null;
   active: boolean;
+  /** live = partner corridor, template = launch card, corrected = admin overlay */
+  origin?: "live" | "template" | "corrected";
 }
 
 export interface VolumeDiscountTier {
@@ -71,6 +73,13 @@ export interface PayoutMinimum {
   minimum_fee: number;
   fee_currency: string;
 }
+
+export type PricingWorkbook = {
+  corridors: CorridorRateCard[];
+  wallets: CorridorRateCard[];
+  volumes: VolumeDiscountTier[];
+  payouts: PayoutMinimum[];
+};
 
 export interface QuoteInput {
   sourceCurrency: string;

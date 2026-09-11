@@ -4,16 +4,14 @@ import {
   VOLUME_DISCOUNT_TIERS,
   WALLET_RATES,
 } from "./rateCard.ts";
-import type { CorridorRateCard, PayoutMinimum, VolumeDiscountTier } from "./types.ts";
+import type { CorridorRateCard, PayoutMinimum, PricingWorkbook, VolumeDiscountTier } from "./types.ts";
+import {
+  applyCorrections,
+  emptyCorrections,
+  type PricingCorrections,
+} from "./assembleDynamicWorkbook.ts";
 
-export type PricingWorkbook = {
-  corridors: CorridorRateCard[];
-  wallets: CorridorRateCard[];
-  volumes: VolumeDiscountTier[];
-  payouts: PayoutMinimum[];
-};
-
-const STORAGE_KEY = "efinmoney.pricing.workbook.v1";
+const STORAGE_KEY = "efinmoney.pricing.corrections.v1";
 
 const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
 
@@ -26,37 +24,68 @@ export function defaultWorkbook(): PricingWorkbook {
   };
 }
 
-let memory: PricingWorkbook | null = null;
+let liveBase: PricingWorkbook = defaultWorkbook();
+let corrections: PricingCorrections = emptyCorrections();
+let hydratedLocal = false;
 
-function readLocal(): PricingWorkbook | null {
-  if (typeof localStorage === "undefined") return null;
+function readLocalCorrections(): PricingCorrections {
+  if (typeof localStorage === "undefined") return emptyCorrections();
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as PricingWorkbook;
-    if (!Array.isArray(parsed?.corridors) || !Array.isArray(parsed?.wallets)) return null;
-    return parsed;
+    if (!raw) return emptyCorrections();
+    const parsed = JSON.parse(raw) as PricingCorrections;
+    return {
+      corridors: parsed.corridors ?? {},
+      wallets: parsed.wallets ?? {},
+      volumes: parsed.volumes ?? {},
+      payouts: parsed.payouts ?? {},
+    };
   } catch {
-    return null;
+    return emptyCorrections();
   }
+}
+
+function persistLocal() {
+  if (typeof localStorage === "undefined") return;
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(corrections));
+}
+
+function ensureHydrated() {
+  if (hydratedLocal) return;
+  hydratedLocal = true;
+  corrections = readLocalCorrections();
+}
+
+export function getCorrections(): PricingCorrections {
+  ensureHydrated();
+  return clone(corrections);
+}
+
+export function setLiveBase(next: PricingWorkbook) {
+  liveBase = clone(next);
+}
+
+export function setCorrections(next: PricingCorrections) {
+  ensureHydrated();
+  corrections = clone(next);
+  persistLocal();
 }
 
 export function getWorkbook(): PricingWorkbook {
-  if (!memory) memory = readLocal() ?? defaultWorkbook();
-  return memory;
+  ensureHydrated();
+  return applyCorrections(liveBase, corrections);
 }
 
+/** @deprecated Use setLiveBase + setCorrections. Kept so older callers still persist a full snapshot. */
 export function setWorkbook(next: PricingWorkbook) {
-  memory = clone(next);
-  if (typeof localStorage !== "undefined") {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(memory));
-  }
+  liveBase = clone(next);
+  persistLocal();
 }
 
 export function resetWorkbook(): PricingWorkbook {
-  memory = defaultWorkbook();
+  corrections = emptyCorrections();
   if (typeof localStorage !== "undefined") localStorage.removeItem(STORAGE_KEY);
-  return clone(memory);
+  return getWorkbook();
 }
 
 export function getActiveRateCards(): CorridorRateCard[] {
