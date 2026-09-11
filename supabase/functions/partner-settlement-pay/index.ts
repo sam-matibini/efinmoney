@@ -4,6 +4,12 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { z } from "https://esm.sh/zod@3.23.8";
+import {
+  listVertoWallets,
+  sendVertoPayout,
+  sendVertoToBusiness,
+  vertoConfigured,
+} from "../_shared/verto.ts";
 
 const BodySchema = z.object({
   partner_id: z.string().uuid(),
@@ -146,12 +152,90 @@ Deno.serve(async (req) => {
       .in("id", body.invoice_ids);
     if (updErr) return json({ error: updErr.message }, 500);
 
+    let verto: Record<string, unknown> | null = null;
+    if ((body.payment_method ?? "").toLowerCase() === "verto") {
+      try {
+        const { data: partner } = await supabase
+          .from("payment_partners")
+          .select("id, name, verto_company_id, verto_beneficiary_id, verto_purpose_id")
+          .eq("id", body.partner_id)
+          .maybeSingle();
+        const paymentId = crypto.randomUUID();
+        const reference = body.payment_reference || `SETTLE-${settlement.id.slice(0, 8)}`;
+        if (!vertoConfigured()) {
+          await supabase.from("verto_transfers").insert({
+            flow_type: partner?.verto_company_id ? "vpay" : "payout",
+            status: "pending",
+            mode: "mock",
+            source_currency: currency,
+            dest_currency: currency,
+            source_amount: totalDue,
+            dest_amount: totalDue,
+            partner_id: body.partner_id,
+            settlement_id: settlement.id,
+            payment_id: paymentId,
+            client_reference: reference,
+            created_by: user.id,
+            error_message: "Verto credentials not configured",
+          });
+          verto = { mode: "mock", queued: true };
+        } else {
+          const wallets = await listVertoWallets();
+          const wallet = wallets.find((w) => w.currency === currency && w.available >= totalDue)
+            || wallets.find((w) => w.currency === currency);
+          if (!wallet) throw new Error(`No Verto ${currency} wallet`);
+          const sent = partner?.verto_company_id
+            ? await sendVertoToBusiness({
+              sourceWalletId: wallet.id,
+              sourceAmount: totalDue,
+              targetCompanyId: partner.verto_company_id,
+              purposeId: partner.verto_purpose_id || undefined,
+              paymentId,
+              reference,
+            })
+            : partner?.verto_beneficiary_id
+            ? await sendVertoPayout({
+              sourceWalletId: wallet.id,
+              sourceAmount: totalDue,
+              targetAccountId: partner.verto_beneficiary_id,
+              purposeId: partner.verto_purpose_id || undefined,
+              paymentId,
+              reference,
+            })
+            : null;
+          if (!sent) throw new Error("Map this partner's Verto company ID or beneficiary ID first");
+          await supabase.from("verto_transfers").insert({
+            flow_type: partner?.verto_company_id ? "vpay" : "payout",
+            status: sent.status || "requested",
+            mode: "live",
+            source_currency: currency,
+            dest_currency: currency,
+            source_amount: totalDue,
+            dest_amount: totalDue,
+            source_wallet_id: wallet.id,
+            partner_id: body.partner_id,
+            target_company_id: partner?.verto_company_id ?? null,
+            target_account_id: partner?.verto_beneficiary_id ?? null,
+            settlement_id: settlement.id,
+            payment_id: sent.paymentId,
+            client_reference: reference,
+            raw: sent.raw,
+            created_by: user.id,
+          });
+          verto = { mode: "live", payment_id: sent.paymentId, status: sent.status };
+        }
+      } catch (err) {
+        verto = { error: err instanceof Error ? err.message : String(err) };
+      }
+    }
+
     return json({
       success: true,
       settlement_id: settlement.id,
       journal_id: journalId,
       total_paid: totalDue,
       invoices: invoices.length,
+      verto,
     });
   } catch (err) {
     return json({ error: err instanceof Error ? err.message : "Unknown error" }, 500);

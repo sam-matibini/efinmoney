@@ -175,6 +175,7 @@ function partnerCodeToRailIds(code: string): string[] {
     paypal: ["paypal"],
     wise: ["wise"],
     interac: ["interac"],
+    verto: ["verto"],
   };
   return map[c] ?? (c ? [c] : []);
 }
@@ -218,6 +219,7 @@ export const PAYOUT_FN_BY_RAIL: Record<string, string> = {
   pawapay: "pawapay-payout",
   mtn_momo: "mtn-momo-payout",
   paysafe: "paysafe-payout",
+  verto: "verto-payout",
 };
 
 /** Collect method keys used by TopUp UI / gateways. */
@@ -240,6 +242,7 @@ export const COLLECT_METHOD_BY_RAIL: Record<string, string> = {
   elicate: "elicate",
   lenhub: "lenhub",
   lenhub_flutter: "lenhub",
+  verto: "verto",
 };
 
 export function payoutFnForRail(rail: string): string | null {

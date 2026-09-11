@@ -497,3 +497,6 @@ verify_jwt = false
 
 [functions.flw-create-virtual-account]
 verify_jwt = false
+
+[functions.verto-webhook]
+verify_jwt = false

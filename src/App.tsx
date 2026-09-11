@@ -150,6 +150,7 @@ const SupportInboxPage = lazyImport(() => import("./pages/admin/SupportInboxPage
 const PricingPage = lazyImport(() => import("./pages/admin/PricingPage"));
 const OpsQueuePage = lazyImport(() => import("./pages/admin/OpsQueuePage"));
 const NombaFincraPage = lazyImport(() => import("./pages/admin/NombaFincraPage"));
+const VertoClearingPage = lazyImport(() => import("./pages/admin/VertoClearingPage"));
 const RevenuePage = lazyImport(() => import("./pages/admin/RevenuePage"));
 const SimpleAdminLayout = lazyImport(() => import("./components/admin-simple/SimpleAdminLayout"));
 const SimpleHomePage = lazyImport(() => import("./pages/admin-simple/SimpleHomePage"));
@@ -414,6 +415,7 @@ const AppRoutes = () => {
           <Route path="/admin/settlement-reconciliation" element={<SettlementReconciliationPage />} />
           <Route path="/admin/ops-queue" element={<OpsQueuePage />} />
           <Route path="/admin/nomba-fincra" element={<NombaFincraPage />} />
+          <Route path="/admin/verto" element={<VertoClearingPage />} />
           <Route path="/admin/simple" element={<SimpleAdminLayout />}>
             <Route index element={<SimpleHomePage />} />
             <Route path="users" element={<SimpleUsersPage />} />

@@ -11,6 +11,18 @@ Cost-recovery pricing and the competitive CAD rate card live in
 - Excel: `public/docs/eFinMoney-Rates-and-Pricing-Summary.xlsx` or `npm run export:rate-card`
 - Engine checks: `npm run test:pricing`
 
+## Verto corporate clearing
+
+Verto is the rail for corporate flow of funds between eFinMoney and payment partners
+([docs.verto.co](https://docs.verto.co/)): wallet FX, V-Pay (`WALLET_TO_BUSINESS`), and
+bank payouts (`WALLET_PAYOUT`).
+
+- Admin: **Finance → Verto clearing** (`/admin/verto`) or **Finance → Treasury → Verto clearing**
+- Map each partner's Verto company ID (V-Pay) or approved beneficiary ID on the partner sheet
+- Secrets: `VERTO_CLIENT_ID`, `VERTO_API_KEY`, optional `VERTO_ENV=sandbox|production`, `VERTO_COMPANY_ID`, `VERTO_PURPOSE_ID`, `VERTO_WEBHOOK_SECRET`
+- Without secrets the desk runs in mock mode so ops can rehearse the flow
+- SQL: `supabase/migrations/20260911210000_verto_corporate_clearing.sql`
+
 ## Project info
 
 **URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID

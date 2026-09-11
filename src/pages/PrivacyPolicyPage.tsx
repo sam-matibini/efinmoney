@@ -68,7 +68,7 @@ const SECTIONS: Array<{ id: string; title: string; body: React.ReactNode }> = [
       <>
         <p>We share information only with parties that help us run the Services, including:</p>
         <ul className="list-disc pl-6 space-y-2 mt-3">
-          <li><strong>Payment & banking partners</strong> — Flutterwave, Stripe, Paysafe, Plaid, M-Pesa, and licensed correspondent banks.</li>
+          <li><strong>Payment & banking partners</strong> — Flutterwave, Stripe, Paysafe, Plaid, M-Pesa, Verto, and licensed correspondent banks.</li>
           <li><strong>Identity verification providers</strong> — Persona and other KYC/AML vendors.</li>
           <li><strong>Cloud and infrastructure providers</strong> — used for hosting, storage, and email delivery.</li>
           <li><strong>Regulators and law enforcement</strong> — when required by applicable law, court order, or to prevent harm.</li>

@@ -151,6 +151,21 @@ async function testFincra(): Promise<TestResult> {
   return { ok: false, message: `Fincra error ${r.status}` };
 }
 
+async function testVerto(): Promise<TestResult> {
+  const clientId = Deno.env.get("VERTO_CLIENT_ID")!;
+  const apiKey = Deno.env.get("VERTO_API_KEY")!;
+  const env = (Deno.env.get("VERTO_ENV") || "sandbox").trim().toLowerCase();
+  const live = ["live", "production", "prod", "beta"].includes(env);
+  const host = live ? "https://api-company-beta.vertofx.com" : "https://api-company-sandbox.vertofx.com";
+  const r = await fetch(`${host}/users/login`, {
+    method: "POST",
+    headers: { accept: "application/json", "content-type": "application/json" },
+    body: JSON.stringify({ clientId, apiKey, mode: "apiKey" }),
+  });
+  if (r.ok) return { ok: true, message: `Connected — Verto login reachable (${live ? "production" : "sandbox"})` };
+  return { ok: false, message: `Verto login error ${r.status}`, detail: (await r.text()).slice(0, 200) };
+}
+
 // ── Provider registry: required env vars (+ optional live probe) ─────────────
 // A provider with no `live` probe reports "configured" when its secrets are
 // present — an honest signal (missing credentials is the #1 cause of a dead
@@ -178,6 +193,7 @@ const PROVIDERS: Record<string, { required: string[]; live?: () => Promise<TestR
   flovide:     { required: ["FLOVIDE_PUBLIC_KEY", "FLOVIDE_SECRET_KEY"], live: testFlovide },
   dodo:        { required: ["DODO_PAYMENTS_API_KEY"] },
   wise:        { required: ["WISE_API_TOKEN"] },
+  verto:       { required: ["VERTO_CLIENT_ID", "VERTO_API_KEY"], live: testVerto },
   // Banking
   plaid:       { required: ["PLAID_CLIENT_ID", "PLAID_SECRET"], live: testPlaid },
   interac:     { required: ["INTERAC_CLIENT_ID", "INTERAC_PRIVATE_JWK"] },

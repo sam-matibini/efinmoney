@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Sheet,
   SheetContent,
@@ -41,6 +41,7 @@ import PartnerContactsTab from "./crm/PartnerContactsTab";
 import PartnerAddressesTab from "./crm/PartnerAddressesTab";
 import PartnerDocumentsTab from "./crm/PartnerDocumentsTab";
 import PartnerActivityTab from "./crm/PartnerActivityTab";
+import { useSaveVertoPartner } from "@/hooks/useVertoClearing";
 
 const mask = (v: string | null) => (v ? `•••• ${v.slice(-4)}` : "—");
 
@@ -78,7 +79,17 @@ export const PartnerDetailSheet = ({ partner, open, onOpenChange, onEdit, onTogg
 
   const reauth = useReauthenticate();
   const saveAccount = useSavePartnerBankAccount();
+  const saveVerto = useSaveVertoPartner();
+  const [vertoCompany, setVertoCompany] = useState(partner?.verto_company_id ?? "");
+  const [vertoBeneficiary, setVertoBeneficiary] = useState(partner?.verto_beneficiary_id ?? "");
+  const [vertoPurpose, setVertoPurpose] = useState(partner?.verto_purpose_id ?? "");
   const removeAccount = useDeletePartnerBankAccount();
+
+  useEffect(() => {
+    setVertoCompany(partner?.verto_company_id ?? "");
+    setVertoBeneficiary(partner?.verto_beneficiary_id ?? "");
+    setVertoPurpose(partner?.verto_purpose_id ?? "");
+  }, [partner?.id, partner?.verto_company_id, partner?.verto_beneficiary_id, partner?.verto_purpose_id]);
 
   const balances = useMemo(
     () => (liquidity ?? []).filter((l) => l.partner_id === partner?.id),
@@ -150,6 +161,7 @@ export const PartnerDetailSheet = ({ partner, open, onOpenChange, onEdit, onTogg
             <TabsTrigger value="rates">Rate card ({pricing?.length ?? 0})</TabsTrigger>
             <TabsTrigger value="liquidity">Liquidity</TabsTrigger>
             <TabsTrigger value="financial">Financial</TabsTrigger>
+            <TabsTrigger value="verto">Verto</TabsTrigger>
           </TabsList>
 
           <TabsContent value="crm" className="mt-4">
@@ -197,6 +209,45 @@ export const PartnerDetailSheet = ({ partner, open, onOpenChange, onEdit, onTogg
                 <Field label="Notes" value={partner.notes} />
               </div>
             ) : null}
+          </TabsContent>
+
+          <TabsContent value="verto" className="mt-4 space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Corporate clearing uses Verto V-Pay (company ID) or an approved beneficiary for bank payouts.
+            </p>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-1">
+                <Label>Verto company ID</Label>
+                <Input value={vertoCompany} onChange={(e) => setVertoCompany(e.target.value)} />
+              </div>
+              <div className="space-y-1">
+                <Label>Verto beneficiary ID</Label>
+                <Input value={vertoBeneficiary} onChange={(e) => setVertoBeneficiary(e.target.value)} />
+              </div>
+              <div className="space-y-1 sm:col-span-2">
+                <Label>Purpose ID</Label>
+                <Input value={vertoPurpose} onChange={(e) => setVertoPurpose(e.target.value)} placeholder="1" />
+              </div>
+            </div>
+            <Button
+              size="sm"
+              onClick={async () => {
+                try {
+                  await saveVerto.mutateAsync({
+                    partner_id: partner.id,
+                    verto_company_id: vertoCompany,
+                    verto_beneficiary_id: vertoBeneficiary,
+                    verto_purpose_id: vertoPurpose,
+                  });
+                  toast.success("Verto mapping saved");
+                } catch (e) {
+                  toast.error(e instanceof Error ? e.message : "Could not save Verto mapping");
+                }
+              }}
+              disabled={saveVerto.isPending}
+            >
+              Save Verto mapping
+            </Button>
           </TabsContent>
 
           <TabsContent value="corridors" className="mt-4">

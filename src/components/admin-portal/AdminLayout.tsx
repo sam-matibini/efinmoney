@@ -72,6 +72,7 @@ const NAV_GROUPS: NavGroup[] = [
   {
     label: "Finance", icon: Wallet, items: [
       { to: "/admin/finance", label: "Finance", icon: Wallet },
+      { to: "/admin/verto", label: "Verto clearing", icon: ArrowLeftRight },
       { to: "/admin/revenue", label: "Revenue", icon: TrendingUp },
       { to: "/admin/payroll", label: "Payroll", icon: Banknote },
       { to: "/admin/settlement-reconciliation", label: "Settlement Rec.", icon: Scale },

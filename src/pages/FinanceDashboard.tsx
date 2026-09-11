@@ -22,6 +22,7 @@ import { ReportsCentrePanel } from "@/components/finance/ReportsCentrePanel";
 import { SalesTaxPanel } from "@/components/finance/SalesTaxPanel";
 import { TreasuryPanel } from "@/components/finance/treasury/TreasuryPanel";
 import { TreasuryWorkerPanel } from "@/components/finance/treasury/TreasuryWorkerPanel";
+import { VertoClearingPanel } from "@/components/finance/VertoClearingPanel";
 import { SafeguardingPanel } from "@/components/finance/SafeguardingPanel";
 import { UnclaimedFundsPanel } from "@/components/finance/UnclaimedFundsPanel";
 import { SettlementReconciliationPanel } from "@/components/finance/SettlementReconciliationPanel";
@@ -139,12 +140,16 @@ const FinanceDashboard = () => {
                 <TabsList>
                   <TabsTrigger value="worker">Settlement Worker</TabsTrigger>
                   <TabsTrigger value="stripe-fa">Stripe Treasury</TabsTrigger>
+                  <TabsTrigger value="verto">Verto clearing</TabsTrigger>
                 </TabsList>
                 <TabsContent value="worker">
                   <SectionBoundary name="TreasuryWorkerPanel"><TreasuryWorkerPanel /></SectionBoundary>
                 </TabsContent>
                 <TabsContent value="stripe-fa">
                   <SectionBoundary name="TreasuryPanel"><TreasuryPanel /></SectionBoundary>
+                </TabsContent>
+                <TabsContent value="verto">
+                  <SectionBoundary name="VertoClearingPanel"><VertoClearingPanel /></SectionBoundary>
                 </TabsContent>
               </Tabs>
             </TabsContent>

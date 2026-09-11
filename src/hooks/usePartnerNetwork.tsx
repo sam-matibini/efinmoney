@@ -46,6 +46,9 @@ export interface PaymentPartner {
   status: PartnerOpStatus;
   notes: string | null;
   statement_mapping?: Record<string, string> | null;
+  verto_company_id?: string | null;
+  verto_beneficiary_id?: string | null;
+  verto_purpose_id?: string | null;
   created_at: string;
   updated_at: string;
 }

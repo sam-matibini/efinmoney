@@ -60,6 +60,7 @@ const INTEGRATIONS: Array<{
   { key: "square", name: "Square", description: "Card checkout for USD/EUR/GBP wallet top-up", category: "Payments — Global & Cards", envHints: ["SQUARE_ACCESS_TOKEN", "SQUARE_APPLICATION_ID", "SQUARE_LOCATION_ID"] },
   { key: "paysafe", name: "Paysafe", description: "Canadian Interac & EFT payouts", category: "Payments — Global & Cards", envHints: ["PAYSAFE_API_KEY"] },
   { key: "bambora", name: "Bambora (Worldline)", description: "CAD/USD card collect, saved profiles, Canadian EFT debit", category: "Payments — Global & Cards", envHints: ["BAMBORA_MERCHANT_ID", "BAMBORA_API_PASSCODE", "BAMBORA_PAYMENTS_PASSCODE", "BAMBORA_BATCH_PASSCODE"] },
+  { key: "verto", name: "Verto", description: "Corporate FX, V-Pay and partner bank payouts", category: "Payments — Global & Cards", envHints: ["VERTO_CLIENT_ID", "VERTO_API_KEY"] },
   // Banking
   { key: "plaid", name: "Plaid", description: "Bank account linking & balances (Canada domestic)", category: "Banking", envHints: ["PLAID_CLIENT_ID", "PLAID_SECRET"] },
   { key: "interac", name: "Interac", description: "Canada domestic e-Transfer / EFT rail", category: "Banking", envHints: ["INTERAC_CLIENT_ID", "INTERAC_PRIVATE_JWK"] },
@@ -82,6 +83,10 @@ const EDGE_FUNCTIONS: Array<{ name: string; description: string; jwt: boolean; c
   { name: "intra-ca-transfer-create",  description: "Canada domestic Interac / EFT transfer",     jwt: false, category: "Transfers" },
   // FX
   { name: "fx-engine",                 description: "FX rate quotes & swap execution",            jwt: true,  category: "FX" },
+  { name: "verto-ops",                 description: "Verto wallets, FX quote/book, partner V-Pay", jwt: true,  category: "Verto" },
+  { name: "verto-payout",              description: "Corporate Verto payout rail",                jwt: true,  category: "Verto" },
+  { name: "verto-webhook",             description: "Receives Verto payment status events",       jwt: false, category: "Verto" },
+  { name: "partner-balance-verto",     description: "Verto wallet balances for liquidity",        jwt: true,  category: "Verto" },
   { name: "circle-quote",              description: "Quote via Circle USDC corridor",             jwt: true,  category: "FX" },
   { name: "market-rates",              description: "Public live FX market rates",                jwt: false, category: "FX" },
   { name: "refresh-fx-rates",          description: "Cron-style FX rate refresh",                jwt: false, category: "FX" },

@@ -32,6 +32,7 @@ export const RAIL_OPTIONS = [
   "paypal",
   "wise",
   "interac",
+  "verto",
 ] as const;
 
 /** Notes tag so we only re-enable rules we turned off with the Partners toggle. */
@@ -61,6 +62,7 @@ export function partnerCodeToRailIds(code: string): string[] {
     paypal: ["paypal"],
     wise: ["wise"],
     interac: ["interac"],
+    verto: ["verto"],
   };
   if (map[c]) return map[c];
   if ((RAIL_OPTIONS as readonly string[]).includes(c)) return [c];

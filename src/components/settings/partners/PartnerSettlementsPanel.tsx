@@ -516,6 +516,7 @@ export const PartnerSettlementsPanel = () => {
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="bank_transfer">Bank transfer</SelectItem>
+                  <SelectItem value="verto">Verto V-Pay / payout</SelectItem>
                   <SelectItem value="swift">SWIFT</SelectItem>
                   <SelectItem value="stablecoin">Stablecoin</SelectItem>
                   <SelectItem value="netting">Netting / offset</SelectItem>

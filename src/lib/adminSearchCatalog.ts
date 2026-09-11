@@ -67,6 +67,7 @@ export const ADMIN_SEARCH_CATALOG: AdminSearchHit[] = [
   { id: "staff", label: "Staff", group: "Users", to: "/admin/staff", keywords: "admin roles" },
 
   { id: "finance", label: "Finance", group: "Finance", to: "/admin/finance", keywords: "treasury reports statements ledger" },
+  { id: "verto", label: "Verto clearing", group: "Finance", to: "/admin/verto", keywords: "verto fx vpay partner payout corporate" },
   { id: "revenue", label: "Revenue", group: "Finance", to: "/admin/revenue", keywords: "" },
   { id: "payroll", label: "Payroll", group: "Finance", to: "/admin/payroll", keywords: "salary" },
   { id: "settle", label: "Settlement Rec.", group: "Finance", to: "/admin/settlement-reconciliation", keywords: "reconcile" },
