@@ -1,3 +1,5 @@
+import { FINCRA_CAD_INTERAC_ALIAS } from "@/lib/fincraCad";
+
 /** Company Flutterwave Africa collect corridors (card / MoMo / bank where supported). */
 export const FLUTTERWAVE_CURRENCIES = ["NGN", "KES", "UGX", "RWF", "GHS", "TZS", "ZMW"];
 /** Same set — used by Africa MoMo multi-rail picker. */
@@ -428,7 +430,7 @@ export function intlMethodDescription(method: IntlTopupMethod, currency: string)
     return `Pay with card on a secure page — your ${c} wallet credits after you approve.`;
   }
   if (method === "interac") {
-    return "Send CAD from your Canadian bank with Interac e-Transfer.";
+    return `Send CAD from your Canadian bank to ${FINCRA_CAD_INTERAC_ALIAS}. Paste the payment code in the Interac message.`;
   }
   if (method === "wise") {
     return `Send ${c} by bank transfer to our receive account — include your payment reference.`;

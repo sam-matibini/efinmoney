@@ -63,11 +63,13 @@ export default function WiseInteracInvoiceCheckout({
   const lang = langProp ?? langState;
   const setLang = onLangChange ?? setLangState;
 
-  const [method, setMethod] = useState<CheckoutMethod | null>(null);
-  const showLoopBilling = loopBillingLinkConfigured();
+  const showLoopBilling = !productFeatures.fincraInterac && loopBillingLinkConfigured();
   const fincraOn = productFeatures.fincraInterac;
   const flovideOn = !fincraOn && (productFeatures.flovide || productFeatures.flovideInterac);
-  const interacTitle = fincraOn || flovideOn ? "Interac" : undefined;
+  const [method, setMethod] = useState<CheckoutMethod | null>(
+    fincraOn || !loopBillingLinkConfigured() ? "interac" : null,
+  );
+  const interacTitle = fincraOn || flovideOn ? "Interac e-Transfer" : undefined;
   const interacDescription = fincraOn
     ? lang === "fr"
       ? `Virement Autodeposit vers ${FINCRA_CAD_INTERAC_ALIAS}`

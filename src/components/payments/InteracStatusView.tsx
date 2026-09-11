@@ -48,8 +48,8 @@ export default function InteracStatusView({
 
   const detailsText = [
     `Amount: ${amountLabel}`,
-    sendTo ? `Send to: ${sendTo}` : null,
-    `Reference: ${reference}`,
+    sendTo ? `Interac email: ${sendTo}` : null,
+    `Payment code: ${reference}`,
     ...(showEft
       ? [
           "",
@@ -98,13 +98,13 @@ export default function InteracStatusView({
   const steps = fr
     ? [
         `Ouvrez votre app bancaire et démarrez un Virement Interac.`,
-        `Envoyez exactement ${amountLabel} à l'adresse ci-dessous.`,
-        `Collez la référence dans le message. Aucune question de sécurité.`,
+        `Envoyez exactement ${amountLabel} à l'adresse Interac ci-dessous.`,
+        `Collez le code de paiement dans le message. Autodeposit est activé — aucune question de sécurité.`,
       ]
     : [
         `Open your banking app and start an Interac e-Transfer.`,
-        `Send exactly ${amountLabel} to the address below.`,
-        `Paste the reference in the message field. No security question.`,
+        `Send exactly ${amountLabel} to the Interac email below.`,
+        `Paste the payment code in the message field. Autodeposit is on — no security question.`,
       ];
 
   return (

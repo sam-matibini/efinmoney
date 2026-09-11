@@ -189,18 +189,23 @@ export default function InteracCheckout({
         };
 
         let json: Record<string, unknown> | null = null;
-        let fn = WISE_FN;
+        let fn = productFeatures.fincraInterac ? FINCRA_FN : WISE_FN;
 
-        // Prefer Fincra Autodeposit (support.cad.live-015@fincra.ca) when ready.
-        if (productFeatures.fincraInterac) {
-          json = await tryFn(FINCRA_FN);
-          if (json && json.configured !== false && json.alias) {
-            fn = FINCRA_FN;
-          } else {
-            json = null;
-          }
+        // CAD collections go through Fincra Autodeposit (support.cad.live-015@fincra.ca).
+        json = await tryFn(FINCRA_FN);
+        if (json && json.configured !== false) {
+          fn = FINCRA_FN;
+        } else if (productFeatures.fincraInterac) {
+          // Keep Fincra even if GET is thin — POST still creates the intent + payment code.
+          fn = FINCRA_FN;
+          json = {
+            ...(json ?? {}),
+            configured: true,
+            alias: (json?.alias as string | undefined) || FINCRA_CAD_INTERAC_ALIAS,
+            pending: Array.isArray(json?.pending) ? json.pending : [],
+          };
         }
-        if (!json && (productFeatures.flovide || productFeatures.flovideInterac)) {
+        if (!json && (productFeatures.flovide || productFeatures.flovideInterac) && !productFeatures.fincraInterac) {
           json = await tryFn(FLOVIDE_FN);
           if (json && json.configured !== false && (json.alias || json.mode === "autodeposit")) {
             fn = FLOVIDE_FN;
@@ -210,16 +215,10 @@ export default function InteracCheckout({
             json = null;
           }
         }
-        if (!json) {
+        if (!json && !productFeatures.fincraInterac) {
           json = await tryFn(WISE_FN);
           if (json && json.configured !== false) fn = WISE_FN;
-          else if (productFeatures.fincraInterac) {
-            const fincra = await tryFn(FINCRA_FN);
-            if (fincra && fincra.configured !== false) {
-              json = fincra;
-              fn = FINCRA_FN;
-            }
-          } else if (productFeatures.flovide || productFeatures.flovideInterac) {
+          else if (productFeatures.flovide || productFeatures.flovideInterac) {
             const flovide = await tryFn(FLOVIDE_FN);
             if (flovide) {
               json = flovide;
@@ -230,7 +229,7 @@ export default function InteracCheckout({
         if (cancelled) return;
         if (!json) return;
         setRailFn(fn);
-        setAlias((json.alias as string | null) ?? null);
+        setAlias((json.alias as string | null) ?? (fn === FINCRA_FN ? FINCRA_CAD_INTERAC_ALIAS : null));
         // Compact Autodeposit UI hides phone — drop any non-CA profile phone so it can't fail validation.
         if (fn === FLOVIDE_FN || fn === FINCRA_FN) {
           setForm((prev) => (prev.phone ? { ...prev, phone: "" } : prev));
@@ -338,9 +337,11 @@ export default function InteracCheckout({
         return data as Record<string, unknown>;
       };
 
-      const fallbackOrder = [FINCRA_FN, FLOVIDE_FN, WISE_FN].filter(
-        (fn, i, arr) => fn !== railFn && arr.indexOf(fn) === i,
-      );
+      const fallbackOrder = productFeatures.fincraInterac
+        ? []
+        : [FINCRA_FN, FLOVIDE_FN, WISE_FN].filter(
+            (fn, i, arr) => fn !== railFn && arr.indexOf(fn) === i,
+          );
 
       let data: Record<string, unknown>;
       let usedFn = railFn;
@@ -561,6 +562,13 @@ export default function InteracCheckout({
       error={error}
       onSubmit={() => void pay()}
       compact={railFn === FLOVIDE_FN || railFn === FINCRA_FN}
+      depositEmail={
+        railFn === FINCRA_FN
+          ? (alias || FINCRA_CAD_INTERAC_ALIAS)
+          : railFn === FLOVIDE_FN
+          ? (alias || "efin@flovide.com")
+          : alias
+      }
     />
   );
 }

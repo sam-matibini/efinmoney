@@ -48,8 +48,8 @@ export const CHECKOUT_STRINGS = {
     waiting: "Waiting for your Interac e-Transfer…",
     received: "Payment received",
     paymentDetails: "Copy payment details",
-    sendTo: "Send to",
-    reference: "Reference (message)",
+    sendTo: "Interac email",
+    reference: "Payment code",
     stillNotSent: "Hide payment details",
     showDetails: "Show payment details",
     bankNumber: "Institution (Bank #)",
@@ -65,7 +65,7 @@ export const CHECKOUT_STRINGS = {
     flovideDetailsCopied: "Payment details copied — paste them in your e-Transfer",
     fincraWaiting: "Waiting for your Interac e-Transfer…",
     fincraPushHint:
-      `Send an Interac Autodeposit e-Transfer to ${FINCRA_CAD_INTERAC_ALIAS}. Put the reference in the message field so we can match your deposit.`,
+      `Send an Interac Autodeposit e-Transfer to ${FINCRA_CAD_INTERAC_ALIAS}. Paste the payment code in the message field so Fincra can match your deposit.`,
   },
   fr: {
     selectMethod: "Choisissez un mode de paiement",
@@ -110,8 +110,8 @@ export const CHECKOUT_STRINGS = {
     waiting: "En attente de votre Virement Interac…",
     received: "Paiement reçu",
     paymentDetails: "Copier les détails",
-    sendTo: "Envoyer à",
-    reference: "Référence (message)",
+    sendTo: "Courriel Interac",
+    reference: "Code de paiement",
     stillNotSent: "Masquer les détails",
     showDetails: "Afficher les détails",
     bankNumber: "Institution (n° de banque)",
@@ -127,7 +127,7 @@ export const CHECKOUT_STRINGS = {
     flovideDetailsCopied: "Détails copiés — collez-les dans votre Virement Interac",
     fincraWaiting: "En attente de votre Virement Interac…",
     fincraPushHint:
-      `Envoyez un Virement Autodeposit à ${FINCRA_CAD_INTERAC_ALIAS}. Mettez la référence dans le message pour que nous puissions apparier le dépôt.`,
+      `Envoyez un Virement Autodeposit à ${FINCRA_CAD_INTERAC_ALIAS}. Collez le code de paiement dans le message pour que Fincra puisse apparier le dépôt.`,
   },
 } as const;
 

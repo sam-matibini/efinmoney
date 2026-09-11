@@ -5,6 +5,7 @@ import CheckoutShell from "@/components/payments/CheckoutShell";
 import type { InteracIntent } from "@/components/payments/InteracCheckout";
 import { type Lang } from "@/components/payments/checkoutStrings";
 import { productFeatures } from "@/lib/productFeatures";
+import { FINCRA_CAD_INTERAC_ALIAS } from "@/lib/fincraCad";
 
 interface Props {
   walletId: string;
@@ -22,7 +23,9 @@ export default function CadCollectionPanel({ walletId, walletCurrency, initialAm
   const isCad = walletCurrency.toUpperCase() === "CAD";
   const seedAmount = Number(initialAmount) > 0 ? Number(initialAmount) : 0;
   const interacOn =
-    productFeatures.fincraInterac || productFeatures.flovide || productFeatures.flovideInterac;
+    productFeatures.fincraInterac
+    || productFeatures.flovide
+    || productFeatures.flovideInterac;
   const plaidOn = productFeatures.plaid;
 
   const [lang, setLang] = useState<Lang>("en");
@@ -64,8 +67,8 @@ export default function CadCollectionPanel({ walletId, walletCurrency, initialAm
           reference: intentRef,
           description:
             lang === "fr"
-              ? "Virement Interac Autodeposit — votre portefeuille CAD est crédité automatiquement dès réception."
-              : "Interac Autodeposit — your CAD wallet credits automatically when the deposit arrives.",
+              ? `Virement Interac Autodeposit vers ${FINCRA_CAD_INTERAC_ALIAS} — votre portefeuille CAD est crédité automatiquement dès réception.`
+              : `Interac Autodeposit to ${FINCRA_CAD_INTERAC_ALIAS} — your CAD wallet credits automatically when Fincra matches the deposit.`,
           lineItem: lang === "fr" ? "Rechargement CAD" : "CAD wallet top-up",
         }}
       >

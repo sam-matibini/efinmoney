@@ -37,8 +37,8 @@ export const productFeatures = {
   paytotaPayout: envFlag("VITE_FEATURE_PAYTOTA_PAYOUT", true),
   /** Fincra hosted checkout — western + Africa collect (NGN/GHS/KES/…). */
   fincra: envFlag("VITE_FEATURE_FINCRA", true),
-  /** Fincra CAD Interac Autodeposit — off; CAD top-up is Nomba card. */
-  fincraInterac: envFlag("VITE_FEATURE_FINCRA_INTERAC", false),
+  /** Fincra CAD Interac Autodeposit — send checkout + CAD collections. */
+  fincraInterac: envFlag("VITE_FEATURE_FINCRA_INTERAC", true),
   /** Flovide (OhentPay) — banks, resolve, FX, NGN/KES/GHS/UGX/CAD payouts. */
   flovide: envFlag("VITE_FEATURE_FLOVIDE", true),
   /** Flovide CAD Interac Autodeposit — off; CAD top-up is Nomba card. */

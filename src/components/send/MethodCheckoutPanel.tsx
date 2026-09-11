@@ -189,7 +189,7 @@ const MethodCheckoutPanel = ({
           <p className="text-sm font-semibold">{fincraOn || flovideOn ? "Interac" : "Interac (CAD)"}</p>
           <p className="mt-1 text-xs text-muted-foreground">
             {fincraOn
-              ? `Confirm to open checkout for ${symbol}${money(total)} ${currency}. Send Interac Autodeposit to ${FINCRA_CAD_INTERAC_ALIAS} — your payout releases when the deposit matches.`
+              ? `Confirm to open Interac checkout for ${symbol}${money(total)} ${currency}. Send CAD to ${FINCRA_CAD_INTERAC_ALIAS}. We'll give you a unique payment code to paste in the Interac message. Fincra matches the deposit and releases your payout.`
               : flovideOn
               ? `Confirm to open checkout for ${symbol}${money(total)} ${currency}. We'll send an Interac request to your email — approve it in your banking app. Your payout releases when payment confirms.`
               : `Confirm to open checkout for ${symbol}${money(total)} ${currency}. Send Interac Autodeposit — your payout releases when the deposit matches.`}

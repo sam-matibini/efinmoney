@@ -93,6 +93,7 @@ import { quoteCadNombaTopup } from "@/lib/nombaTopupQuote";
 import { useFxRates } from "@/hooks/useFxRates";
 import ComingSoon from "@/components/common/ComingSoon";
 import { isLiveTopupCurrency, productFeatures } from "@/lib/productFeatures";
+import { FINCRA_CAD_INTERAC_ALIAS } from "@/lib/fincraCad";
 import AppPage from "@/components/layout/AppPage";
 import { SectionBoundary } from "@/components/common/SectionBoundary";
 import { currencySymbol } from "@/lib/currency";
@@ -118,7 +119,7 @@ function availableIntlMethods(currency: string): IntlTopupMethod[] {
     if (productFeatures.dodo) methods.push("dodo");
     if (productFeatures.square && c !== "CAD") methods.push("square");
     if (productFeatures.paypal && c !== "CAD") methods.push("paypal");
-    // Interac removed — CAD top-up is Nomba card only.
+    if (c === "CAD" && productFeatures.fincraInterac) methods.push("interac");
     if (productFeatures.wise) methods.push("wise");
     if (productFeatures.flutterwave && FLW_WESTERN_TOPUP_CURRENCIES.includes(c) && c !== "CAD") {
       methods.push("flutterwave");
@@ -1125,8 +1126,10 @@ const TopUpPage = () => {
       payMethods.push({
         id: "plaid",
         tone: "bank",
-        label: "Interac",
-        description: "Use bank account to make instant payments",
+        label: "Interac e-Transfer",
+        description: productFeatures.fincraInterac
+          ? `Send CAD to ${FINCRA_CAD_INTERAC_ALIAS}`
+          : "Use bank account to make instant payments",
         content: (
           <SectionBoundary name="CadCollection">
             <CadCollectionPanel
@@ -1170,18 +1173,20 @@ const TopUpPage = () => {
         productFeatures.flovideInterac ||
         productFeatures.flovide)
     ) {
-      // Fallback when Plaid is off — Flovide/Fincra via CadCollectionPanel, or invoice shell when amount set
+      // CAD Interac via Fincra Autodeposit (`fincra-cad-interac`)
       const interacAmount = Number(amount);
-      const useFlovide =
-        productFeatures.flovide || productFeatures.flovideInterac || productFeatures.fincraInterac;
+      const useFincraCad =
+        productFeatures.fincraInterac || productFeatures.flovide || productFeatures.flovideInterac;
       payMethods.push({
         id: "interac",
         tone: "bank",
-        label: "Interac",
-        description: "Use bank account to make instant payments",
+        label: "Interac e-Transfer",
+        description: productFeatures.fincraInterac
+          ? `Send CAD to ${FINCRA_CAD_INTERAC_ALIAS}`
+          : "Use bank account to make instant payments",
         content: (
           <SectionBoundary name="CadInteracTopUp">
-            {useFlovide || !(Number.isFinite(interacAmount) && interacAmount >= 1) ? (
+            {useFincraCad || !(Number.isFinite(interacAmount) && interacAmount >= 1) ? (
               <CadCollectionPanel
                 walletId={walletId}
                 walletCurrency={currency}

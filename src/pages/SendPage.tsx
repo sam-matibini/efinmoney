@@ -46,7 +46,7 @@ import { resolveEffectiveRate } from "@/lib/fx";
 import { currencySymbol, countryToCurrency } from "@/lib/currency";
 import { useProfile } from "@/hooks/useProfile";
 import { toast } from "sonner";
-import { ArrowRight, CheckCircle, Wallet, Landmark, CreditCard, AlertCircle, X, Search, Globe2, Lock, Loader2, Check, Shield, Users, UserPlus, ChevronDown } from "lucide-react";
+import { ArrowRight, CheckCircle, Wallet, CreditCard, AlertCircle, X, Search, Globe2, Lock, Loader2, Check, Shield, Users, UserPlus, ChevronDown, Banknote } from "lucide-react";
 import { BrandFlag, CountryFlag } from "@/components/ui/FlagImage";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import CanadaSendFlow from "@/components/send/CanadaSendFlow";
@@ -850,7 +850,7 @@ const SendPage = () => {
       exchange_rate: overrides?.exchange_rate ?? effectiveRate,
       fee_amount: overrides?.fee_amount ?? fee,
       // Card: prepaid into wallet, then paid out as wallet.
-      // Interac/Wise: park as bank-funded until Loop/Wise deposit credits the wallet.
+      // Interac/Wise: park as bank-funded until Fincra Autodeposit credits the CAD wallet.
       funding_source:
         funding === "card"
           ? "wallet"
@@ -930,7 +930,7 @@ const SendPage = () => {
     setConfirming(true);
     const funding = fundingOverride ?? fundingSource;
 
-    // CAD Interac pay-in: park the transfer, then open Flovide/Loop Interac checkout.
+    // CAD Interac pay-in: park the transfer, then open Fincra Autodeposit checkout.
     if (funding === 'interac') {
       if (!cadWallet) {
         toast.error('You need a CAD wallet to pay from your Canadian bank.');
@@ -2116,6 +2116,9 @@ const SendPage = () => {
       );
     }
     if (fundingSource === "wallet" && !selectedWallet) reasons.push("Select a wallet");
+    if (fundingSource === "interac" && !cadWallet) {
+      reasons.push("Create a CAD wallet to pay with Interac e-Transfer");
+    }
     if (fundingSource === "card") {
       if (!cardSendEnabled || !cardPayoutCodes.includes(targetCountry.code)) {
         reasons.push(`Card send is not available to ${targetCountry.country}`);
@@ -2195,6 +2198,7 @@ const SendPage = () => {
     caAccountNumber,
     recipientPhone,
     effectivePayoutMethod,
+    cadWallet,
   ]);
 
   const canContinue = continueBlockers.length === 0;
@@ -2208,15 +2212,16 @@ const SendPage = () => {
   const cardFundingAvailable = productFeatures.nombaNigeria || productFeatures.lenhubFlutter
     || productFeatures.paytota || productFeatures.swychr || productFeatures.flutterwave;
 
-  // TEMP: Interac pay-in hidden until the CAD Interac rail is live again.
-  const interacFundingAvailable = false;
+  const interacFundingAvailable = productFeatures.fincraInterac;
   const interacUsesFincra = productFeatures.fincraInterac;
   const interacUsesFlovide = !interacUsesFincra && (productFeatures.flovide || productFeatures.flovideInterac);
   const wisePayWallet = wallets?.find((w) => isWisePayCurrency(w.currency_code));
 
   useEffect(() => {
-    if (fundingSource === "interac") setFundingSource("wallet");
-  }, [fundingSource]);
+    if (fundingSource === "interac" && cadWallet && selectedWalletId !== cadWallet.wallet_id) {
+      setSelectedWalletId(cadWallet.wallet_id);
+    }
+  }, [fundingSource, cadWallet, selectedWalletId]);
 
   const fundingMethodOptions: PaymentMethodOption<FundingSource>[] = [
     ...(cardFundingAvailable
@@ -2227,11 +2232,11 @@ const SendPage = () => {
           id: "interac" as const,
           label: "Interac",
           sublabel: interacUsesFincra
-            ? `Autodeposit · ${FINCRA_CAD_INTERAC_ALIAS}`
+            ? `e-Transfer · ${FINCRA_CAD_INTERAC_ALIAS}`
             : interacUsesFlovide
             ? "Autodeposit · efin@flovide.com"
-            : "Bank account · instant",
-          icon: Landmark,
+            : "e-Transfer · CAD",
+          icon: Banknote,
           tone: "bank" as const,
         }]
       : []),
@@ -3216,8 +3221,8 @@ const SendPage = () => {
                                               </span>
                                             ) : (
                                               <span className="inline-flex items-center gap-2">
-                                                {fundingSource === "card" ? <CreditCard className="w-4 h-4" /> : <Shield className="w-4 h-4" />}
-                                                {useLink ? "Send secure link" : fundingSource === "card" ? "Pay with card" : "Confirm Transfer"}
+                                                {fundingSource === "card" ? <CreditCard className="w-4 h-4" /> : fundingSource === "interac" ? <Banknote className="w-4 h-4" /> : <Shield className="w-4 h-4" />}
+                                                {useLink ? "Send secure link" : fundingSource === "card" ? "Pay with card" : fundingSource === "interac" ? "Pay with Interac" : "Confirm Transfer"}
                                               </span>
                                             )}
                                           </Button>

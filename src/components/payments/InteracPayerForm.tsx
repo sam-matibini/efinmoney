@@ -57,6 +57,8 @@ interface Props {
   onSubmit: () => void;
   /** Autodeposit rails only need name + email (no bank / address block). */
   compact?: boolean;
+  /** Fincra / Flovide Autodeposit email shown before the payment code is issued. */
+  depositEmail?: string | null;
 }
 
 /**
@@ -74,6 +76,7 @@ export default function InteracPayerForm({
   error,
   onSubmit,
   compact = false,
+  depositEmail = null,
 }: Props) {
   const t = CHECKOUT_STRINGS[lang];
   const set = <K extends keyof PayerForm>(key: K, next: PayerForm[K]) =>
@@ -88,11 +91,21 @@ export default function InteracPayerForm({
       }}
     >
       {compact && (
-        <p className="rounded-lg border bg-muted/40 px-3 py-2 text-[12px] leading-relaxed text-muted-foreground">
-          {lang === "fr"
-            ? "Après « Payer », vous recevrez l'adresse Autodeposit et une référence. Envoyez le Virement — nous créditons automatiquement dès réception."
-            : "After Pay, you'll get the Autodeposit address and a reference. Send the e-Transfer — we credit automatically when it arrives."}
-        </p>
+        <div className="space-y-2 rounded-lg border bg-muted/40 px-3 py-2.5">
+          {depositEmail ? (
+            <div className="space-y-0.5">
+              <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                {t.sendTo}
+              </p>
+              <p className="break-all text-sm font-semibold text-foreground">{depositEmail}</p>
+            </div>
+          ) : null}
+          <p className="text-[12px] leading-relaxed text-muted-foreground">
+            {lang === "fr"
+              ? "Après « Continuer », nous affichons votre code de paiement unique. Envoyez le Virement Interac — Fincra crédite automatiquement dès réception."
+              : "After Continue, we show your unique payment code. Send the Interac e-Transfer — Fincra credits automatically when it arrives."}
+          </p>
+        </div>
       )}
 
       {onAmountChange && (

@@ -114,7 +114,7 @@ export function buildFincraInteracInstructions(
   return [
     `Open your Canadian banking app and start an Interac e-Transfer.`,
     `Send exactly CAD ${amount.toFixed(2)} to ${alias}.`,
-    `Put the reference ${reference} in the message field.`,
+    `Put the payment code ${reference} in the message field.`,
     `Send from ${contact} so we can match your deposit.`,
     `Autodeposit is enabled — no security question needed.`,
     purpose === "transfer"
