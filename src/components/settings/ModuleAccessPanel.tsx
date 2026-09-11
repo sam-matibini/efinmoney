@@ -115,8 +115,8 @@ export const ModuleAccessPanel = () => {
     },
     {
       id: 'reports',
-      name: 'Reports Centre',
-      description: 'Financial reporting and analytics',
+      name: 'Financial Reports',
+      description: 'Reports Centre, financial statements and analytics',
       icon: FileText,
       enabled: true,
       requiredRoles: ['admin', 'finance'],

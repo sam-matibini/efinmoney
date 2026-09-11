@@ -30,7 +30,16 @@ import {
   GitCompare
 } from "lucide-react";
 import { toast } from "sonner";
-import { feeIncomeFromLedger, generateLedgerReport, downloadGeneratedReport, loadLedgerPeriod } from "@/lib/finance/ledgerReports";
+import { cn } from "@/lib/utils";
+import {
+  feeIncomeFromLedger,
+  generateLedgerReport,
+  downloadGeneratedReport,
+  incomeStatementFromLedger,
+  loadAgingReport,
+  loadLedgerPeriod,
+  safeTableRows,
+} from "@/lib/finance/ledgerReports";
 
 type DateRange = {
   from: Date;
@@ -120,138 +129,93 @@ export const ReportsCentrePanel = () => {
     staleTime: 0,
     refetchOnMount: "always",
     queryFn: async () => {
+      const from = dateRange.from.toISOString();
+      const to = dateRange.to.toISOString();
       const [transfers, invoices, bills, fxTrades, ledger] = await Promise.all([
-        supabase.from('transfers')
-          .select('source_amount, fee_amount, status')
-          .gte('created_at', dateRange.from.toISOString())
-          .lte('created_at', dateRange.to.toISOString()),
-        supabase.from('sales_invoices')
-          .select('total_amount, amount_paid, status')
-          .gte('created_at', dateRange.from.toISOString())
-          .lte('created_at', dateRange.to.toISOString()),
-        supabase.from('purchase_bills')
-          .select('total_amount, amount_paid, status')
-          .gte('created_at', dateRange.from.toISOString())
-          .lte('created_at', dateRange.to.toISOString()),
-        supabase.from('fx_transactions')
-          .select('from_amount, to_amount, fee_amount, status')
-          .gte('created_at', dateRange.from.toISOString())
-          .lte('created_at', dateRange.to.toISOString()),
+        safeTableRows(
+          supabase.from('transfers')
+            .select('source_amount, fee_amount, status')
+            .gte('created_at', from)
+            .lte('created_at', to),
+        ),
+        safeTableRows(
+          supabase.from('sales_invoices')
+            .select('total_amount, amount_paid, status')
+            .gte('created_at', from)
+            .lte('created_at', to),
+        ),
+        safeTableRows(
+          supabase.from('purchase_bills')
+            .select('total_amount, amount_paid, status')
+            .gte('created_at', from)
+            .lte('created_at', to),
+        ),
+        safeTableRows(
+          supabase.from('fx_transactions')
+            .select('from_amount, to_amount, fee_amount, status')
+            .gte('created_at', from)
+            .lte('created_at', to),
+        ),
         loadLedgerPeriod(dateRange.from, dateRange.to).catch(() => ({ accounts: [], entries: [] })),
       ]);
 
-      const totalTransfers = transfers.data?.reduce((sum, t) => sum + (t.source_amount || 0), 0) || 0;
-      const operationalFees = (transfers.data?.reduce((sum, t) => sum + (t.fee_amount || 0), 0) || 0) +
-                        (fxTrades.data?.reduce((sum, t) => sum + (t.fee_amount || 0), 0) || 0);
+      const totalTransfers = transfers.reduce((sum, t) => sum + (t.source_amount || 0), 0);
+      const operationalFees = transfers.reduce((sum, t) => sum + (t.fee_amount || 0), 0) +
+        fxTrades.reduce((sum, t) => sum + (t.fee_amount || 0), 0);
       const ledgerFees = feeIncomeFromLedger(ledger.accounts, ledger.entries);
       const totalFees = ledgerFees.total !== 0 ? ledgerFees.total : operationalFees;
-      const totalInvoiced = invoices.data?.reduce((sum, i) => sum + (i.total_amount || 0), 0) || 0;
-      const totalReceived = invoices.data?.reduce((sum, i) => sum + (i.amount_paid || 0), 0) || 0;
-      const totalBilled = bills.data?.reduce((sum, b) => sum + (b.total_amount || 0), 0) || 0;
-      const totalPaid = bills.data?.reduce((sum, b) => sum + (b.amount_paid || 0), 0) || 0;
-      const fxVolume = fxTrades.data?.reduce((sum, t) => sum + (t.from_amount || 0), 0) || 0;
+      const totalInvoiced = invoices.reduce((sum, i) => sum + (i.total_amount || 0), 0);
+      const totalReceived = invoices.reduce((sum, i) => sum + (i.amount_paid || 0), 0);
+      const totalBilled = bills.reduce((sum, b) => sum + (b.total_amount || 0), 0);
+      const totalPaid = bills.reduce((sum, b) => sum + (b.amount_paid || 0), 0);
+      const fxVolume = fxTrades.reduce((sum, t) => sum + (t.from_amount || 0), 0);
 
       return {
         totalTransfers,
         totalFees,
         feeSource: ledgerFees.total !== 0 ? "ledger" : "operational",
+        ledgerEntryCount: ledger.entries.length,
         totalInvoiced,
         totalReceived,
         totalBilled,
         totalPaid,
         fxVolume,
-        transferCount: transfers.data?.length || 0,
-        invoiceCount: invoices.data?.length || 0,
-        billCount: bills.data?.length || 0,
-        fxCount: fxTrades.data?.length || 0,
+        transferCount: transfers.length,
+        invoiceCount: invoices.length,
+        billCount: bills.length,
+        fxCount: fxTrades.length,
       };
     },
   });
 
-  // Fetch aging report data
   const { data: agingData, isLoading: agingLoading } = useQuery({
     queryKey: ['aging-report'],
-    queryFn: async () => {
-      const today = new Date();
-      const [invoices, bills] = await Promise.all([
-        supabase.from('sales_invoices')
-          .select('*, customers(name)')
-          .in('status', ['sent', 'partial', 'overdue']),
-        supabase.from('purchase_bills')
-          .select('*, vendors(name)')
-          .in('status', ['sent', 'partial', 'overdue']),
-      ]);
-
-      const categorizeAge = (dueDate: string) => {
-        const due = new Date(dueDate);
-        const daysDiff = Math.floor((today.getTime() - due.getTime()) / (1000 * 60 * 60 * 24));
-        if (daysDiff < 0) return 'current';
-        if (daysDiff <= 30) return '1-30';
-        if (daysDiff <= 60) return '31-60';
-        if (daysDiff <= 90) return '61-90';
-        return '90+';
-      };
-
-      const receivables = { current: 0, '1-30': 0, '31-60': 0, '61-90': 0, '90+': 0 };
-      const payables = { current: 0, '1-30': 0, '31-60': 0, '61-90': 0, '90+': 0 };
-
-      invoices.data?.forEach(inv => {
-        const outstanding = (inv.total_amount || 0) - (inv.amount_paid || 0);
-        const age = categorizeAge(inv.due_date);
-        receivables[age as keyof typeof receivables] += outstanding;
-      });
-
-      bills.data?.forEach(bill => {
-        const outstanding = (bill.total_amount || 0) - (bill.amount_paid || 0);
-        const age = categorizeAge(bill.due_date);
-        payables[age as keyof typeof payables] += outstanding;
-      });
-
-      return { receivables, payables, invoices: invoices.data || [], bills: bills.data || [] };
-    },
+    staleTime: 0,
+    refetchOnMount: "always",
+    queryFn: loadAgingReport,
   });
 
-  // Fetch P&L data
-  const { data: plData, isLoading: plLoading } = useQuery({
+  const { data: plData, isLoading: plLoading, isError: plError, error: plErr, refetch: refetchPl } = useQuery({
     queryKey: ['pl-report', dateRange],
     staleTime: 0,
     refetchOnMount: "always",
     queryFn: async () => {
-      const { data: entries } = await supabase
-        .from('ledger_entries')
-        .select('*, ledger_accounts(name, account_type)')
-        .gte('created_at', dateRange.from.toISOString())
-        .lte('created_at', dateRange.to.toISOString());
-
-      const income: Record<string, number> = {};
-      const expenses: Record<string, number> = {};
-
-      entries?.forEach(entry => {
-        const accountName = entry.ledger_accounts?.name || 'Unknown';
-        const accountType = entry.ledger_accounts?.account_type;
-        const netAmount = (entry.credit_amount || 0) - (entry.debit_amount || 0);
-
-        if (accountType === 'income') {
-          income[accountName] = (income[accountName] || 0) + netAmount;
-        } else if (accountType === 'expense') {
-          expenses[accountName] = (expenses[accountName] || 0) + Math.abs(netAmount);
-        }
-      });
-
-      const totalIncome = Object.values(income).reduce((sum, val) => sum + val, 0);
-      const totalExpenses = Object.values(expenses).reduce((sum, val) => sum + val, 0);
-
-      return { income, expenses, totalIncome, totalExpenses, netIncome: totalIncome - totalExpenses };
+      const { accounts, entries } = await loadLedgerPeriod(dateRange.from, dateRange.to);
+      return { ...incomeStatementFromLedger(accounts, entries), entryCount: entries.length };
     },
   });
 
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
+    return new Intl.NumberFormat('en-CA', { style: 'currency', currency: 'CAD' }).format(amount);
   };
 
   const handleGenerate = async (reportId: string) => {
     try {
-      if (["fee_income", "trial_balance", "income_statement", "balance_sheet"].includes(reportId)) {
+      if (
+        ["fee_income", "trial_balance", "income_statement", "balance_sheet", "cash_flow", "ar_aging", "ap_aging"].includes(
+          reportId,
+        )
+      ) {
         const report = await generateLedgerReport(reportId, dateRange.from, dateRange.to);
         downloadGeneratedReport(report.filename, report.header, report.rows);
         toast.success(`${report.filename} downloaded from the live ledger`);
@@ -267,12 +231,13 @@ export const ReportsCentrePanel = () => {
             ["FX volume", summaryData?.fxVolume ?? 0],
             ["Transfer count", summaryData?.transferCount ?? 0],
             ["FX count", summaryData?.fxCount ?? 0],
+            ["Ledger entries", summaryData?.ledgerEntryCount ?? 0],
           ],
         );
         toast.success("Transaction summary downloaded");
         return;
       }
-      toast.message("Open the matching Finance tab for this report (Aging, Cash Flow).");
+      toast.error("Unknown report");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Could not generate report");
     }
@@ -300,7 +265,9 @@ export const ReportsCentrePanel = () => {
                 <FileText className="h-5 w-5" />
                 Reports Centre
               </CardTitle>
-              <CardDescription>Generate and export financial reports</CardDescription>
+              <CardDescription>
+                Live ledger P&amp;L, fee income (CoA 4100 / 4200 / 4300), aging, and CSV exports
+              </CardDescription>
             </div>
             <div className="flex items-center gap-2 flex-wrap">
               <Select value={reportPeriod} onValueChange={handlePeriodChange}>
@@ -474,7 +441,9 @@ export const ReportsCentrePanel = () => {
                     <p className="text-sm font-medium text-muted-foreground">Fee Income</p>
                     <p className="text-2xl font-bold text-indigo-600">{formatCurrency(summaryData?.totalFees || 0)}</p>
                     <p className="text-xs text-muted-foreground">
-                      {summaryData?.feeSource === "ledger" ? "CoA 4100 / 4200 / 4300" : "Transfer & FX fees"}
+                      {summaryData?.feeSource === "ledger"
+                        ? `CoA 4100 / 4200 / 4300 · ${summaryData.ledgerEntryCount} ledger entries`
+                        : "Transfer & FX fees"}
                     </p>
                   </div>
                   <div className="h-12 w-12 rounded-full bg-indigo-500/10 flex items-center justify-center">
@@ -654,6 +623,25 @@ export const ReportsCentrePanel = () => {
             <CardContent>
               {plLoading ? (
                 <Skeleton className="h-60" />
+              ) : plError ? (
+                <div className="rounded-lg border border-dashed border-muted-foreground/30 bg-muted/10 p-6 text-center space-y-3">
+                  <p className="text-sm text-muted-foreground">
+                    Could not load the live ledger
+                    {plErr instanceof Error ? `: ${plErr.message}` : "."}
+                  </p>
+                  <Button size="sm" variant="outline" onClick={() => void refetchPl()}>
+                    Try again
+                  </Button>
+                </div>
+              ) : Object.keys(plData?.income || {}).length === 0 && Object.keys(plData?.expenses || {}).length === 0 ? (
+                <div className="rounded-lg border border-dashed border-muted-foreground/30 bg-muted/10 p-6 text-center space-y-2">
+                  <p className="text-sm font-medium">No income or expense postings in this period</p>
+                  <p className="text-xs text-muted-foreground">
+                    {(plData?.entryCount || 0) > 0
+                      ? `${plData?.entryCount} ledger entries were found, but none posted to income or expense accounts.`
+                      : "Fee income from transfers and FX swaps posts to CoA 4100, 4200 and 4300 after checkout journals."}
+                  </p>
+                </div>
               ) : (
                 <div className="grid gap-6 lg:grid-cols-2">
                   <div>

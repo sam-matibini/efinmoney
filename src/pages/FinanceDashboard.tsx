@@ -58,7 +58,7 @@ const FinanceDashboard = () => {
             value="Ledger & treasury"
             meta={[
               { icon: Landmark, text: "Bank accounts, reconciliation & safeguarding" },
-              { icon: FileSpreadsheet, text: "Reports, tax, and period-end controls" },
+              { icon: FileSpreadsheet, text: "Financial reports, tax, and period-end controls" },
             ]}
             variant="primary"
           />
@@ -70,7 +70,7 @@ const FinanceDashboard = () => {
               <TabsTrigger value="banking">Banking</TabsTrigger>
               <TabsTrigger value="safeguarding">Safeguarding</TabsTrigger>
               <TabsTrigger value="treasury">Treasury</TabsTrigger>
-              <TabsTrigger value="reports">Reports</TabsTrigger>
+              <TabsTrigger value="reports">Financial Reports</TabsTrigger>
               <TabsTrigger value="sales-tax">Sales Tax</TabsTrigger>
               
               <TabsTrigger value="invoices">Invoices</TabsTrigger>
@@ -150,16 +150,16 @@ const FinanceDashboard = () => {
             </TabsContent>
 
             <TabsContent value="reports" className="space-y-4">
-              <Tabs defaultValue="statements" className="space-y-4">
+              <Tabs defaultValue="centre" className="space-y-4">
                 <TabsList>
-                  <TabsTrigger value="statements">Financial Statements</TabsTrigger>
                   <TabsTrigger value="centre">Reports Centre</TabsTrigger>
+                  <TabsTrigger value="statements">Financial Statements</TabsTrigger>
                 </TabsList>
-                <TabsContent value="statements">
-                  <SectionBoundary name="FinancialStatementsPanel"><FinancialStatementsPanel /></SectionBoundary>
-                </TabsContent>
                 <TabsContent value="centre">
                   <SectionBoundary name="ReportsCentrePanel"><ReportsCentrePanel /></SectionBoundary>
+                </TabsContent>
+                <TabsContent value="statements">
+                  <SectionBoundary name="FinancialStatementsPanel"><FinancialStatementsPanel /></SectionBoundary>
                 </TabsContent>
               </Tabs>
             </TabsContent>

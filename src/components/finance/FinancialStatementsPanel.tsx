@@ -80,7 +80,7 @@ export const FinancialStatementsPanel = () => {
     arrangeLatestFirst: false,
   });
   const [tempCompareConfig, setTempCompareConfig] = useState<CompareConfig>(compareConfig);
-  const [selectedCurrency, setSelectedCurrency] = useState<string>('USD');
+  const [selectedCurrency, setSelectedCurrency] = useState<string>('CAD');
 
   // Calculate comparison periods based on config
   const getComparisonPeriods = (): DateRange[] => {
@@ -182,27 +182,37 @@ export const FinancialStatementsPanel = () => {
     setExpandedSections(new Set());
   };
 
-  // Fetch balance data for a specific date range, filtered to one currency
+  // Fetch balance data for a specific date range, optionally filtered to one currency
   const fetchBalances = async (range: DateRange, currency: string) => {
     const { data: accounts, error: accountsError } = await supabase
       .from('ledger_accounts')
       .select('id, code, name, account_type, parent_id')
-      .eq('is_active', true)
       .order('code');
 
     if (accountsError) throw accountsError;
 
-    const { data: entries, error: entriesError } = await supabase
-      .from('ledger_entries')
-      .select('account_id, debit_amount, credit_amount, created_at')
-      .gte('created_at', range.from.toISOString())
-      .lte('created_at', range.to.toISOString())
-      .eq('currency_code', currency);
-
-    if (entriesError) throw entriesError;
+    const pageSize = 1000;
+    const entries: Array<{ account_id: string; debit_amount: number | null; credit_amount: number | null }> = [];
+    let offset = 0;
+    while (true) {
+      let query = supabase
+        .from('ledger_entries')
+        .select('account_id, debit_amount, credit_amount, created_at')
+        .gte('created_at', range.from.toISOString())
+        .lte('created_at', range.to.toISOString())
+        .order('created_at', { ascending: true })
+        .range(offset, offset + pageSize - 1);
+      if (currency !== 'ALL') query = query.eq('currency_code', currency);
+      const { data, error: entriesError } = await query;
+      if (entriesError) throw entriesError;
+      if (!data?.length) break;
+      entries.push(...data);
+      if (data.length < pageSize) break;
+      offset += pageSize;
+    }
 
     const balanceMap = new Map<string, number>();
-    (entries || []).forEach(entry => {
+    entries.forEach(entry => {
       const current = balanceMap.get(entry.account_id) || 0;
       balanceMap.set(
         entry.account_id,
@@ -220,7 +230,7 @@ export const FinancialStatementsPanel = () => {
     }));
   };
 
-  const { data: accountBalances = [], isLoading } = useQuery({
+  const { data: accountBalances = [], isLoading, isError, error, refetch } = useQuery({
     queryKey: ['financial-statements', dateRange, selectedCurrency],
     staleTime: 0,
     refetchOnMount: "always",
@@ -294,14 +304,15 @@ export const FinancialStatementsPanel = () => {
   const calculatedEquity = totalAssets - totalLiabilities;
 
   const formatCurrency = (amount: number) => {
+    const code = selectedCurrency === 'ALL' ? 'CAD' : selectedCurrency;
     try {
-      return new Intl.NumberFormat('en-US', {
+      return new Intl.NumberFormat('en-CA', {
         style: 'currency',
-        currency: selectedCurrency,
+        currency: code,
         minimumFractionDigits: 2,
       }).format(amount);
     } catch {
-      return `${selectedCurrency} ${amount.toFixed(2)}`;
+      return `${code} ${amount.toFixed(2)}`;
     }
   };
 
@@ -743,6 +754,22 @@ export const FinancialStatementsPanel = () => {
     );
   }
 
+  if (isError) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Financial Statements</CardTitle>
+          <CardDescription>
+            Could not load ledger balances{error instanceof Error ? `: ${error.message}` : "."}
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Button variant="outline" onClick={() => void refetch()}>Try again</Button>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <div className="space-y-4">
       {/* Filters Card */}
@@ -762,8 +789,9 @@ export const FinancialStatementsPanel = () => {
                   <SelectValue placeholder="Currency" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="USD">USD</SelectItem>
+                  <SelectItem value="ALL">All</SelectItem>
                   <SelectItem value="CAD">CAD</SelectItem>
+                  <SelectItem value="USD">USD</SelectItem>
                   <SelectItem value="NGN">NGN</SelectItem>
                   <SelectItem value="GBP">GBP</SelectItem>
                   <SelectItem value="ZMW">ZMW</SelectItem>

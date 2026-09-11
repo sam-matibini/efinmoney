@@ -14,6 +14,8 @@ export const FINANCIAL_BOOK_QUERY_KEYS = [
   "ledger-fx",
   "reports-summary",
   "pl-report",
+  "aging-report",
+  "cash-flow-statement",
   "general-ledger",
 ] as const;
 
