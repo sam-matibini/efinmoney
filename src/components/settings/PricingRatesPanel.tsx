@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Download, Plus, RefreshCw, RotateCcw, Save, Undo2 } from "lucide-react";
+import { ArrowDown, ArrowUp, ChevronsUpDown, Download, Plus, RefreshCw, RotateCcw, Save, Undo2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,7 +12,8 @@ import { quoteTransfer } from "@/lib/pricing/costRecoveryEngine";
 import { ADMIN_CONFIGURATION_FIELDS, PRICING_LAYERS } from "@/lib/pricing/rateCard";
 import { downloadRateCardWorkbook } from "@/lib/pricing/exportRateCardWorkbook";
 import { useLivePricingWorkbook } from "@/hooks/useLivePricingWorkbook";
-import type { PayoutMethod, RecommendedPosition } from "@/lib/pricing/types";
+import { compareBy, type SortDir } from "@/components/admin-portal/TableControls";
+import type { CorridorRateCard, PayoutMethod, PayoutMinimum, RecommendedPosition } from "@/lib/pricing/types";
 
 const SHEETS = [
   { id: "summary", label: "Summary" },
@@ -49,6 +50,74 @@ const METHODS: PayoutMethod[] = [
 const cellClass =
   "h-8 w-full min-w-[4.5rem] rounded-sm border border-transparent bg-transparent px-1.5 text-sm tabular-nums hover:border-border focus:border-primary focus:bg-background focus:outline-none";
 
+function useSheetSort<K extends string>(initial: K) {
+  const [key, setKey] = useState<K>(initial);
+  const [dir, setDir] = useState<SortDir>("asc");
+  const toggle = (next: K) => {
+    if (next === key) setDir((d) => (d === "asc" ? "desc" : "asc"));
+    else {
+      setKey(next);
+      setDir("asc");
+    }
+  };
+  return { key, dir, toggle };
+}
+
+function SortHead<K extends string>({
+  label,
+  column,
+  sort,
+}: {
+  label: string;
+  column: K;
+  sort: { key: K; dir: SortDir; toggle: (k: K) => void };
+}) {
+  return (
+    <TableHead>
+      <button
+        type="button"
+        onClick={() => sort.toggle(column)}
+        className="inline-flex items-center gap-1 whitespace-nowrap hover:text-foreground"
+      >
+        {label}
+        {sort.key === column ? (
+          sort.dir === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />
+        ) : (
+          <ChevronsUpDown className="h-3 w-3 opacity-40" />
+        )}
+      </button>
+    </TableHead>
+  );
+}
+
+function matchesQuery(haystack: string, query: string) {
+  const q = query.trim().toUpperCase();
+  if (!q) return true;
+  return haystack.toUpperCase().includes(q);
+}
+
+function corridorValue(c: CorridorRateCard, key: string): string | number {
+  switch (key) {
+    case "partner": return c.partner ?? "";
+    case "spread": return c.efin_fx_spread;
+    case "feePct": return c.efin_transfer_fee_pct;
+    case "min": return c.minimum_fee;
+    case "max": return c.maximum_fee;
+    case "position": return c.recommended_position;
+    case "origin": return c.origin ?? "template";
+    case "active": return c.active ? 1 : 0;
+    case "method": return c.payout_method;
+    case "partnerPct": return c.costs.partner_cost_pct;
+    case "partnerFixed": return c.costs.partner_fixed_fee;
+    case "paymentPct": return c.costs.payment_cost_pct;
+    case "paymentFixed": return c.costs.payment_fixed_fee;
+    case "liquidity": return c.costs.liquidity_cost_pct;
+    case "risk": return c.costs.risk_cost_pct;
+    case "margin": return c.costs.required_margin;
+    default: return `${c.source_currency}_${c.destination_currency}_${c.payout_method}`;
+  }
+}
+
 function money(n: number, ccy = "CAD") {
   return ccy === "USD" ? `US$${n.toFixed(2)}` : `C$${n.toFixed(2)}`;
 }
@@ -63,6 +132,16 @@ export default function PricingRatesPanel() {
   const pricing = useLivePricingWorkbook();
   const [sheet, setSheet] = useState<SheetId>("corridor");
   const [filter, setFilter] = useState("");
+  const [walletFilter, setWalletFilter] = useState("");
+  const [payoutFilter, setPayoutFilter] = useState("");
+  const [engineFilter, setEngineFilter] = useState("");
+  const [originFilter, setOriginFilter] = useState("all");
+  const [methodFilter, setMethodFilter] = useState("all");
+  const [walletOriginFilter, setWalletOriginFilter] = useState("all");
+  const corridorSort = useSheetSort<"corridor" | "partner" | "spread" | "feePct" | "min" | "max" | "position" | "origin" | "active">("corridor");
+  const walletSort = useSheetSort<"corridor" | "spread" | "feePct" | "min" | "max" | "origin" | "active">("corridor");
+  const payoutSort = useSheetSort<"label" | "min">("label");
+  const engineSort = useSheetSort<"corridor" | "partnerPct" | "partnerFixed" | "paymentPct" | "paymentFixed" | "liquidity" | "risk" | "margin">("corridor");
   const [amount, setAmount] = useState("100");
   const [source, setSource] = useState("CAD");
   const [dest, setDest] = useState("USDC");
@@ -94,16 +173,68 @@ export default function PricingRatesPanel() {
     [amount, source, dest, mid, pricing.workbook],
   );
 
-  const corridors = pricing.workbook.corridors.filter((c) => {
-    const q = filter.trim().toUpperCase();
-    if (!q) return true;
-    return `${c.corridor_id} ${c.destination_currency} ${c.partner} ${c.delivery}`.toUpperCase().includes(q);
-  });
+  const corridors = useMemo(() => {
+    const rows = pricing.workbook.corridors.filter((c) => {
+      if (originFilter !== "all" && (c.origin ?? "template") !== originFilter) return false;
+      if (methodFilter !== "all" && c.payout_method !== methodFilter) return false;
+      return matchesQuery(`${c.corridor_id} ${c.source_currency} ${c.destination_currency} ${c.partner} ${c.delivery} ${c.payout_method}`, filter);
+    });
+    rows.sort(compareBy((c) => corridorValue(c, corridorSort.key), corridorSort.dir));
+    return rows;
+  }, [pricing.workbook.corridors, filter, originFilter, methodFilter, corridorSort.key, corridorSort.dir]);
+
+  const wallets = useMemo(() => {
+    const rows = pricing.workbook.wallets.filter((c) => {
+      if (walletOriginFilter !== "all" && (c.origin ?? "template") !== walletOriginFilter) return false;
+      return matchesQuery(`${c.corridor_id} ${c.source_currency} ${c.destination_currency}`, walletFilter);
+    });
+    rows.sort(compareBy((c) => corridorValue(c, walletSort.key), walletSort.dir));
+    return rows;
+  }, [pricing.workbook.wallets, walletFilter, walletOriginFilter, walletSort.key, walletSort.dir]);
+
+  const payouts = useMemo(() => {
+    const rows = pricing.workbook.payouts.filter((p) =>
+      matchesQuery(`${p.label} ${p.payout_method} ${p.minimum_fee}`, payoutFilter),
+    );
+    rows.sort(
+      compareBy((p: PayoutMinimum) => (payoutSort.key === "min" ? p.minimum_fee : p.label), payoutSort.dir),
+    );
+    return rows;
+  }, [pricing.workbook.payouts, payoutFilter, payoutSort.key, payoutSort.dir]);
+
+  const engineRows = useMemo(() => {
+    const rows = pricing.workbook.corridors.filter((c) =>
+      matchesQuery(`${c.corridor_id} ${c.partner}`, engineFilter),
+    );
+    rows.sort(compareBy((c) => corridorValue(c, engineSort.key), engineSort.dir));
+    return rows;
+  }, [pricing.workbook.corridors, engineFilter, engineSort.key, engineSort.dir]);
+
+  const onRefresh = async () => {
+    const result = await pricing.refetch();
+    if (result.ok) toast.success("Live partner, corridor, FX and currency data refreshed");
+    else toast.warning(`Refreshed with ${result.failed} source${result.failed === 1 ? "" : "s"} unavailable`);
+  };
+
+  const onReset = () => {
+    pricing.resetToLive();
+    toast.success("Showing live partner and corridor rates. Corrections were cleared.");
+  };
 
   const onSave = async () => {
     const result = await pricing.save();
-    if (result.db) toast.success("Pricing corrections saved. Checkout and wallet quotes will use the updated card.");
-    else toast.success("Corrections saved in this workspace. Apply the corridor rate-card SQL to persist them in the database.");
+    if (!result.ok) {
+      const message =
+        typeof result.error === "string"
+          ? result.error
+          : result.error instanceof Error
+            ? result.error.message
+            : "Could not save pricing corrections";
+      toast.error(message);
+      return;
+    }
+    if (result.db) toast.success(`Saved ${result.wrote} rate-card row${result.wrote === 1 ? "" : "s"}. Checkout will use the updated card.`);
+    else toast.warning("Saved in this workspace. Apply the corridor rate-card SQL so they persist in the database.");
   };
 
   const addRow = (channel: "wallet" | "external") => {
@@ -142,18 +273,11 @@ export default function PricingRatesPanel() {
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Button variant="outline" size="sm" className="gap-1.5" onClick={() => void pricing.refetch()}>
-              <RefreshCw className="h-4 w-4" /> Refresh live data
+            <Button variant="outline" size="sm" className="gap-1.5" onClick={() => void onRefresh()} disabled={pricing.refreshing}>
+              <RefreshCw className={cn("h-4 w-4", pricing.refreshing && "animate-spin")} />
+              {pricing.refreshing ? "Refreshing…" : "Refresh live data"}
             </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-1.5"
-              onClick={() => {
-                pricing.resetToLive();
-                toast.message("Reverted to live partner/corridor pricing");
-              }}
-            >
+            <Button variant="outline" size="sm" className="gap-1.5" onClick={onReset}>
               <RotateCcw className="h-4 w-4" /> Reset to live
             </Button>
             <Button
@@ -167,7 +291,7 @@ export default function PricingRatesPanel() {
             >
               <Download className="h-4 w-4" /> Excel
             </Button>
-            <Button size="sm" className="gap-1.5" onClick={() => void onSave()} disabled={pricing.saving || !pricing.dirty}>
+            <Button size="sm" className="gap-1.5" onClick={() => void onSave()} disabled={pricing.saving}>
               <Save className="h-4 w-4" /> {pricing.saving ? "Saving…" : "Save corrections"}
             </Button>
           </div>
@@ -225,7 +349,21 @@ export default function PricingRatesPanel() {
         {sheet === "corridor" && (
           <div className="space-y-3">
             <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
-              <Input placeholder="Filter corridor, currency or partner" value={filter} onChange={(e) => setFilter(e.target.value)} className="max-w-sm" />
+              <div className="flex flex-wrap items-center gap-2">
+                <Input placeholder="Filter corridor, currency or partner" value={filter} onChange={(e) => setFilter(e.target.value)} className="w-64" />
+                <select className={cn(cellClass, "w-40 border-border")} value={methodFilter} onChange={(e) => setMethodFilter(e.target.value)}>
+                  <option value="all">All methods</option>
+                  {METHODS.map((m) => (
+                    <option key={m} value={m}>{m}</option>
+                  ))}
+                </select>
+                <select className={cn(cellClass, "w-36 border-border")} value={originFilter} onChange={(e) => setOriginFilter(e.target.value)}>
+                  <option value="all">All sources</option>
+                  <option value="live">Live</option>
+                  <option value="template">Template</option>
+                  <option value="corrected">Corrected</option>
+                </select>
+              </div>
               <div className="flex flex-wrap items-center gap-2">
                 <Input className="w-20" value={addSource} onChange={(e) => setAddSource(e.target.value.toUpperCase())} placeholder="From" />
                 <Input className="w-24" value={addDest} onChange={(e) => setAddDest(e.target.value.toUpperCase())} placeholder="To" />
@@ -239,17 +377,29 @@ export default function PricingRatesPanel() {
                 </Button>
               </div>
             </div>
+            <p className="text-xs text-muted-foreground">{corridors.length} of {pricing.workbook.corridors.length} corridors · click a column to sort</p>
             <div className="overflow-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
-                    {["Corridor", "Partner", "FX spread %", "Fee %", "Min fee", "Max fee", "Position", "Source", "On", ""].map((h) => (
-                      <TableHead key={h}>{h}</TableHead>
-                    ))}
+                    <SortHead label="Corridor" column="corridor" sort={corridorSort} />
+                    <SortHead label="Partner" column="partner" sort={corridorSort} />
+                    <SortHead label="FX spread %" column="spread" sort={corridorSort} />
+                    <SortHead label="Fee %" column="feePct" sort={corridorSort} />
+                    <SortHead label="Min fee" column="min" sort={corridorSort} />
+                    <SortHead label="Max fee" column="max" sort={corridorSort} />
+                    <SortHead label="Position" column="position" sort={corridorSort} />
+                    <SortHead label="Source" column="origin" sort={corridorSort} />
+                    <SortHead label="On" column="active" sort={corridorSort} />
+                    <TableHead />
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {corridors.map((c) => {
+                  {corridors.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={10} className="py-8 text-center text-sm text-muted-foreground">No corridors match this filter.</TableCell>
+                    </TableRow>
+                  ) : corridors.map((c) => {
                     const dirty = pricing.isCardDirty("corridors", c.corridor_id);
                     return (
                       <TableRow key={c.corridor_id} className={dirty ? "bg-amber-50/70 dark:bg-amber-950/20" : undefined}>
@@ -305,24 +455,45 @@ export default function PricingRatesPanel() {
 
         {sheet === "wallet" && (
           <div className="space-y-3">
-            <div className="flex flex-wrap items-center gap-2">
-              <Input className="w-20" value={addSource} onChange={(e) => setAddSource(e.target.value.toUpperCase())} placeholder="From" />
-              <Input className="w-24" value={addDest} onChange={(e) => setAddDest(e.target.value.toUpperCase())} placeholder="To" />
-              <Button size="sm" variant="outline" className="gap-1.5" onClick={() => addRow("wallet")}>
-                <Plus className="h-4 w-4" /> Add wallet rate
-              </Button>
+            <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
+              <div className="flex flex-wrap items-center gap-2">
+                <Input placeholder="Filter wallet pair" value={walletFilter} onChange={(e) => setWalletFilter(e.target.value)} className="w-64" />
+                <select className={cn(cellClass, "w-36 border-border")} value={walletOriginFilter} onChange={(e) => setWalletOriginFilter(e.target.value)}>
+                  <option value="all">All sources</option>
+                  <option value="live">Live</option>
+                  <option value="template">Template</option>
+                  <option value="corrected">Corrected</option>
+                </select>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <Input className="w-20" value={addSource} onChange={(e) => setAddSource(e.target.value.toUpperCase())} placeholder="From" />
+                <Input className="w-24" value={addDest} onChange={(e) => setAddDest(e.target.value.toUpperCase())} placeholder="To" />
+                <Button size="sm" variant="outline" className="gap-1.5" onClick={() => addRow("wallet")}>
+                  <Plus className="h-4 w-4" /> Add wallet rate
+                </Button>
+              </div>
             </div>
+            <p className="text-xs text-muted-foreground">{wallets.length} of {pricing.workbook.wallets.length} wallet rates · click a column to sort</p>
             <div className="overflow-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
-                    {["Transaction", "FX spread %", "Fee %", "Min fee", "Max fee", "Source", "On", ""].map((h) => (
-                      <TableHead key={h}>{h}</TableHead>
-                    ))}
+                    <SortHead label="Transaction" column="corridor" sort={walletSort} />
+                    <SortHead label="FX spread %" column="spread" sort={walletSort} />
+                    <SortHead label="Fee %" column="feePct" sort={walletSort} />
+                    <SortHead label="Min fee" column="min" sort={walletSort} />
+                    <SortHead label="Max fee" column="max" sort={walletSort} />
+                    <SortHead label="Source" column="origin" sort={walletSort} />
+                    <SortHead label="On" column="active" sort={walletSort} />
+                    <TableHead />
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {pricing.workbook.wallets.map((c) => {
+                  {wallets.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={8} className="py-8 text-center text-sm text-muted-foreground">No wallet rates match this filter.</TableCell>
+                    </TableRow>
+                  ) : wallets.map((c) => {
                     const dirty = pricing.isCardDirty("wallets", c.corridor_id);
                     return (
                       <TableRow key={c.corridor_id} className={dirty ? "bg-amber-50/70 dark:bg-amber-950/20" : undefined}>
@@ -391,42 +562,60 @@ export default function PricingRatesPanel() {
         )}
 
         {sheet === "payout" && (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                {["Payout method", "Minimum fee"].map((h) => (
-                  <TableHead key={h}>{h}</TableHead>
-                ))}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {pricing.workbook.payouts.map((p) => (
-                <TableRow key={p.payout_method} className={pricing.draft.payouts[p.payout_method] ? "bg-amber-50/70 dark:bg-amber-950/20" : undefined}>
-                  <TableCell>{p.label}</TableCell>
-                  <TableCell>
-                    <Num value={p.minimum_fee} onChange={(n) => pricing.patchPayout(p.payout_method, { minimum_fee: n })} />
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        )}
-
-        {sheet === "engine" && (
-          <div className="overflow-auto">
-            <p className="mb-3 text-sm text-muted-foreground">
-              Layer 1 costs come from contracted partner pricing and refresh with the partner rate sheet. Correct a cell when the contracted cost is wrong.
-            </p>
+          <div className="space-y-3">
+            <Input placeholder="Filter payout method" value={payoutFilter} onChange={(e) => setPayoutFilter(e.target.value)} className="w-64" />
+            <p className="text-xs text-muted-foreground">{payouts.length} of {pricing.workbook.payouts.length} methods · click a column to sort</p>
             <Table>
               <TableHeader>
                 <TableRow>
-                  {["Corridor", "Partner %", "Partner fixed", "Payment %", "Payment fixed", "Liquidity %", "Risk %", "Required margin"].map((h) => (
-                    <TableHead key={h}>{h}</TableHead>
-                  ))}
+                  <SortHead label="Payout method" column="label" sort={payoutSort} />
+                  <SortHead label="Minimum fee" column="min" sort={payoutSort} />
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {pricing.workbook.corridors.map((c) => (
+                {payouts.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={2} className="py-8 text-center text-sm text-muted-foreground">No payout methods match this filter.</TableCell>
+                  </TableRow>
+                ) : payouts.map((p) => (
+                  <TableRow key={p.payout_method} className={pricing.draft.payouts[p.payout_method] ? "bg-amber-50/70 dark:bg-amber-950/20" : undefined}>
+                    <TableCell>{p.label}</TableCell>
+                    <TableCell>
+                      <Num value={p.minimum_fee} onChange={(n) => pricing.patchPayout(p.payout_method, { minimum_fee: n })} />
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        )}
+
+        {sheet === "engine" && (
+          <div className="space-y-3 overflow-auto">
+            <p className="text-sm text-muted-foreground">
+              Layer 1 costs come from contracted partner pricing and refresh with the partner rate sheet. Correct a cell when the contracted cost is wrong.
+            </p>
+            <Input placeholder="Filter corridor or partner" value={engineFilter} onChange={(e) => setEngineFilter(e.target.value)} className="w-64" />
+            <p className="text-xs text-muted-foreground">{engineRows.length} of {pricing.workbook.corridors.length} corridors · click a column to sort</p>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <SortHead label="Corridor" column="corridor" sort={engineSort} />
+                  <SortHead label="Partner %" column="partnerPct" sort={engineSort} />
+                  <SortHead label="Partner fixed" column="partnerFixed" sort={engineSort} />
+                  <SortHead label="Payment %" column="paymentPct" sort={engineSort} />
+                  <SortHead label="Payment fixed" column="paymentFixed" sort={engineSort} />
+                  <SortHead label="Liquidity %" column="liquidity" sort={engineSort} />
+                  <SortHead label="Risk %" column="risk" sort={engineSort} />
+                  <SortHead label="Required margin" column="margin" sort={engineSort} />
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {engineRows.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={8} className="py-8 text-center text-sm text-muted-foreground">No pricing-engine rows match this filter.</TableCell>
+                  </TableRow>
+                ) : engineRows.map((c) => (
                   <TableRow key={c.corridor_id} className={pricing.isCardDirty("corridors", c.corridor_id) ? "bg-amber-50/70 dark:bg-amber-950/20" : undefined}>
                     <TableCell className="whitespace-nowrap">{c.corridor_id}</TableCell>
                     <TableCell><Pct value={c.costs.partner_cost_pct} onChange={(n) => pricing.patchCard("corridors", c.corridor_id, { costs: { partner_cost_pct: n } })} /></TableCell>

@@ -186,8 +186,10 @@ export function useLivePricingWorkbook() {
 
   const [draft, setDraft] = useState<PricingCorrections>(() => getCorrections());
   const [saving, setSaving] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [lastRefreshed, setLastRefreshed] = useState(() => new Date());
   const hydrated = useRef(false);
+  const holdHydrate = useRef(false);
 
   useEffect(() => {
     setLiveBase(liveBase, "admin");
@@ -196,6 +198,7 @@ export function useLivePricingWorkbook() {
   }, [liveBase]);
 
   useEffect(() => {
+    if (holdHydrate.current) return;
     if (hydrated.current) return;
     if (partners.isLoading || corridors.isLoading || efin.isLoading || dbCards.isLoading) return;
     hydrated.current = true;
@@ -274,10 +277,11 @@ export function useLivePricingWorkbook() {
   };
 
   const resetToLive = () => {
+    holdHydrate.current = true;
+    hydrated.current = true;
     const empty = emptyCorrections();
     setDraft(empty);
     setCorrections(empty);
-    hydrated.current = false;
   };
 
   const save = async () => {
@@ -290,20 +294,33 @@ export function useLivePricingWorkbook() {
         ...Object.keys(draft.wallets),
         ...(draft.extras ?? []).map((row) => row.corridor_id),
       ]);
-      const dirtyCards = [...merged.corridors, ...merged.wallets].filter((c) => dirtyIds.has(c.corridor_id));
+      const allCards = [...merged.corridors, ...merged.wallets];
+      const cardsToWrite = dirtyIds.size ? allCards.filter((c) => dirtyIds.has(c.corridor_id)) : allCards;
+      let wrote = 0;
+      const failures: string[] = [];
 
-      for (const card of dirtyCards) {
+      for (const card of cardsToWrite) {
         const row = cardToDbRow(card);
-        const { data: existing } = await db
+        const { data: existing, error: updateError } = await db
           .from("corridor_rate_cards")
           .update(row)
           .eq("corridor_id", card.corridor_id)
           .is("effective_to", null)
           .select("id");
-        if (!existing?.length) {
-          await db.from("corridor_rate_cards").insert(row);
+        if (updateError) {
+          failures.push(updateError.message);
+          continue;
         }
+        if (!existing?.length) {
+          const { error: insertError } = await db.from("corridor_rate_cards").insert(row);
+          if (insertError) {
+            failures.push(insertError.message);
+            continue;
+          }
+        }
+        wrote += 1;
 
+        if (!dirtyIds.has(card.corridor_id)) continue;
         const payment_method = card.channel === "wallet" ? "fx_swap" : card.payout_method.toLowerCase();
         const current = (efin.data ?? []).find(
           (r) =>
@@ -314,7 +331,7 @@ export function useLivePricingWorkbook() {
         if (current?.id) {
           await db.from("efinmoney_pricing").update({ effective_to: new Date().toISOString() }).eq("id", current.id);
         }
-        await db.from("efinmoney_pricing").insert({
+        const { error: priceError } = await db.from("efinmoney_pricing").insert({
           customer_type: "consumer",
           direction: "payout",
           source_currency: card.source_currency,
@@ -326,10 +343,11 @@ export function useLivePricingWorkbook() {
           min_fee: card.minimum_fee,
           max_fee: card.maximum_fee,
         });
+        if (priceError) failures.push(priceError.message);
       }
 
       for (const tier of merged.volumes) {
-        await db.from("volume_discount_tiers").upsert({
+        const { error } = await db.from("volume_discount_tiers").upsert({
           id: tier.id,
           min_monthly_volume: tier.min_monthly_volume,
           max_monthly_volume: tier.max_monthly_volume,
@@ -338,42 +356,56 @@ export function useLivePricingWorkbook() {
           label: tier.label,
           custom: tier.custom,
         });
+        if (error) failures.push(error.message);
       }
       for (const payout of merged.payouts) {
-        await db.from("payout_method_minimums").upsert({
+        const { error } = await db.from("payout_method_minimums").upsert({
           payout_method: payout.payout_method,
           label: payout.label,
           minimum_fee: payout.minimum_fee,
           fee_currency: payout.fee_currency,
         });
+        if (error) failures.push(error.message);
       }
 
       await qc.invalidateQueries({ queryKey: ["corridor_rate_cards"] });
       await qc.invalidateQueries({ queryKey: ["efinmoney_pricing"] });
       await qc.invalidateQueries({ queryKey: ["volume_discount_tiers"] });
       await qc.invalidateQueries({ queryKey: ["payout_method_minimums"] });
-      return { ok: true as const, db: true };
+
+      if (failures.length && wrote === 0) {
+        return { ok: false as const, db: false, wrote, error: failures[0] };
+      }
+      return { ok: true as const, db: failures.length === 0, wrote, error: failures[0] };
     } catch (error) {
       setCorrections(draft);
-      return { ok: true as const, db: false, error };
+      return { ok: false as const, db: false, wrote: 0, error };
     } finally {
       setSaving(false);
     }
   };
 
   const refetch = async () => {
-    await Promise.all([
-      partners.refetch(),
-      corridors.refetch(),
-      partnerPricing.refetch(),
-      partnerFx.refetch(),
-      currencies.refetch(),
-      fxRates.refetch(),
-      dbCards.refetch(),
-      volumes.refetch(),
-      payouts.refetch(),
-    ]);
-    setLastRefreshed(new Date());
+    setRefreshing(true);
+    try {
+      const settled = await Promise.allSettled([
+        partners.refetch(),
+        corridors.refetch(),
+        partnerPricing.refetch(),
+        partnerFx.refetch(),
+        currencies.refetch(),
+        fxRates.refetch(),
+        dbCards.refetch(),
+        volumes.refetch(),
+        payouts.refetch(),
+        efin.refetch(),
+      ]);
+      const failed = settled.filter((r) => r.status === "rejected").length;
+      setLastRefreshed(new Date());
+      return { ok: failed === 0, failed };
+    } finally {
+      setRefreshing(false);
+    }
   };
 
   useEffect(() => {
@@ -393,6 +425,7 @@ export function useLivePricingWorkbook() {
     draft,
     loading,
     saving,
+    refreshing,
     dirty: hasCorrections(draft),
     liveCorridorCount,
     liveWalletCount,
