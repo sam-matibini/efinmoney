@@ -8,7 +8,10 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import {
   buildFincraInteracInstructions,
+  FINCRA_INTERAC_DONE_STATUSES,
+  FINCRA_INTERAC_OPEN_STATUSES,
   resolveFincraCadAlias,
+  settleFincraCadInteracIntent,
 } from "../_shared/fincraCad.ts";
 
 const corsHeaders = {
@@ -36,7 +39,7 @@ const OPEN_STATUSES = ["pending", "awaiting_payment"];
 const INTENT_TABLE = "fincra_cad_interac_intents";
 
 const INTENT_COLUMNS =
-  "id, public_id, amount, currency_code, reference, status, created_at, expires_at, credited_at, claimed_sent_at, sender_name, sender_email, sender_bank, sender_phone, purpose, transfer_id, hosted_url, sender_account_type, sender_address_line1, sender_address_line2, sender_city, sender_region, sender_postal_code, sender_country";
+  "id, public_id, amount, currency_code, reference, status, created_at, expires_at, credited_at, claimed_sent_at, sender_name, sender_email, sender_bank, sender_phone, purpose, transfer_id, hosted_url, provider_reference, sender_account_type, sender_address_line1, sender_address_line2, sender_city, sender_region, sender_postal_code, sender_country";
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
@@ -107,6 +110,8 @@ Deno.serve(async (req) => {
       sender_email?: string;
       sender_phone?: string;
       sender_bank?: string;
+      interac_reference?: string;
+      provider_reference?: string;
       purpose?: string;
       transfer_id?: string;
       merchant_id?: string;
@@ -162,6 +167,68 @@ Deno.serve(async (req) => {
         .maybeSingle();
       if (!current) return json({ error: "Intent not found" }, 404);
       return json({ ok: true, intent: current });
+    }
+
+    if (action === "complete") {
+      const intentId = String(body.intent_id || "");
+      const interacRef = String(body.interac_reference || body.provider_reference || "").trim();
+      if (!intentId) return fail("intent_id", "intent_id required", 400);
+      if (!/^[A-Za-z0-9][A-Za-z0-9-]{3,31}$/.test(interacRef)) {
+        return fail(
+          "interac_reference",
+          "Enter the Interac reference from your bank confirmation (for example CAh9ECkx).",
+          400,
+          { interacRef },
+        );
+      }
+
+      const { data: current, error: lookupErr } = await admin
+        .from(INTENT_TABLE)
+        .select(`${INTENT_COLUMNS}, user_id, wallet_id`)
+        .eq("id", intentId)
+        .eq("user_id", user.id)
+        .maybeSingle();
+      if (lookupErr) return json({ error: lookupErr.message }, 500);
+      if (!current) return fail("intent_lookup", "Intent not found", 404, { intentId });
+
+      if (FINCRA_INTERAC_DONE_STATUSES.includes(String(current.status))) {
+        return json({ ok: true, intent: current, already: true });
+      }
+      if (!FINCRA_INTERAC_OPEN_STATUSES.includes(String(current.status))) {
+        return fail("intent_status", "This Interac request is no longer open.", 409, { status: current.status });
+      }
+
+      try {
+        const settled = await settleFincraCadInteracIntent(
+          admin,
+          {
+            id: current.id,
+            user_id: current.user_id,
+            wallet_id: current.wallet_id,
+            amount: Number(current.amount),
+            reference: current.reference,
+            public_id: current.public_id,
+            status: current.status,
+            purpose: current.purpose,
+            transfer_id: current.transfer_id,
+            provider_reference: current.provider_reference,
+          },
+          interacRef,
+          "user_interac_reference",
+        );
+        const { data: fresh } = await admin
+          .from(INTENT_TABLE)
+          .select(INTENT_COLUMNS)
+          .eq("id", settled.id)
+          .maybeSingle();
+        return json({ ok: true, intent: fresh ?? { ...current, ...settled, status: "settled", provider_reference: interacRef } });
+      } catch (settleErr) {
+        return fail(
+          "complete",
+          settleErr instanceof Error ? settleErr.message : "Could not complete this Interac payment",
+          500,
+        );
+      }
     }
 
     if (!alias) {

@@ -1,6 +1,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { creditWalletViaFincra, isFincraWalletTopUp } from "../_shared/fincra-credit.ts";
 import { getFincraConfig } from "../_shared/fincra.ts";
+import { settleFincraCadInteracIntent } from "../_shared/fincraCad.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -149,7 +150,7 @@ Deno.serve(async (req) => {
         const openStatuses = ["pending", "awaiting_payment"];
         const { data: candidates } = await supabase
           .from("fincra_cad_interac_intents")
-          .select("id, user_id, wallet_id, amount, reference, public_id, status, purpose, transfer_id")
+          .select("id, user_id, wallet_id, amount, reference, public_id, status, purpose, transfer_id, provider_reference")
           .in("status", openStatuses)
           .eq("currency_code", "CAD")
           .gt("expires_at", nowIso)
@@ -161,50 +162,35 @@ Deno.serve(async (req) => {
           const refs = [row.reference, row.public_id].filter(Boolean).map((r) => String(r).toUpperCase());
           return refs.some((r) => r.length >= 8 && haystack.includes(r));
         });
+        const byUserRef = (candidates ?? []).find((row) => {
+          const pr = String(row.provider_reference || "").toUpperCase();
+          return pr.length >= 4 && (haystack.includes(pr) || pr === String(providerRef).toUpperCase());
+        });
         const byAmount = (candidates ?? []).find((row) => {
           const expected = Number(row.amount);
           return Number.isFinite(expected) && Math.abs(expected - amount) < 0.02;
         });
-        const match = byRef || byAmount;
+        const match = byRef || byUserRef || byAmount;
 
         if (match) {
-          const idempotencyRef = providerRef || `interac-${match.id}`;
           try {
-            await creditWalletViaFincra(
+            await settleFincraCadInteracIntent(
               supabase,
-              match.user_id as string,
-              "CAD",
-              amount,
-              idempotencyRef,
-              match.wallet_id as string,
-              `Interac e-Transfer top-up (${match.reference})`,
+              {
+                id: match.id as string,
+                user_id: match.user_id as string,
+                wallet_id: match.wallet_id as string,
+                amount: Number(match.amount),
+                reference: String(match.reference),
+                public_id: match.public_id as string | null,
+                status: String(match.status),
+                purpose: String(match.purpose),
+                transfer_id: (match.transfer_id as string | null) ?? null,
+                provider_reference: (match.provider_reference as string | null) ?? null,
+              },
+              providerRef || null,
+              byRef ? "payment_code" : byUserRef ? "interac_reference" : "amount",
             );
-            await supabase.from("fincra_cad_interac_intents").update({
-              status: "completed",
-              provider_reference: providerRef || null,
-              credited_at: nowIso,
-            }).eq("id", match.id).in("status", openStatuses);
-
-            if (match.purpose === "transfer" && match.transfer_id) {
-              try {
-                const base = Deno.env.get("SUPABASE_URL")!;
-                const service = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-                await fetch(`${base}/functions/v1/execute-transfer`, {
-                  method: "POST",
-                  headers: {
-                    Authorization: `Bearer ${service}`,
-                    "Content-Type": "application/json",
-                    apikey: Deno.env.get("SUPABASE_ANON_KEY") || "",
-                  },
-                  body: JSON.stringify({
-                    transfer_id: match.transfer_id,
-                    internal_secret: Deno.env.get("INTERNAL_FUNCTION_SECRET") || service,
-                  }),
-                });
-              } catch (releaseErr) {
-                console.warn("fincra-webhook: transfer release failed", releaseErr);
-              }
-            }
           } catch (creditErr) {
             console.error("fincra-webhook CAD Interac credit failed", creditErr);
           }

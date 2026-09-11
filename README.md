@@ -30,9 +30,10 @@ Send checkout and CAD wallet collections take Interac Autodeposit through Fincra
 - Pay-with **Interac** on Send (CAD) and **Interac e-Transfer** on CAD top-up
 - Deposit email: `support.cad.live-015@fincra.ca` (`FINCRA_CAD_INTERAC_ALIAS`)
 - Payment code: unique `EFM-YYYYMMDD-…` reference from `next_interac_public_id` — paste it in the Interac message
-- Edge function: `fincra-cad-interac`; webhook: `fincra-webhook` (`collection.successful`)
+- After sending, the customer enters the bank Interac reference (e.g. `CAh9ECkx`) and taps **Complete** — checkout closes onto the transfer success report
+- Edge function: `fincra-cad-interac` (`action: complete`); webhook: `fincra-webhook` (`collection.successful`)
 - Secrets: `FINCRA_SECRET_KEY`, `FINCRA_BUSINESS_ID`, `FINCRA_CAD_INTERAC_ALIAS`, optional `FINCRA_CAD_VIRTUAL_ACCOUNT_ID`
-- Flag: `VITE_FEATURE_FINCRA_INTERAC` (on by default)
+- SQL: `supabase/migrations/20260911220000_fincra_interac_complete_status.sql`
 
 ## Project info
 

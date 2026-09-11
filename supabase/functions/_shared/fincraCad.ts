@@ -4,6 +4,7 @@
  * Docs: https://docs.fincra.com/docs/cad-collections-interac-e-transfer
  */
 import { fincraFetch } from "./fincra.ts";
+import { creditWalletViaFincra } from "./fincra-credit.ts";
 
 export type FincraCadConfig = {
   alias: string;
@@ -123,4 +124,107 @@ export function buildFincraInteracInstructions(
       ? `The payment is confirmed once we match the deposit to this reference.`
       : `Your CAD wallet credits once we match the deposit to this reference.`,
   ];
+}
+
+export const FINCRA_INTERAC_OPEN_STATUSES = ["pending", "awaiting_payment", "received", "matched", "confirmed"];
+export const FINCRA_INTERAC_DONE_STATUSES = ["settled", "completed"];
+
+export type FincraCadIntentRow = {
+  id: string;
+  user_id: string;
+  wallet_id: string;
+  amount: number;
+  reference: string;
+  public_id?: string | null;
+  status: string;
+  purpose: string;
+  transfer_id: string | null;
+  provider_reference?: string | null;
+};
+
+async function releaseLinkedTransfer(transferId: string): Promise<void> {
+  const base = Deno.env.get("SUPABASE_URL")!;
+  const service = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+  await fetch(`${base}/functions/v1/execute-transfer`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${service}`,
+      "Content-Type": "application/json",
+      apikey: Deno.env.get("SUPABASE_ANON_KEY") || "",
+    },
+    body: JSON.stringify({
+      transfer_id: transferId,
+      internal_secret: Deno.env.get("INTERNAL_FUNCTION_SECRET") || service,
+    }),
+  });
+}
+
+/** Credit the CAD wallet and settle the Interac intent (idempotent per intent id). */
+export async function settleFincraCadInteracIntent(
+  // deno-lint-ignore no-explicit-any
+  admin: any,
+  intent: FincraCadIntentRow,
+  providerReference: string | null,
+  matchTier: string,
+): Promise<FincraCadIntentRow> {
+  if (FINCRA_INTERAC_DONE_STATUSES.includes(intent.status)) {
+    return intent;
+  }
+
+  const amount = Number(intent.amount);
+  const creditRef = `interac-${intent.id}`;
+  const refs = [creditRef];
+  if (providerReference) refs.push(providerReference);
+  const { data: alreadyCredited } = await admin
+    .from("ledger_entries")
+    .select("id")
+    .eq("reference_type", "fincra_topup")
+    .in("external_reference", refs)
+    .limit(1);
+  if (!alreadyCredited?.length) {
+    await creditWalletViaFincra(
+      admin,
+      intent.user_id,
+      "CAD",
+      amount,
+      creditRef,
+      intent.wallet_id,
+      `Interac e-Transfer (${intent.reference}${providerReference ? ` · ${providerReference}` : ""})`,
+    );
+  }
+
+  const nowIso = new Date().toISOString();
+  const { data: updated, error } = await admin
+    .from("fincra_cad_interac_intents")
+    .update({
+      status: "settled",
+      provider_reference: providerReference || intent.provider_reference || null,
+      credited_at: nowIso,
+      confirmed_at: nowIso,
+      received_at: nowIso,
+      matched_at: nowIso,
+      match_tier: matchTier,
+    })
+    .eq("id", intent.id)
+    .in("status", FINCRA_INTERAC_OPEN_STATUSES)
+    .select("id, user_id, wallet_id, amount, reference, public_id, status, purpose, transfer_id, provider_reference")
+    .maybeSingle();
+
+  if (error) throw new Error(error.message);
+
+  const settled: FincraCadIntentRow = updated ?? {
+    ...intent,
+    status: "settled",
+    provider_reference: providerReference,
+  };
+
+  if (intent.purpose === "transfer" && intent.transfer_id) {
+    try {
+      await releaseLinkedTransfer(intent.transfer_id);
+    } catch (releaseErr) {
+      console.warn("fincraCad: transfer release failed", releaseErr);
+    }
+  }
+
+  return settled;
 }

@@ -1,4 +1,6 @@
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { CheckCircle2, Copy, Loader2, ShieldCheck } from "lucide-react";
 import { CHECKOUT_STRINGS, type Lang } from "@/components/payments/checkoutStrings";
@@ -6,6 +8,7 @@ import type { InteracIntent } from "@/components/payments/InteracCheckout";
 import { LOOP_CAD_EFT, type LoopCadEft } from "@/lib/loopCad";
 import { FINCRA_CAD_INTERAC_ALIAS } from "@/lib/fincraCad";
 import { cn } from "@/lib/utils";
+import { useState } from "react";
 
 export type InteracRailVariant = "flovide" | "loop" | "fincra";
 
@@ -20,6 +23,10 @@ interface Props {
   /** Cancel this request and return to the amount form. */
   onChangeAmount?: () => void;
   changingAmount?: boolean;
+  /** Submit the Interac confirmation reference (e.g. CAh9ECkx) and close checkout. */
+  onCompletePayment?: (interacReference: string) => void;
+  completing?: boolean;
+  completeError?: string | null;
 }
 
 /**
@@ -35,8 +42,12 @@ export default function InteracStatusView({
   variant = "loop",
   onChangeAmount,
   changingAmount = false,
+  onCompletePayment,
+  completing = false,
+  completeError = null,
 }: Props) {
   const t = CHECKOUT_STRINGS[lang];
+  const [bankRef, setBankRef] = useState("");
   const reference = intent.public_id || intent.reference;
   const amountLabel = `CAD ${Number(intent.amount).toFixed(2)}`;
   const eftDetails = eft ?? LOOP_CAD_EFT;
@@ -100,11 +111,13 @@ export default function InteracStatusView({
         `Ouvrez votre app bancaire et démarrez un Virement Interac.`,
         `Envoyez exactement ${amountLabel} à l'adresse Interac ci-dessous.`,
         `Collez le code de paiement dans le message. Autodeposit est activé — aucune question de sécurité.`,
+        `Entrez le numéro de référence Interac (ex. CAh9ECkx) et appuyez sur Terminer.`,
       ]
     : [
         `Open your banking app and start an Interac e-Transfer.`,
         `Send exactly ${amountLabel} to the Interac email below.`,
         `Paste the payment code in the message field. Autodeposit is on — no security question.`,
+        `Enter the Interac reference from your confirmation (for example CAh9ECkx) and tap Complete.`,
       ];
 
   return (
@@ -116,13 +129,9 @@ export default function InteracStatusView({
             {fr ? "En attente de votre Virement Interac…" : "Waiting for your Interac e-Transfer…"}
           </p>
           <p className="text-[12px] leading-relaxed text-emerald-800/90">
-            {isFincra
-              ? fr
-                ? "Dès que le dépôt arrive, nous créditons votre portefeuille automatiquement — rien à confirmer ici."
-                : "When the deposit lands, we credit your wallet automatically — nothing to confirm here."
-              : fr
-                ? "Nous surveillons votre dépôt et créditons automatiquement."
-                : "We're watching for your deposit and will credit automatically."}
+            {fr
+              ? "Après l'envoi, entrez le numéro de référence Interac de votre confirmation, puis appuyez sur Terminer."
+              : "After you send, enter the Interac reference from your confirmation, then tap Complete."}
           </p>
         </div>
       </div>
@@ -169,6 +178,46 @@ export default function InteracStatusView({
         />
       </div>
 
+      {onCompletePayment && (
+        <form
+          className="space-y-2 rounded-lg border border-pay-bank/30 bg-pay-bank/5 p-3.5"
+          onSubmit={(e) => {
+            e.preventDefault();
+            const trimmed = bankRef.trim();
+            if (!/^[A-Za-z0-9][A-Za-z0-9-]{3,31}$/.test(trimmed)) {
+              toast.error(
+                fr
+                  ? "Entrez le numéro de référence Interac (ex. CAh9ECkx)."
+                  : "Enter the Interac reference from your confirmation (for example CAh9ECkx).",
+              );
+              return;
+            }
+            onCompletePayment(trimmed);
+          }}
+        >
+          <div className="space-y-1.5">
+            <Label htmlFor="interac-bank-ref">{t.interacBankRef}</Label>
+            <Input
+              id="interac-bank-ref"
+              value={bankRef}
+              onChange={(e) => setBankRef(e.target.value)}
+              placeholder={t.interacBankRefPlaceholder}
+              autoComplete="off"
+              spellCheck={false}
+              maxLength={32}
+              disabled={completing}
+              className="font-mono tracking-wide"
+            />
+            <p className="text-[11px] leading-relaxed text-muted-foreground">{t.interacBankRefHint}</p>
+          </div>
+          {completeError ? <p className="text-sm text-destructive">{completeError}</p> : null}
+          <Button type="submit" className="w-full" disabled={completing || !bankRef.trim()}>
+            {completing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+            {t.interacComplete}
+          </Button>
+        </form>
+      )}
+
       {showEft && (
         <div className="w-full min-w-0 space-y-2 rounded-lg border p-3 text-sm">
           <p className="text-xs font-medium text-foreground">{t.eftHint}</p>
@@ -208,8 +257,8 @@ export default function InteracStatusView({
       <p className="flex items-center justify-center gap-1.5 text-[11px] text-muted-foreground">
         <ShieldCheck className="h-3.5 w-3.5" />
         {fr
-          ? "Autodeposit · confirmation automatique"
-          : "Autodeposit · automatic confirmation"}
+          ? "Entrez le numéro de référence Interac, puis Terminer"
+          : "Enter the Interac reference, then Complete"}
       </p>
     </div>
   );

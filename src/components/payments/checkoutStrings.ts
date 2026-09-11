@@ -66,6 +66,10 @@ export const CHECKOUT_STRINGS = {
     fincraWaiting: "Waiting for your Interac e-Transfer…",
     fincraPushHint:
       `Send an Interac Autodeposit e-Transfer to ${FINCRA_CAD_INTERAC_ALIAS}. Paste the payment code in the message field so Fincra can match your deposit.`,
+    interacBankRef: "e-Transfer reference number",
+    interacBankRefHint: "From your bank confirmation after you send — for example CAh9ECkx.",
+    interacBankRefPlaceholder: "CAh9ECkx",
+    interacComplete: "Complete",
   },
   fr: {
     selectMethod: "Choisissez un mode de paiement",
@@ -128,6 +132,10 @@ export const CHECKOUT_STRINGS = {
     fincraWaiting: "En attente de votre Virement Interac…",
     fincraPushHint:
       `Envoyez un Virement Autodeposit à ${FINCRA_CAD_INTERAC_ALIAS}. Collez le code de paiement dans le message pour que Fincra puisse apparier le dépôt.`,
+    interacBankRef: "Numéro de référence Interac",
+    interacBankRefHint: "Sur la confirmation de votre banque après l'envoi — par exemple CAh9ECkx.",
+    interacBankRefPlaceholder: "CAh9ECkx",
+    interacComplete: "Terminer",
   },
 } as const;
 

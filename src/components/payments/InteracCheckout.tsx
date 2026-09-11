@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { z } from "zod";
 import { FunctionsHttpError } from "@supabase/supabase-js";
@@ -139,6 +139,8 @@ export default function InteracCheckout({
   const [bootstrapped, setBootstrapped] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [cancelling, setCancelling] = useState(false);
+  const [completing, setCompleting] = useState(false);
+  const closedRef = useRef(false);
 
 
   const amountLabel = `CAD ${(Number(amount) || 0).toFixed(2)}`;
@@ -436,6 +438,8 @@ export default function InteracCheckout({
     const applyDone = (next: InteracIntent) => {
       setIntent(next);
       if (!DONE.includes(next.status)) return false;
+      if (closedRef.current) return true;
+      closedRef.current = true;
       toast.success(
         purpose === "transfer"
           ? `CAD ${next.amount} received — sending your transfer now`
@@ -504,6 +508,44 @@ export default function InteracCheckout({
     };
   }, [intent?.id, intent?.status, onComplete, purpose, railFn]);
 
+  const completeWithReference = useCallback(async (interacReference: string) => {
+    if (!intent || completing || closedRef.current) return;
+    setCompleting(true);
+    setError(null);
+    try {
+      const { data, error: fnError } = await supabase.functions.invoke(railFn, {
+        body: {
+          action: "complete",
+          intent_id: intent.id,
+          interac_reference: interacReference,
+        },
+      });
+      if (fnError) throw new Error(await edgeErrorMessage(fnError, "Could not complete this payment"));
+      if ((data as { error?: string } | null)?.error) {
+        throw new Error(String((data as { error: string }).error));
+      }
+      const next = (data as { intent?: InteracIntent } | null)?.intent ?? {
+        ...intent,
+        status: "settled",
+      };
+      setIntent(next);
+      if (closedRef.current) return;
+      closedRef.current = true;
+      toast.success(
+        purpose === "transfer"
+          ? `CAD ${next.amount} received — sending your transfer now`
+          : `CAD ${next.amount} credited to your wallet`,
+      );
+      onComplete?.();
+    } catch (e) {
+      const message = e instanceof Error ? e.message : "Could not complete this payment";
+      setError(message);
+      toast.error(message);
+    } finally {
+      setCompleting(false);
+    }
+  }, [intent, completing, railFn, purpose, onComplete]);
+
   if (!bootstrapped) {
     return (
       <div className="flex items-center gap-2 py-4 text-sm text-muted-foreground">
@@ -527,6 +569,13 @@ export default function InteracCheckout({
         variant={isFlovide ? "flovide" : isFincra ? "fincra" : "loop"}
         onChangeAmount={DONE.includes(intent.status) ? undefined : () => void cancelAndChangeAmount()}
         changingAmount={cancelling}
+        onCompletePayment={
+          DONE.includes(intent.status) || !isFincra
+            ? undefined
+            : (ref) => void completeWithReference(ref)
+        }
+        completing={completing}
+        completeError={error}
       />
     );
   }
