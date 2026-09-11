@@ -33,6 +33,7 @@ import { useSavedCards } from "@/hooks/useSavedCards";
 import { usePricingConfig } from "@/hooks/usePricingConfig";
 import { supabase } from "@/integrations/supabase/client";
 import { usePriceQuote } from "@/hooks/usePriceQuote";
+import { quoteTransfer } from "@/lib/pricing/costRecoveryEngine";
 import { fetchFxRate, cardChargeCurrency, initializeFlwPayment, verifyFlwPayment } from "@/lib/flutterwave";
 import { payoutMinAmount, validatePayoutMin } from "@/lib/payoutMins";
 import {
@@ -552,11 +553,6 @@ const SendPage = () => {
       ? Number(cardFundingLeg.fee)
       : (pricing?.transfer_card_surcharge ?? 0))
     : 0;
-  const fee = parsedAmount > 0
-    ? (priceQuote && !priceQuote.pricing_missing && Number.isFinite(Number(priceQuote.total_fee))
-      ? Number(priceQuote.total_fee)
-      : baseFee + cardFee)
-    : 0;
 
   const directDbRate =
     fxRate && Number(fxRate.effective_rate) > 0 ? Number(fxRate.effective_rate) : null;
@@ -565,14 +561,37 @@ const SendPage = () => {
   const rawRate = isSameCurrency
     ? 1
     : resolvedDbRate ?? directDbRate ?? derivedRate ?? nombaRate ?? 0;
-  const fxMarginBps = Number(priceQuote?.fx_margin_bps ?? 0);
-  const effectiveRate = rawRate > 0 && fxMarginBps > 0
-    ? rawRate * (1 - fxMarginBps / 10_000)
-    : rawRate;
+  const engineQuote = useMemo(
+    () =>
+      quoteTransfer({
+        sourceCurrency,
+        destinationCurrency: targetCountry.code,
+        amount: parsedAmount,
+        channel: "external",
+        payoutMethod: destPayoutMethod,
+        midMarketRate: rawRate > 0 ? rawRate : null,
+      }),
+    [sourceCurrency, targetCountry.code, parsedAmount, destPayoutMethod, rawRate],
+  );
+  const engineReady = !engineQuote.pricingMissing && parsedAmount > 0 && rawRate > 0;
+  const fxMarginBps = engineReady
+    ? engineQuote.fxSpread * 10_000
+    : Number(priceQuote?.fx_margin_bps ?? 0);
+  const effectiveRate = engineReady && engineQuote.customerRate
+    ? engineQuote.customerRate
+    : rawRate > 0 && fxMarginBps > 0
+      ? rawRate * (1 - fxMarginBps / 10_000)
+      : rawRate;
   const rateAvailable = isSameCurrency || effectiveRate > 0;
-  // Fee is charged on top: recipient gets the full send amount converted.
+  const fee = parsedAmount > 0
+    ? (engineReady
+      ? engineQuote.transferFee + cardFee
+      : (priceQuote && !priceQuote.pricing_missing && Number.isFinite(Number(priceQuote.total_fee))
+        ? Number(priceQuote.total_fee)
+        : baseFee + cardFee))
+    : 0;
   const receivedAmount = parsedAmount > 0 && rateAvailable
-    ? Math.max(0, parsedAmount * effectiveRate)
+    ? (engineReady ? (engineQuote.youReceive ?? 0) : Math.max(0, parsedAmount * effectiveRate))
     : 0;
   const payoutMinError = receivedAmount > 0
     ? validatePayoutMin(targetCountry.code, receivedAmount)

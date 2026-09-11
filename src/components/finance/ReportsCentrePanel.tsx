@@ -29,7 +29,8 @@ import {
   PieChart,
   GitCompare
 } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { toast } from "sonner";
+import { feeIncomeFromLedger, generateLedgerReport, downloadGeneratedReport, loadLedgerPeriod } from "@/lib/finance/ledgerReports";
 
 type DateRange = {
   from: Date;
@@ -113,11 +114,13 @@ export const ReportsCentrePanel = () => {
     setCompareDialogOpen(false);
   };
 
-  // Fetch summary data
+  // Fetch summary data from operational tables + ledger fee income (CoA 4100/4200/4300)
   const { data: summaryData, isLoading: summaryLoading } = useQuery({
     queryKey: ['reports-summary', dateRange],
+    staleTime: 0,
+    refetchOnMount: "always",
     queryFn: async () => {
-      const [transfers, invoices, bills, fxTrades] = await Promise.all([
+      const [transfers, invoices, bills, fxTrades, ledger] = await Promise.all([
         supabase.from('transfers')
           .select('source_amount, fee_amount, status')
           .gte('created_at', dateRange.from.toISOString())
@@ -134,11 +137,14 @@ export const ReportsCentrePanel = () => {
           .select('from_amount, to_amount, fee_amount, status')
           .gte('created_at', dateRange.from.toISOString())
           .lte('created_at', dateRange.to.toISOString()),
+        loadLedgerPeriod(dateRange.from, dateRange.to).catch(() => ({ accounts: [], entries: [] })),
       ]);
 
       const totalTransfers = transfers.data?.reduce((sum, t) => sum + (t.source_amount || 0), 0) || 0;
-      const totalFees = (transfers.data?.reduce((sum, t) => sum + (t.fee_amount || 0), 0) || 0) +
+      const operationalFees = (transfers.data?.reduce((sum, t) => sum + (t.fee_amount || 0), 0) || 0) +
                         (fxTrades.data?.reduce((sum, t) => sum + (t.fee_amount || 0), 0) || 0);
+      const ledgerFees = feeIncomeFromLedger(ledger.accounts, ledger.entries);
+      const totalFees = ledgerFees.total !== 0 ? ledgerFees.total : operationalFees;
       const totalInvoiced = invoices.data?.reduce((sum, i) => sum + (i.total_amount || 0), 0) || 0;
       const totalReceived = invoices.data?.reduce((sum, i) => sum + (i.amount_paid || 0), 0) || 0;
       const totalBilled = bills.data?.reduce((sum, b) => sum + (b.total_amount || 0), 0) || 0;
@@ -148,6 +154,7 @@ export const ReportsCentrePanel = () => {
       return {
         totalTransfers,
         totalFees,
+        feeSource: ledgerFees.total !== 0 ? "ledger" : "operational",
         totalInvoiced,
         totalReceived,
         totalBilled,
@@ -207,6 +214,8 @@ export const ReportsCentrePanel = () => {
   // Fetch P&L data
   const { data: plData, isLoading: plLoading } = useQuery({
     queryKey: ['pl-report', dateRange],
+    staleTime: 0,
+    refetchOnMount: "always",
     queryFn: async () => {
       const { data: entries } = await supabase
         .from('ledger_entries')
@@ -238,6 +247,35 @@ export const ReportsCentrePanel = () => {
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
+  };
+
+  const handleGenerate = async (reportId: string) => {
+    try {
+      if (["fee_income", "trial_balance", "income_statement", "balance_sheet"].includes(reportId)) {
+        const report = await generateLedgerReport(reportId, dateRange.from, dateRange.to);
+        downloadGeneratedReport(report.filename, report.header, report.rows);
+        toast.success(`${report.filename} downloaded from the live ledger`);
+        return;
+      }
+      if (reportId === "transaction_summary") {
+        downloadGeneratedReport(
+          `transaction-summary-${format(dateRange.from, "yyyy-MM-dd")}`,
+          ["Metric", "Amount"],
+          [
+            ["Transfers", summaryData?.totalTransfers ?? 0],
+            ["Fee income", summaryData?.totalFees ?? 0],
+            ["FX volume", summaryData?.fxVolume ?? 0],
+            ["Transfer count", summaryData?.transferCount ?? 0],
+            ["FX count", summaryData?.fxCount ?? 0],
+          ],
+        );
+        toast.success("Transaction summary downloaded");
+        return;
+      }
+      toast.message("Open the matching Finance tab for this report (Aging, Cash Flow).");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not generate report");
+    }
   };
 
   const reportTypes = [
@@ -435,7 +473,9 @@ export const ReportsCentrePanel = () => {
                   <div>
                     <p className="text-sm font-medium text-muted-foreground">Fee Income</p>
                     <p className="text-2xl font-bold text-indigo-600">{formatCurrency(summaryData?.totalFees || 0)}</p>
-                    <p className="text-xs text-muted-foreground">Transfer & FX fees</p>
+                    <p className="text-xs text-muted-foreground">
+                      {summaryData?.feeSource === "ledger" ? "CoA 4100 / 4200 / 4300" : "Transfer & FX fees"}
+                    </p>
                   </div>
                   <div className="h-12 w-12 rounded-full bg-indigo-500/10 flex items-center justify-center">
                     <DollarSign className="h-6 w-6 text-indigo-600" />
@@ -502,7 +542,7 @@ export const ReportsCentrePanel = () => {
                           <p className="font-medium">{report.name}</p>
                           <p className="text-xs text-muted-foreground">{report.description}</p>
                         </div>
-                        <Button size="sm" variant="outline" className="w-full">
+                        <Button size="sm" variant="outline" className="w-full" onClick={() => void handleGenerate(report.id)}>
                           <Download className="h-4 w-4 mr-2" />
                           Generate
                         </Button>

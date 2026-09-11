@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
 import { track } from '@/lib/analytics';
+import { invalidateFinancialBooks } from '@/lib/finance/invalidateFinancialBooks';
 
 export interface Transfer {
   id: string;
@@ -131,6 +132,7 @@ export const useCreateTransfer = () => {
       }
       queryClient.invalidateQueries({ queryKey: ['transfers'] });
       queryClient.invalidateQueries({ queryKey: ['wallets'] });
+      invalidateFinancialBooks(queryClient);
     },
   });
 };

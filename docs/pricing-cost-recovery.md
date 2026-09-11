@@ -5,7 +5,9 @@ cost sheets, live FX and active currencies. Administrators correct the
 Pricing & Fees workbook; saved overlays stay in place when new corridors
 appear.
 
-Checkout must not hard-code `0.5%`.
+Checkout and wallet FX quotes use `quoteTransfer`. Posted transfer fees
+credit CoA **4200 Transfer Fees**, so Chart of Accounts, Trial Balance,
+statements and Reports Centre stay in sync with the live rate card.
 
 ## Formula
 

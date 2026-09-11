@@ -8,8 +8,6 @@ import TopUpModal from "@/components/modals/TopUpModal";
 import {
   buildUsdMap,
   midRateFromUsdMap,
-  quoteTransferRecipient,
-  quoteTransferSend,
   parseAmount,
   type MarketResponse,
 } from "@/components/fx/liveFxUtils";
@@ -17,13 +15,14 @@ import { resolveEffectiveRate } from "@/lib/fx";
 import { supabase } from "@/integrations/supabase/client";
 import { useWallets } from "@/hooks/useWallets";
 import { useFxRates } from "@/hooks/useFxRates";
-import { usePricingConfig } from "@/hooks/usePricingConfig";
 import { findCountryByCode, COUNTRIES } from "@/lib/countries";
+import { invertSendAmount, quoteTransfer } from "@/lib/pricing/costRecoveryEngine";
 import { saveSendHandoff } from "@/lib/sendHandoff";
 import { productFeatures } from "@/lib/productFeatures";
 import { toast } from "sonner";
 
 const PAYOUT_CODES = COUNTRIES.map((c) => c.code);
+const AFRICAN_PAYOUT = new Set(["NGN", "KES", "GHS", "ZMW", "UGX", "TZS", "RWF", "XOF", "XAF"]);
 
 interface SendMoneyModalProps {
   children: React.ReactNode;
@@ -39,7 +38,6 @@ const SendMoneyModal = ({ children }: SendMoneyModalProps) => {
 
   const { data: wallets } = useWallets();
   const { data: fxRates } = useFxRates();
-  const { data: pricing } = usePricingConfig();
 
   const { data: marketData } = useQuery({
     queryKey: ["market-rates-fx-calc"],
@@ -64,25 +62,55 @@ const SendMoneyModal = ({ children }: SendMoneyModalProps) => {
   const effectiveRate = dbRate ?? marketRate;
   const rateReady = effectiveRate != null && effectiveRate > 0;
 
-  const baseFee = pricing?.transfer_base_fee ?? 0;
+  const african = AFRICAN_PAYOUT;
+  const engineQuote = useMemo(
+    () =>
+      quoteTransfer({
+        sourceCurrency: from,
+        destinationCurrency: to,
+        amount: parseAmount(amount),
+        channel: from === to ? "wallet" : "external",
+        payoutMethod: from === to ? "WALLET_TO_WALLET" : african.has(to) ? "MOBILE_MONEY" : "BANK",
+        midMarketRate: effectiveRate,
+      }),
+    [from, to, amount, effectiveRate],
+  );
 
   const quoteRecipient = useCallback(
     (send: number) => {
       if (!rateReady || !effectiveRate) return 0;
-      return quoteTransferRecipient(send, effectiveRate, baseFee);
+      return (
+        quoteTransfer({
+          sourceCurrency: from,
+          destinationCurrency: to,
+          amount: send,
+          channel: from === to ? "wallet" : "external",
+          payoutMethod: from === to ? "WALLET_TO_WALLET" : african.has(to) ? "MOBILE_MONEY" : "BANK",
+          midMarketRate: effectiveRate,
+        }).youReceive ?? 0
+      );
     },
-    [rateReady, effectiveRate, baseFee],
+    [rateReady, effectiveRate, from, to],
   );
 
   const quoteSend = useCallback(
     (recv: number) => {
       if (!rateReady || !effectiveRate) return 0;
-      return quoteTransferSend(recv, effectiveRate, baseFee);
+      return invertSendAmount(recv, {
+        sourceCurrency: from,
+        destinationCurrency: to,
+        channel: from === to ? "wallet" : "external",
+        payoutMethod: from === to ? "WALLET_TO_WALLET" : AFRICAN_PAYOUT.has(to) ? "MOBILE_MONEY" : "BANK",
+        midMarketRate: effectiveRate,
+      });
     },
-    [rateReady, effectiveRate, baseFee],
+    [rateReady, effectiveRate, from, to],
   );
 
-  const feeLabel = baseFee > 0 ? `${from} ${baseFee.toFixed(2)} flat fee` : "No transfer fee";
+  const displayRate = engineQuote.customerRate ?? effectiveRate;
+  const feeLabel = engineQuote.pricingMissing
+    ? "Live rate card"
+    : `${from} ${engineQuote.transferFee.toFixed(2)} transfer fee`;
 
   const walletCodes = useMemo(
     () => [...new Set((wallets ?? []).map((w) => w.currency_code))],
@@ -205,7 +233,7 @@ const SendMoneyModal = ({ children }: SendMoneyModalProps) => {
           onSendAmountChange={(v) => setAmount(v)}
           quoteRecipient={rateReady ? quoteRecipient : undefined}
           quoteSend={rateReady ? quoteSend : undefined}
-          displayRate={rateReady ? effectiveRate : undefined}
+          displayRate={rateReady ? displayRate : undefined}
           feeLabel={feeLabel}
           fromCurrencyFilter={walletCodes.length ? walletCodes : undefined}
           toCurrencyFilter={PAYOUT_CODES}

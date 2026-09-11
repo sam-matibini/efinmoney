@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { invokeTransferError, executeWalletFxSwap } from '@/lib/walletTransfer';
+import { invalidateFinancialBooks } from "@/lib/finance/invalidateFinancialBooks";
 import { useAuth } from './useAuth';
 
 export type WalletTransferInput = {
@@ -28,7 +28,7 @@ export function useWalletTransfer() {
       qc.invalidateQueries({ queryKey: ['wallets', user?.id] });
       qc.invalidateQueries({ queryKey: ['wallets'] });
       qc.invalidateQueries({ queryKey: ['fx_rates'] });
-      qc.invalidateQueries({ queryKey: ['ledger-fx'] });
+      invalidateFinancialBooks(qc);
     },
   });
 }

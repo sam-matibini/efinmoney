@@ -23,6 +23,7 @@ import AppPage from "@/components/layout/AppPage";
 import { productFeatures } from "@/lib/productFeatures";
 import TransferSummary from "@/components/pricing/TransferSummary";
 import { invertSendAmount, quoteTransfer } from "@/lib/pricing/costRecoveryEngine";
+import { invalidateFinancialBooks } from "@/lib/finance/invalidateFinancialBooks";
 
 const MIN_AMOUNT = 0.01;
 const MAX_AMOUNT = 1_000_000;
@@ -256,7 +257,7 @@ const FxTradingPanel = () => {
       setSuccess(true);
       queryClient.invalidateQueries({ queryKey: ['wallets'] });
       queryClient.invalidateQueries({ queryKey: ['fx_rates'] });
-      queryClient.invalidateQueries({ queryKey: ['ledger-fx'] });
+      invalidateFinancialBooks(queryClient);
       toast.success('Exchange completed successfully!');
 
       successTimer.current = setTimeout(() => {
@@ -574,7 +575,7 @@ const ExchangePage = () => {
             label="Instant conversion"
             value="Live FX rates"
             meta={[
-              { icon: TrendingUp, text: "0.5% spread on wallet swaps" },
+              { icon: TrendingUp, text: "Priced from the live rate card" },
               { icon: Sparkles, text: "Live rates for supported pairs" },
             ]}
             variant="cta"

@@ -222,6 +222,9 @@ export const FinancialStatementsPanel = () => {
 
   const { data: accountBalances = [], isLoading } = useQuery({
     queryKey: ['financial-statements', dateRange, selectedCurrency],
+    staleTime: 0,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: true,
     queryFn: () => fetchBalances(dateRange, selectedCurrency),
   });
 

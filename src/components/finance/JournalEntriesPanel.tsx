@@ -13,6 +13,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Plus, Trash2, CheckCircle, XCircle, Users, Building2 } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
+import { invalidateFinancialBooks } from "@/lib/finance/invalidateFinancialBooks";
 
 interface JournalLine {
   account_id: string;
@@ -161,8 +162,7 @@ export const JournalEntriesPanel = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['recent-journals'] });
-      queryClient.invalidateQueries({ queryKey: ['ledger-entries'] });
-      queryClient.invalidateQueries({ queryKey: ['trial-balance'] });
+      invalidateFinancialBooks(queryClient);
       toast.success('Journal entry created successfully');
       resetForm();
     },

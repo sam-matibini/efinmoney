@@ -35,6 +35,9 @@ export const ChartOfAccountsPanel = ({ onViewLedger }: Props) => {
 
   const { data: accounts = [], isLoading } = useQuery({
     queryKey: ['chart-of-accounts'],
+    staleTime: 0,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: true,
     queryFn: async () => {
       const { data, error } = await supabase
         .from('ledger_accounts')
@@ -48,6 +51,9 @@ export const ChartOfAccountsPanel = ({ onViewLedger }: Props) => {
   // Aggregate balances from ledger_entries
   const { data: balances = {} } = useQuery({
     queryKey: ['account-balances'],
+    staleTime: 0,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: true,
     queryFn: async () => {
       const map: Record<string, { debit: number; credit: number }> = {};
       const pageSize = 1000;
