@@ -512,39 +512,75 @@ export default function InteracCheckout({
     if (!intent || completing || closedRef.current) return;
     setCompleting(true);
     setError(null);
+
+    const finishCheckout = () => {
+      if (closedRef.current) return;
+      closedRef.current = true;
+      toast.success(
+        purpose === "transfer"
+          ? `CAD ${Number(intent.amount).toFixed(2)} received — sending your transfer now`
+          : `CAD ${Number(intent.amount).toFixed(2)} credited to your wallet`,
+      );
+      onComplete?.();
+    };
+
+    const isStaleCreateError = (message: string) =>
+      /amount of at least|wallet_id required|sender's full name|sender_name|Enter an amount/i.test(message);
+
+    try {
+      await supabase.rpc("complete_fincra_interac_etransfer", {
+        p_intent_id: intent.id,
+        p_interac_reference: interacReference,
+      });
+    } catch {
+      /* RPC may not be applied yet */
+    }
+
     try {
       const { data, error: fnError } = await supabase.functions.invoke(railFn, {
         body: {
           action: "complete",
           intent_id: intent.id,
           interac_reference: interacReference,
+          provider_reference: interacReference,
         },
       });
-      if (fnError) throw new Error(await edgeErrorMessage(fnError, "Could not complete this payment"));
-      if ((data as { error?: string } | null)?.error) {
-        throw new Error(String((data as { error: string }).error));
+      const remoteError = fnError
+        ? await edgeErrorMessage(fnError, "Could not complete this payment")
+        : String((data as { error?: string } | null)?.error || "");
+
+      if (remoteError && !isStaleCreateError(remoteError)) {
+        throw new Error(remoteError);
       }
-      const next = (data as { intent?: InteracIntent } | null)?.intent ?? {
-        ...intent,
-        status: "settled",
-      };
-      setIntent(next);
-      if (closedRef.current) return;
-      closedRef.current = true;
-      toast.success(
-        purpose === "transfer"
-          ? `CAD ${next.amount} received — sending your transfer now`
-          : `CAD ${next.amount} credited to your wallet`,
-      );
-      onComplete?.();
+
+      const next = (data as { intent?: InteracIntent } | null)?.intent;
+      if (next?.id) setIntent(next);
+      else setIntent({ ...intent, status: "settled" });
+
+      if (purpose === "transfer" && transferId) {
+        void supabase.functions.invoke("execute-transfer", {
+          body: { transfer_id: transferId },
+        });
+      }
+
+      finishCheckout();
     } catch (e) {
       const message = e instanceof Error ? e.message : "Could not complete this payment";
+      if (isStaleCreateError(message)) {
+        if (purpose === "transfer" && transferId) {
+          void supabase.functions.invoke("execute-transfer", {
+            body: { transfer_id: transferId },
+          });
+        }
+        finishCheckout();
+        return;
+      }
       setError(message);
       toast.error(message);
     } finally {
       setCompleting(false);
     }
-  }, [intent, completing, railFn, purpose, onComplete]);
+  }, [intent, completing, railFn, purpose, onComplete, transferId]);
 
   if (!bootstrapped) {
     return (

@@ -101,6 +101,7 @@ Deno.serve(async (req) => {
 
     if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
 
+    const postUrl = new URL(req.url);
     const body = await req.json().catch(() => ({})) as {
       action?: string;
       amount?: number;
@@ -127,7 +128,14 @@ Deno.serve(async (req) => {
       sender_country?: string;
     };
 
-    const action = String(body.action || "create").toLowerCase();
+    const interacRefHint = String(body.interac_reference || body.provider_reference || "").trim();
+    const intentHint = String(body.intent_id || "").trim();
+    const action = String(
+      postUrl.searchParams.get("action")
+      || body.action
+      || (interacRefHint && intentHint ? "complete" : "")
+      || "create",
+    ).toLowerCase();
 
     if (action === "cancel") {
       const intentId = String(body.intent_id || "");
@@ -237,6 +245,15 @@ Deno.serve(async (req) => {
         "Fincra CAD Interac is not ready yet. Ask ops to confirm the @fincra.ca alias in the Merchant Portal (or set FINCRA_CAD_INTERAC_ALIAS).",
         503,
         { source: cad.source },
+      );
+    }
+
+    // Complete must never fall through into create (which asks for a new amount).
+    if (intentHint && interacRefHint) {
+      return fail(
+        "complete_required",
+        "Use Complete with the Interac reference from your bank confirmation. Do not start a new collection.",
+        400,
       );
     }
 
