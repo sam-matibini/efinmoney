@@ -123,52 +123,71 @@ export default function PricingRatesPanel() {
   };
 
   return (
-    <div className="overflow-hidden rounded-xl border bg-background shadow-sm">
-      <div className="flex flex-col gap-3 border-b px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-lg font-semibold">Pricing & Fees</h1>
-          <p className="text-sm text-muted-foreground">
-            {pricing.loading
-              ? "Loading live partners, corridors and currencies…"
-              : `${pricing.workbook.corridors.length} corridors · ${pricing.liveCorridorCount} live partners${
-                  pricing.livePartners.length ? ` (${pricing.livePartners.slice(0, 4).join(", ")})` : ""
-                } · ${pricing.workbook.wallets.length} wallet rates · ${pricing.liveWalletCount} live`}
-          </p>
-          <p className="text-xs text-muted-foreground">
-            Auto-refreshes from partners, corridors, FX and currencies every 60s
-            {pricing.lastRefreshed ? ` · last ${pricing.lastRefreshed.toLocaleTimeString()}` : ""}
-            {pricing.dirty ? " · unsaved corrections" : ""}
-          </p>
+    <div className="rounded-xl border bg-background shadow-sm">
+      <div className="sticky top-0 z-20 rounded-t-xl border-b bg-background/95 backdrop-blur">
+        <div className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h1 className="text-lg font-semibold">Pricing & Fees</h1>
+            <p className="text-sm text-muted-foreground">
+              {pricing.loading
+                ? "Loading live partners, corridors and currencies…"
+                : `${pricing.workbook.corridors.length} corridors · ${pricing.liveCorridorCount} live partners${
+                    pricing.livePartners.length ? ` (${pricing.livePartners.slice(0, 4).join(", ")})` : ""
+                  } · ${pricing.workbook.wallets.length} wallet rates · ${pricing.liveWalletCount} live`}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Auto-refreshes from partners, corridors, FX and currencies every 60s
+              {pricing.lastRefreshed ? ` · last ${pricing.lastRefreshed.toLocaleTimeString()}` : ""}
+              {pricing.dirty ? " · unsaved corrections" : ""}
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" size="sm" className="gap-1.5" onClick={() => void pricing.refetch()}>
+              <RefreshCw className="h-4 w-4" /> Refresh live data
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1.5"
+              onClick={() => {
+                pricing.resetToLive();
+                toast.message("Reverted to live partner/corridor pricing");
+              }}
+            >
+              <RotateCcw className="h-4 w-4" /> Reset to live
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1.5"
+              onClick={() => {
+                downloadRateCardWorkbook();
+                toast.success("Excel workbook downloaded");
+              }}
+            >
+              <Download className="h-4 w-4" /> Excel
+            </Button>
+            <Button size="sm" className="gap-1.5" onClick={() => void onSave()} disabled={pricing.saving || !pricing.dirty}>
+              <Save className="h-4 w-4" /> {pricing.saving ? "Saving…" : "Save corrections"}
+            </Button>
+          </div>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <Button variant="outline" size="sm" className="gap-1.5" onClick={() => void pricing.refetch()}>
-            <RefreshCw className="h-4 w-4" /> Refresh live data
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            className="gap-1.5"
-            onClick={() => {
-              pricing.resetToLive();
-              toast.message("Reverted to live partner/corridor pricing");
-            }}
-          >
-            <RotateCcw className="h-4 w-4" /> Reset to live
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            className="gap-1.5"
-            onClick={() => {
-              downloadRateCardWorkbook();
-              toast.success("Excel workbook downloaded");
-            }}
-          >
-            <Download className="h-4 w-4" /> Excel
-          </Button>
-          <Button size="sm" className="gap-1.5" onClick={() => void onSave()} disabled={pricing.saving || !pricing.dirty}>
-            <Save className="h-4 w-4" /> {pricing.saving ? "Saving…" : "Save corrections"}
-          </Button>
+        <div className="flex overflow-x-auto px-2">
+          {SHEETS.map((s) => (
+            <button
+              key={s.id}
+              type="button"
+              onClick={() => setSheet(s.id)}
+              className={cn(
+                "whitespace-nowrap px-3 py-2.5 text-sm transition-colors",
+                sheet === s.id
+                  ? "border-b-[3px] border-[#217346] font-semibold text-foreground"
+                  : "border-b-[3px] border-transparent text-muted-foreground hover:text-foreground",
+              )}
+            >
+              {s.label}
+            </button>
+          ))}
         </div>
       </div>
 
@@ -448,24 +467,6 @@ export default function PricingRatesPanel() {
             rows={ADMIN_CONFIGURATION_FIELDS.map((f) => [f.field, f.example, f.notes])}
           />
         )}
-      </div>
-
-      <div className="flex overflow-x-auto border-t bg-[#f3f3f3] dark:bg-muted/40">
-        {SHEETS.map((s) => (
-          <button
-            key={s.id}
-            type="button"
-            onClick={() => setSheet(s.id)}
-            className={cn(
-              "whitespace-nowrap border-r border-black/10 px-4 py-2 text-sm",
-              sheet === s.id
-                ? "bg-background font-semibold text-foreground shadow-[inset_0_-3px_0_0_#217346]"
-                : "text-muted-foreground hover:bg-background/70",
-            )}
-          >
-            {s.label}
-          </button>
-        ))}
       </div>
     </div>
   );
