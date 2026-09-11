@@ -8,6 +8,9 @@
 //   email, password, name?, first_name?, last_name?, country?,
 //   account_type?, profile?: { street?, city?, state?, postal_code?,
 //   country_code?, phone?, date_of_birth?, occupation?, nationality? },
+//   business?: { legal_name, registration_number, entity_type, tax_id?,
+//   industry?, website?, business_phone?, business_email?, street?,
+//   city?, state?, postal_code?, country_code? },
 //   redirect_to?
 // }
 //
@@ -52,6 +55,7 @@ Deno.serve(async (req) => {
       country,
       account_type,
       profile,
+      business,
       redirect_to,
     } = await req.json();
 
@@ -94,9 +98,12 @@ Deno.serve(async (req) => {
 
     // Step 2 — generate a confirmation token (no stock Supabase email).
     // Email CTA must land on our app /auth/confirm, not /auth/v1/verify.
+    const isBusiness = account_type === "business";
     const safeRedirect = typeof redirect_to === "string" && redirect_to.startsWith("/")
       ? redirect_to
-      : "/onboarding/account-type";
+      : isBusiness
+        ? "/onboarding/business/details"
+        : "/onboarding/identity";
     const appOrigin = getPublicAppOrigin();
     const redirectTo = `${appOrigin}/auth/confirm?type=signup&next=${encodeURIComponent(safeRedirect)}`;
 
@@ -126,17 +133,22 @@ Deno.serve(async (req) => {
     // etc.) so the user lands on the next page with their data already
     // saved. handle_new_user() has already created the profile row from
     // user_metadata; this just patches the extra fields onto it.
+    // Business signups skip date of birth and nationality — those belong
+    // on beneficial owners during KYB, not on the company login.
     if (profile && typeof profile === "object") {
       const patch: Record<string, string | null> = {};
+      if (fullName)              patch.full_name = fullName;
       if (profile.street)        patch.street_address = profile.street;
       if (profile.city)          patch.city = profile.city;
       if (profile.state)         patch.state_province = profile.state;
       if (profile.postal_code)   patch.postal_code = profile.postal_code;
       if (profile.country_code)  patch.address_country = profile.country_code;
       if (profile.phone)         patch.phone_number = profile.phone;
-      if (profile.date_of_birth) patch.date_of_birth = profile.date_of_birth;
-      if (profile.occupation)    patch.occupation = profile.occupation;
-      if (profile.nationality)   patch.nationality = profile.nationality;
+      if (!isBusiness) {
+        if (profile.date_of_birth) patch.date_of_birth = profile.date_of_birth;
+        if (profile.occupation)    patch.occupation = profile.occupation;
+        if (profile.nationality)   patch.nationality = profile.nationality;
+      }
 
       if (Object.keys(patch).length > 0) {
         const { error: patchErr } = await admin
@@ -146,6 +158,63 @@ Deno.serve(async (req) => {
         if (patchErr) {
           console.warn("[send-signup-confirmation] profile patch:", patchErr.message);
           // Non-fatal — confirmation email still goes out.
+        }
+      }
+    }
+
+    // Step 2.6 — seed the KYB business profile so company details from
+    // signup are waiting on /onboarding/business/details.
+    if (isBusiness && business && typeof business === "object") {
+      const ENTITY_TYPES = new Set([
+        "sole_proprietorship",
+        "partnership",
+        "corporation",
+        "llc",
+        "cooperative",
+        "ngo",
+        "trust",
+        "other",
+      ]);
+      const legalName = typeof business.legal_name === "string" ? business.legal_name.trim() : "";
+      const entityType = ENTITY_TYPES.has(business.entity_type) ? business.entity_type : "corporation";
+      const incorporationCountry =
+        (typeof business.country_code === "string" && business.country_code.trim()) ||
+        (typeof country === "string" && country.trim()) ||
+        "CA";
+
+      if (legalName) {
+        const { error: bizErr } = await admin.from("business_profiles").insert({
+          owner_user_id: created.user.id,
+          legal_name: legalName,
+          entity_type: entityType,
+          incorporation_country: String(incorporationCountry).slice(0, 2).toUpperCase(),
+          incorporation_region: typeof business.state === "string" ? business.state.trim() || null : null,
+          registration_number:
+            typeof business.registration_number === "string"
+              ? business.registration_number.trim() || null
+              : null,
+          tax_id: typeof business.tax_id === "string" ? business.tax_id.trim() || null : null,
+          industry: typeof business.industry === "string" ? business.industry.trim() || null : null,
+          website: typeof business.website === "string" ? business.website.trim() || null : null,
+          business_phone:
+            typeof business.business_phone === "string"
+              ? business.business_phone.trim() || null
+              : null,
+          business_email:
+            typeof business.business_email === "string"
+              ? business.business_email.trim() || email
+              : email,
+          street_address: typeof business.street === "string" ? business.street.trim() || null : null,
+          city: typeof business.city === "string" ? business.city.trim() || null : null,
+          state_province: typeof business.state === "string" ? business.state.trim() || null : null,
+          postal_code:
+            typeof business.postal_code === "string" ? business.postal_code.trim() || null : null,
+          address_country: String(incorporationCountry).slice(0, 2).toUpperCase(),
+          kyb_status: "in_progress",
+          current_step: "details",
+        });
+        if (bizErr) {
+          console.warn("[send-signup-confirmation] business_profiles insert:", bizErr.message);
         }
       }
     }

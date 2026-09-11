@@ -21,6 +21,17 @@ import { passwordPolicyMessage, PASSWORD_MIN_LENGTH } from "@/lib/passwordPolicy
 const isSafeRedirect = (path: string | null): path is string =>
   !!path && path.startsWith("/") && !path.startsWith("//");
 
+const BUSINESS_ENTITY_TYPES: { value: string; label: string }[] = [
+  { value: "corporation", label: "Corporation" },
+  { value: "llc", label: "Limited liability company" },
+  { value: "sole_proprietorship", label: "Sole proprietorship" },
+  { value: "partnership", label: "Partnership" },
+  { value: "cooperative", label: "Cooperative" },
+  { value: "ngo", label: "Non-profit / NGO" },
+  { value: "trust", label: "Trust" },
+  { value: "other", label: "Other" },
+];
+
 const Auth = () => {
   const [params] = useSearchParams();
   const modeParam = params.get("mode");
@@ -51,6 +62,12 @@ const Auth = () => {
   const [dob, setDob] = useState("");
   const [occupation, setOccupation] = useState("");
   const [nationality, setNationality] = useState("");
+  const [businessName, setBusinessName] = useState("");
+  const [entityType, setEntityType] = useState("");
+  const [registrationNumber, setRegistrationNumber] = useState("");
+  const [taxId, setTaxId] = useState("");
+  const [industry, setIndustry] = useState("");
+  const [website, setWebsite] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [signedUpEmail, setSignedUpEmail] = useState<string | null>(null);
@@ -102,11 +119,29 @@ const Auth = () => {
           toast.error(emailCheckMessage ?? "Please enter a valid email address.");
           return;
         }
+        const isBusiness = accountType === "business";
         if (!streetAddress.trim() || !city.trim() || !country) {
-          toast.error("Please complete your address.");
+          toast.error(isBusiness ? "Please complete the corporate address." : "Please complete your address.");
           return;
         }
-        if (!phone.trim() || !dob || !nationality) {
+        if (isBusiness) {
+          if (!businessName.trim()) {
+            toast.error("Business name is required.");
+            return;
+          }
+          if (!firstName.trim() || !lastName.trim()) {
+            toast.error("Contact person first and last name are required.");
+            return;
+          }
+          if (!phone.trim()) {
+            toast.error("Business phone is required.");
+            return;
+          }
+          if (!registrationNumber.trim() || !entityType) {
+            toast.error("Business number and entity type are required.");
+            return;
+          }
+        } else if (!phone.trim() || !dob || !nationality) {
           toast.error("Phone, date of birth, and nationality are required.");
           return;
         }
@@ -123,10 +158,20 @@ const Auth = () => {
             postalCode: postalCode.trim(),
             countryCode: country,
             phone: phone.trim(),
-            dateOfBirth: dob,
-            occupation: occupation.trim(),
-            nationality,
-          }
+            dateOfBirth: isBusiness ? undefined : dob,
+            occupation: isBusiness ? undefined : occupation.trim(),
+            nationality: isBusiness ? undefined : nationality,
+          },
+          isBusiness
+            ? {
+                legalName: businessName.trim(),
+                registrationNumber: registrationNumber.trim(),
+                entityType,
+                taxId: taxId.trim() || undefined,
+                industry: industry.trim() || undefined,
+                website: website.trim() || undefined,
+              }
+            : undefined,
         );
         if (error) toast.error(error.message);
         else {
@@ -340,7 +385,7 @@ const Auth = () => {
                 : isSignUp
                   ? accountType
                     ? accountType === "business"
-                      ? "First, create your login — you'll add your company details next."
+                      ? "Enter the company, the person we should contact, and your corporate address."
                       : "Just a few details to get started."
                     : "First, who is this account for?"
                   : "Sign in to access your wallets."}
@@ -373,7 +418,7 @@ const Auth = () => {
                 </span>
                 <span className="min-w-0">
                   <span className="block font-bold text-neutral-900">Corporate / Business</span>
-                  <span className="block text-sm text-neutral-600">For a registered company — verified with business documents and ownership (KYB).</span>
+                  <span className="block text-sm text-neutral-600">For a registered company — add the business name, contact person, business number, and corporate address.</span>
                 </span>
                 <ArrowRight className="ml-auto mt-1 h-5 w-5 shrink-0 text-neutral-300" />
               </button>
@@ -409,33 +454,54 @@ const Auth = () => {
           />
 
           <form onSubmit={handleSubmit} className="space-y-5">
+            {isSignUp && accountType === "business" && (
+              <div className="space-y-2">
+                <Label htmlFor="businessName" className="text-neutral-700 font-medium">Business name</Label>
+                <Input
+                  id="businessName"
+                  type="text"
+                  placeholder="As shown on your registration documents"
+                  value={businessName}
+                  onChange={(e) => setBusinessName(e.target.value)}
+                  className="h-12 bg-white border-neutral-200 focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20"
+                  autoComplete="organization"
+                  required
+                />
+              </div>
+            )}
+
             {isSignUp && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="firstName" className="text-neutral-700 font-medium">First name</Label>
-                  <Input
-                    id="firstName"
-                    type="text"
-                    placeholder="John"
-                    value={firstName}
-                    onChange={(e) => setFirstName(e.target.value)}
-                    className="h-12 bg-white border-neutral-200 focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20"
-                    autoComplete="given-name"
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="lastName" className="text-neutral-700 font-medium">Last name</Label>
-                  <Input
-                    id="lastName"
-                    type="text"
-                    placeholder="Doe"
-                    value={lastName}
-                    onChange={(e) => setLastName(e.target.value)}
-                    className="h-12 bg-white border-neutral-200 focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20"
-                    autoComplete="family-name"
-                    required
-                  />
+              <div className={accountType === "business" ? "space-y-4 rounded-2xl border border-neutral-200 bg-neutral-50/60 p-4" : undefined}>
+                {accountType === "business" && (
+                  <p className="text-sm font-medium text-neutral-700">Contact person</p>
+                )}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="firstName" className="text-neutral-700 font-medium">First name</Label>
+                    <Input
+                      id="firstName"
+                      type="text"
+                      placeholder="Sam"
+                      value={firstName}
+                      onChange={(e) => setFirstName(e.target.value)}
+                      className="h-12 bg-white border-neutral-200 focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20"
+                      autoComplete="given-name"
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="lastName" className="text-neutral-700 font-medium">Last name</Label>
+                    <Input
+                      id="lastName"
+                      type="text"
+                      placeholder="Adewale"
+                      value={lastName}
+                      onChange={(e) => setLastName(e.target.value)}
+                      className="h-12 bg-white border-neutral-200 focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20"
+                      autoComplete="family-name"
+                      required
+                    />
+                  </div>
                 </div>
               </div>
             )}
@@ -500,7 +566,7 @@ const Auth = () => {
               <div className="space-y-4 rounded-2xl border border-neutral-200 bg-neutral-50/60 p-4">
                 <div className="flex items-center gap-2 text-sm font-medium text-neutral-700">
                   <MapPin className="h-4 w-4 text-primary" />
-                  Address
+                  {accountType === "business" ? "Corporate address" : "Address"}
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="streetAddress" className="text-neutral-700 font-medium">Street address</Label>
@@ -515,7 +581,7 @@ const Auth = () => {
                       setPostalCode(place.postalCode);
                       if (place.countryCode) setCountry(place.countryCode);
                     }}
-                    placeholder="Start typing your address…"
+                    placeholder={accountType === "business" ? "Start typing the registered office address…" : "Start typing your address…"}
                     autoComplete="address-line1"
                     required
                   />
@@ -570,6 +636,95 @@ const Auth = () => {
                   </div>
                 </div>
 
+                {accountType === "business" ? (
+                  <>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="registrationNumber" className="text-neutral-700 font-medium">Business number</Label>
+                        <Input
+                          id="registrationNumber"
+                          type="text"
+                          placeholder={country === "NG" ? "RC number" : "Business number / BN"}
+                          value={registrationNumber}
+                          onChange={(e) => setRegistrationNumber(e.target.value)}
+                          className="h-12 bg-white border-neutral-200 focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20"
+                          autoComplete="off"
+                          required
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="entityType" className="text-neutral-700 font-medium">Entity type</Label>
+                        <Select value={entityType} onValueChange={setEntityType}>
+                          <SelectTrigger id="entityType" className="h-12 bg-white border-neutral-200">
+                            <SelectValue placeholder="Select type" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {BUSINESS_ENTITY_TYPES.map((t) => (
+                              <SelectItem key={t.value} value={t.value}>
+                                {t.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="taxId" className="text-neutral-700 font-medium">
+                          {country === "NG" ? "TIN" : "GST / HST or tax ID"}
+                        </Label>
+                        <Input
+                          id="taxId"
+                          type="text"
+                          placeholder={country === "NG" ? "Tax identification number" : "Optional"}
+                          value={taxId}
+                          onChange={(e) => setTaxId(e.target.value)}
+                          className="h-12 bg-white border-neutral-200 focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20"
+                          autoComplete="off"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="phone" className="text-neutral-700 font-medium">Business phone</Label>
+                        <Input
+                          id="phone"
+                          type="tel"
+                          placeholder="+14165550123"
+                          value={phone}
+                          onChange={(e) => setPhone(e.target.value)}
+                          className="h-12 bg-white border-neutral-200 focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20"
+                          autoComplete="tel"
+                          required
+                        />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="industry" className="text-neutral-700 font-medium">Industry</Label>
+                        <Input
+                          id="industry"
+                          type="text"
+                          placeholder="e.g. Accounting, import & export"
+                          value={industry}
+                          onChange={(e) => setIndustry(e.target.value)}
+                          className="h-12 bg-white border-neutral-200 focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20"
+                          autoComplete="organization-title"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="website" className="text-neutral-700 font-medium">Website</Label>
+                        <Input
+                          id="website"
+                          type="text"
+                          placeholder="https://"
+                          value={website}
+                          onChange={(e) => setWebsite(e.target.value)}
+                          className="h-12 bg-white border-neutral-200 focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20"
+                          autoComplete="url"
+                        />
+                      </div>
+                    </div>
+                  </>
+                ) : (
                 <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="phone" className="text-neutral-700 font-medium">Phone number</Label>
@@ -618,6 +773,7 @@ const Auth = () => {
                     />
                   </div>
                 </div>
+                )}
               </div>
             )}
 
@@ -730,6 +886,12 @@ const Auth = () => {
                 setDob("");
                 setOccupation("");
                 setNationality("");
+                setBusinessName("");
+                setEntityType("");
+                setRegistrationNumber("");
+                setTaxId("");
+                setIndustry("");
+                setWebsite("");
                 setEmailCheck("idle");
                 setEmailCheckMessage(null);
                 setEmailSuggestion(null);

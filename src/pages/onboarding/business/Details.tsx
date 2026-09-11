@@ -27,6 +27,9 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { cn } from "@/lib/utils";
 import { ISO_COUNTRIES, findIsoCountry } from "@/lib/isoCountries";
 import { useKyb, BusinessEntityType } from "@/hooks/useKyb";
+import { useAuth } from "@/hooks/useAuth";
+import { useProfile } from "@/hooks/useProfile";
+import { supabase } from "@/integrations/supabase/client";
 
 const ENTITY_TYPES: { value: BusinessEntityType; label: string }[] = [
   { value: "sole_proprietorship", label: "Sole proprietorship" },
@@ -43,11 +46,23 @@ const ENTITY_TYPES: { value: BusinessEntityType; label: string }[] = [
 // All countries are shown for search, but only these can be submitted.
 const SUPPORTED_COUNTRY_CODES = new Set(["CA", "NG"]);
 
+const splitFullName = (full: string | null | undefined) => {
+  const parts = (full ?? "").trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return { first: "", last: "" };
+  if (parts.length === 1) return { first: parts[0], last: "" };
+  return { first: parts[0], last: parts.slice(1).join(" ") };
+};
+
 const Details = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const { data: profile } = useProfile();
   const { business, saveBusiness, isLoading } = useKyb();
 
   const [countryOpen, setCountryOpen] = useState(false);
+
+  const [contactFirst, setContactFirst] = useState("");
+  const [contactLast, setContactLast] = useState("");
 
   const [form, setForm] = useState({
     legal_name: "",
@@ -96,6 +111,18 @@ const Details = () => {
     }));
   }, [business]);
 
+  useEffect(() => {
+    const meta = user?.user_metadata as
+      | { first_name?: string; last_name?: string; full_name?: string }
+      | undefined;
+    const fromMeta = splitFullName(
+      [meta?.first_name, meta?.last_name].filter(Boolean).join(" ") || meta?.full_name || "",
+    );
+    const fromProfile = splitFullName(profile?.full_name);
+    setContactFirst((f) => f || fromProfile.first || fromMeta.first);
+    setContactLast((l) => l || fromProfile.last || fromMeta.last);
+  }, [profile?.full_name, user?.user_metadata]);
+
   const set = (key: keyof typeof form) => (value: string) =>
     setForm((f) => ({ ...f, [key]: value }));
 
@@ -113,8 +140,18 @@ const Details = () => {
       return toast.error("Business onboarding isn't available in this country yet.");
     if (!form.registration_number.trim())
       return toast.error("Business registration number is required.");
+    if (!contactFirst.trim() || !contactLast.trim())
+      return toast.error("Contact person first and last name are required.");
 
     try {
+      const contactName = `${contactFirst.trim()} ${contactLast.trim()}`.trim();
+      if (user?.id) {
+        const { error: profileErr } = await supabase
+          .from("profiles")
+          .update({ full_name: contactName })
+          .eq("user_id", user.id);
+        if (profileErr) console.warn("contact person profile update:", profileErr.message);
+      }
       await saveBusiness.mutateAsync({
         legal_name: form.legal_name.trim(),
         operating_name: form.operating_name.trim() || null,
@@ -151,6 +188,33 @@ const Details = () => {
       title="Tell us about your business"
       subtitle="This must match your registration documents exactly."
     >
+      <Card className="p-6 space-y-4">
+        <h3 className="font-semibold text-foreground">Contact person</h3>
+        <p className="text-sm text-muted-foreground">
+          The person we'll reach for this company account — typically a director or signing officer.
+        </p>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-2">
+            <Label htmlFor="contact_first">First name *</Label>
+            <Input
+              id="contact_first"
+              value={contactFirst}
+              onChange={(e) => setContactFirst(e.target.value)}
+              autoComplete="given-name"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="contact_last">Last name *</Label>
+            <Input
+              id="contact_last"
+              value={contactLast}
+              onChange={(e) => setContactLast(e.target.value)}
+              autoComplete="family-name"
+            />
+          </div>
+        </div>
+      </Card>
+
       <Card className="p-6 space-y-4">
         <div className="space-y-2">
           <Label htmlFor="legal_name">Legal business name *</Label>

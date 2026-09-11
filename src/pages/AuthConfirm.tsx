@@ -110,16 +110,22 @@ const AuthConfirm = () => {
         }
 
         // Route new signups by the account type chosen at registration.
-        // Falls back to the account-type picker if metadata is missing.
+        // Business accounts skip the personal KYC picker and go straight
+        // to company details — even if an older confirmation email still
+        // pointed at /onboarding/account-type.
         let finalTarget = target;
         let confirmedUser: { id: string; email?: string | null; user_metadata?: Record<string, unknown> } | null = null;
-        if (otpType === "signup" && (!nextParam || nextParam === "/")) {
+        if (otpType === "signup") {
           try {
             const { data } = await supabase.auth.getUser();
             confirmedUser = data.user;
             const at = (data.user?.user_metadata as { account_type?: string } | undefined)?.account_type;
-            if (at === "business") finalTarget = "/onboarding/business/details";
-            else if (at === "individual") finalTarget = "/onboarding/identity";
+            const nextIsGeneric =
+              !nextParam ||
+              nextParam === "/" ||
+              nextParam === "/onboarding/account-type";
+            if (at === "business" && nextIsGeneric) finalTarget = "/onboarding/business/details";
+            else if (at === "individual" && nextIsGeneric) finalTarget = "/onboarding/identity";
           } catch {
             /* keep default target */
           }

@@ -3,6 +3,27 @@ import { supabase } from '@/integrations/supabase/client';
 import { User, Session } from '@supabase/supabase-js';
 import { identifyUser, resetAnalytics, track } from '@/lib/analytics';
 
+interface SignupAddress {
+  street: string;
+  city: string;
+  state: string;
+  postalCode: string;
+  countryCode: string;
+  phone?: string;
+  dateOfBirth?: string;
+  occupation?: string;
+  nationality?: string;
+}
+
+interface SignupBusiness {
+  legalName: string;
+  registrationNumber: string;
+  entityType: string;
+  taxId?: string;
+  industry?: string;
+  website?: string;
+}
+
 interface AuthContextType {
   user: User | null;
   session: Session | null;
@@ -15,17 +36,8 @@ interface AuthContextType {
     firstName: string,
     lastName: string,
     accountType?: string,
-    address?: {
-      street: string;
-      city: string;
-      state: string;
-      postalCode: string;
-      countryCode: string;
-      phone?: string;
-      dateOfBirth?: string;
-      occupation?: string;
-      nationality?: string;
-    }
+    address?: SignupAddress,
+    business?: SignupBusiness,
   ) => Promise<{ error: Error | null }>;
   signIn: (email: string, password: string, p_kind?: "admin" | "customer") => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
@@ -114,19 +126,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     firstName: string,
     lastName: string,
     accountType?: string,
-    address?: {
-      street: string;
-      city: string;
-      state: string;
-      postalCode: string;
-      countryCode: string;
-      phone?: string;
-      dateOfBirth?: string;
-      occupation?: string;
-      nationality?: string;
-    }
+    address?: SignupAddress,
+    business?: SignupBusiness,
   ) => {
     const fullName = `${firstName} ${lastName}`.trim();
+    const isBusiness = accountType === "business";
     try {
       // Create the user + send the branded confirmation email via our
       // Edge Function (replaces the stock Supabase confirmation email).
@@ -141,7 +145,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           last_name: lastName,
           name: fullName,
           country: address?.countryCode ?? null,
-          account_type: accountType === "business" ? "business" : "individual",
+          account_type: isBusiness ? "business" : "individual",
           profile: address
             ? {
                 street: address.street,
@@ -150,12 +154,29 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 postal_code: address.postalCode,
                 country_code: address.countryCode,
                 phone: address.phone,
-                date_of_birth: address.dateOfBirth,
-                occupation: address.occupation,
-                nationality: address.nationality,
+                date_of_birth: isBusiness ? undefined : address.dateOfBirth,
+                occupation: isBusiness ? undefined : address.occupation,
+                nationality: isBusiness ? undefined : address.nationality,
               }
             : undefined,
-          redirect_to: "/onboarding/account-type",
+          business: isBusiness && business
+            ? {
+                legal_name: business.legalName,
+                registration_number: business.registrationNumber,
+                entity_type: business.entityType,
+                tax_id: business.taxId ?? null,
+                industry: business.industry ?? null,
+                website: business.website ?? null,
+                business_phone: address?.phone ?? null,
+                business_email: email,
+                street: address?.street ?? null,
+                city: address?.city ?? null,
+                state: address?.state ?? null,
+                postal_code: address?.postalCode ?? null,
+                country_code: address?.countryCode ?? null,
+              }
+            : undefined,
+          redirect_to: isBusiness ? "/onboarding/business/details" : "/onboarding/identity",
         },
       });
 
