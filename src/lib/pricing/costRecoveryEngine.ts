@@ -18,14 +18,12 @@ import type {
 import {
   CUSTOMER_CORRIDOR_RATES,
   DEFAULT_TRANSFER_FEE_PCT,
-  PAYOUT_MINIMUMS,
   STABLECOIN_PEGS,
-  VOLUME_DISCOUNT_TIERS,
   WALLET_RATES,
-  allStartingRateCards,
   normalizeCurrency,
   payoutMethodFromInput,
 } from "./rateCard.ts";
+import { getActiveRateCards, getPayoutMins, getVolumeTiers } from "./workbookStore.ts";
 
 const r2 = (n: number) => Math.round((Number(n) || 0) * 100) / 100;
 const r6 = (n: number) => Math.round((Number(n) || 0) * 1_000_000) / 1_000_000;
@@ -39,14 +37,15 @@ export function customerRateFromMid(midMarketRate: number, fxSpread: number): nu
 
 export function resolveVolumeTier(monthlyVolume = 0) {
   const volume = Math.max(0, Number(monthlyVolume) || 0);
+  const tiers = getVolumeTiers();
   const tier =
-    [...VOLUME_DISCOUNT_TIERS].reverse().find((t) => volume >= t.min_monthly_volume) ??
-    VOLUME_DISCOUNT_TIERS[0];
+    [...tiers].reverse().find((t) => volume >= t.min_monthly_volume) ??
+    tiers[0];
   return tier;
 }
 
 export function findPayoutMinimum(method: string, feeCurrency = "CAD"): number {
-  const row = PAYOUT_MINIMUMS.find((p) => p.payout_method === method);
+  const row = getPayoutMins().find((p) => p.payout_method === method);
   if (!row) return 0;
   return row.fee_currency === feeCurrency ? row.minimum_fee : row.minimum_fee;
 }
@@ -77,7 +76,7 @@ function scoreCard(
 
 export function resolveCorridorRate(
   input: Pick<QuoteInput, "sourceCurrency" | "destinationCurrency" | "payoutMethod" | "partner" | "channel">,
-  cards: CorridorRateCard[] = allStartingRateCards(),
+  cards: CorridorRateCard[] = getActiveRateCards(),
 ): CorridorRateCard | null {
   const source = normalizeCurrency(input.sourceCurrency);
   const dest = normalizeCurrency(input.destinationCurrency);
@@ -163,7 +162,7 @@ function isBusinessSegment(segment: string | null | undefined): boolean {
 
 export function quoteTransfer(
   input: QuoteInput,
-  cards: CorridorRateCard[] = allStartingRateCards(),
+  cards: CorridorRateCard[] = getActiveRateCards(),
 ): TransferQuote {
   const source = normalizeCurrency(input.sourceCurrency);
   const dest = normalizeCurrency(input.destinationCurrency);
