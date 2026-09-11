@@ -7,6 +7,7 @@ import TopScrollSync from "@/components/admin-portal/TopScrollSync";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import SectionBoundary from "@/components/common/SectionBoundary";
 import PartnerNetworkPanel from "@/components/settings/PartnerNetworkPanel";
+import PricingRatesPanel from "@/components/settings/PricingRatesPanel";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
@@ -70,7 +71,12 @@ const EMPTY: NewPricingRule = {
 
 export default function PricingPage() {
   const [params, setParams] = useSearchParams();
-  const tab = params.get("tab") === "rate-card" ? "rate-card" : "partners";
+  const tab =
+    params.get("tab") === "rate-card"
+      ? "rate-card"
+      : params.get("tab") === "pricing-rates"
+        ? "pricing-rates"
+        : "partners";
 
   return (
     <div className="max-w-[1400px] mx-auto space-y-4">
@@ -85,10 +91,14 @@ export default function PricingPage() {
       >
         <div className="overflow-x-auto pb-2">
           <TabsList className="inline-flex w-auto">
-            <TabsTrigger value="rate-card">Rate card</TabsTrigger>
+            <TabsTrigger value="pricing-rates">Pricing & Rates</TabsTrigger>
+            <TabsTrigger value="rate-card">Legacy rate card</TabsTrigger>
             <TabsTrigger value="partners">Partners & Routing</TabsTrigger>
           </TabsList>
         </div>
+        <TabsContent value="pricing-rates">
+          <SectionBoundary name="PricingRatesPanel"><PricingRatesPanel /></SectionBoundary>
+        </TabsContent>
         <TabsContent value="rate-card">
           <RateCardPanel />
         </TabsContent>

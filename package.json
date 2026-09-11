@@ -11,7 +11,9 @@
     "lint": "eslint .",
     "typecheck": "tsc -b tsconfig.app.json",
     "preview": "vite preview",
-    "export-nav-icons": "node scripts/export-nav-icons.mjs"
+    "export-nav-icons": "node scripts/export-nav-icons.mjs",
+    "export:rate-card": "node --experimental-strip-types scripts/export-efinmoney-rate-card.ts",
+    "test:pricing": "node --experimental-strip-types scripts/verify-cost-recovery.ts"
   },
   "dependencies": {
     "@adyen/adyen-web": "^6.39.0",

@@ -10,6 +10,7 @@ import { useWallets } from '@/hooks/useWallets';
 import { useFxRates } from '@/hooks/useFxRates';
 import { useWalletTransfer } from '@/hooks/useWalletTransfer';
 import { computeTransferQuote } from '@/lib/walletTransfer';
+import TransferSummary from '@/components/pricing/TransferSummary';
 import { CurrencyFlag } from '@/components/ui/FlagImage';
 import { toast } from 'sonner';
 
@@ -58,7 +59,7 @@ export default function WalletTransferModal({ children, defaultFromWalletId }: P
     () =>
       fromWallet && toWallet
         ? computeTransferQuote(parsedAmount, fromWallet.currency_code, toWallet.currency_code, fxRates)
-        : { fee: 0, receive: 0, effective_rate: null, fee_rate: 0 },
+        : computeTransferQuote(0, "CAD", "CAD", fxRates),
     [parsedAmount, fromWallet, toWallet, fxRates],
   );
 
@@ -197,32 +198,7 @@ export default function WalletTransferModal({ children, defaultFromWalletId }: P
             </div>
 
             {parsedAmount > 0 && quote.effective_rate != null && toWallet ? (
-              <div className="rounded-lg border bg-muted/40 p-3 space-y-1.5 text-sm">
-                {!sameCurrency && (
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Rate</span>
-                    <span>
-                      1 {fromWallet?.currency_code} = {quote.effective_rate.toFixed(4)} {toWallet.currency_code}
-                    </span>
-                  </div>
-                )}
-                {quote.fee > 0 && (
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Fee (0.5%)</span>
-                    <span>
-                      {fromWallet?.symbol}
-                      {quote.fee.toFixed(2)}
-                    </span>
-                  </div>
-                )}
-                <div className="flex justify-between font-medium pt-1 border-t">
-                  <span>You receive</span>
-                  <span className="text-primary">
-                    {toWallet.symbol}
-                    {quote.receive.toFixed(2)}
-                  </span>
-                </div>
-              </div>
+              <TransferSummary quote={quote.quote} compact />
             ) : parsedAmount > 0 && quote.effective_rate == null ? (
               <p className="text-sm text-destructive">No exchange rate for this pair.</p>
             ) : null}

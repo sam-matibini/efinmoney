@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 import { resolveEffectiveRate } from "../_shared/fxRatesCore.ts";
+import { quoteTransfer } from "../_shared/pricing/costRecoveryEngine.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -28,11 +29,27 @@ function isValidCurrencyCode(str: unknown): str is string {
 }
 
 function isValidAmount(amount: unknown): amount is number {
-  return typeof amount === 'number' && 
-         !isNaN(amount) && 
-         isFinite(amount) && 
-         amount >= MIN_AMOUNT && 
+  return typeof amount === 'number' &&
+         !isNaN(amount) &&
+         isFinite(amount) &&
+         amount >= MIN_AMOUNT &&
          amount <= MAX_AMOUNT;
+}
+
+function priceWalletSwap(
+  from_currency: string,
+  to_currency: string,
+  amount: number,
+  midMarketRate: number,
+) {
+  return quoteTransfer({
+    sourceCurrency: from_currency,
+    destinationCurrency: to_currency,
+    amount,
+    channel: "wallet",
+    payoutMethod: "WALLET_TO_WALLET",
+    midMarketRate,
+  });
 }
 
 interface FxQuoteRequest {
@@ -379,15 +396,19 @@ serve(async (req) => {
         );
       }
 
-      const fee = amount * resolved.fee_rate;
-      const toAmount = (amount - fee) * resolved.effective_rate;
+      const mid = resolved.market_rate > 0 ? resolved.market_rate : resolved.effective_rate;
+      const priced = priceWalletSwap(from_currency, to_currency, amount, mid);
+      const fee = priced.transferFee;
+      const effectiveRate = priced.customerRate ?? resolved.effective_rate;
+      const toAmount = (amount - fee) * effectiveRate;
 
       return new Response(
         JSON.stringify({
           from_currency, to_currency, from_amount: amount, to_amount: toAmount,
-          market_rate: resolved.market_rate,
-          markup_rate: resolved.markup_rate,
-          effective_rate: resolved.effective_rate, fee_amount: fee,
+          market_rate: mid,
+          markup_rate: priced.fxSpread,
+          effective_rate: effectiveRate, fee_amount: fee,
+          fx_margin: priced.fxMargin,
           rate_locked_until: new Date(Date.now() + 60000).toISOString(),
           expires_in_seconds: 60
         }),
@@ -483,8 +504,10 @@ serve(async (req) => {
         );
       }
 
-      const effectiveRate = resolved.effective_rate;
-      const fee = from_amount * resolved.fee_rate;
+      const mid = resolved.market_rate > 0 ? resolved.market_rate : resolved.effective_rate;
+      const priced = priceWalletSwap(from_currency, to_currency, from_amount, mid);
+      const fee = priced.transferFee;
+      const effectiveRate = priced.customerRate ?? resolved.effective_rate;
       const toAmount = (from_amount - fee) * effectiveRate;
 
       await Promise.all([

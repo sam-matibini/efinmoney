@@ -12,6 +12,8 @@ import { resolveEffectiveRate } from "@/lib/fx";
 import { fxQuoteLabel, type QuoteConvention } from "@/lib/fxQuote";
 import { getFlovideOrNombaRate, isNgnPair } from "@/lib/flovide";
 import { executeWalletFxSwap } from "@/lib/walletTransfer";
+import { quoteTransfer } from "@/lib/pricing/costRecoveryEngine";
+import TransferSummary from "@/components/pricing/TransferSummary";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 
@@ -84,21 +86,28 @@ const ExchangeModal = ({ children }: ExchangeModalProps) => {
   const dbRate = fromCode && toCode
     ? resolveEffectiveRate(fromCode, toCode, fxRates ?? [])
     : null;
-  const effectiveRate = dbRate && dbRate > 0
+  const midMarketRate = dbRate && dbRate > 0
     ? dbRate
     : (nombaQuote?.effective_rate && nombaQuote.effective_rate > 0
       ? nombaQuote.effective_rate
-      : 1);
+      : (fromCode && toCode && fromCode === toCode ? 1 : null));
+  const pricedQuote = quoteTransfer({
+    sourceCurrency: fromCode,
+    destinationCurrency: toCode,
+    amount: parseFloat(amount) > 0 ? parseFloat(amount) : 0,
+    channel: "wallet",
+    payoutMethod: "WALLET_TO_WALLET",
+    midMarketRate: midMarketRate,
+  });
+  const effectiveRate = pricedQuote.customerRate ?? (midMarketRate ?? 1);
   const rateFromNomba = !(dbRate && dbRate > 0) && !!nombaQuote?.effective_rate;
   const rateQuote = useMemo(
-    () => fxQuoteLabel(fromCode, toCode, effectiveRate, quoteConvention),
-    [fromCode, toCode, effectiveRate, quoteConvention],
+    () => fxQuoteLabel(fromCode, toCode, pricedQuote.customerRate ?? effectiveRate, quoteConvention),
+    [fromCode, toCode, pricedQuote.customerRate, effectiveRate, quoteConvention],
   );
 
-  const fee = parseFloat(amount) > 0 ? parseFloat(amount) * 0.005 : 0;
-  const receivedAmount = parseFloat(amount) > 0 
-    ? (parseFloat(amount) - fee) * effectiveRate 
-    : 0;
+  const fee = pricedQuote.transferFee;
+  const receivedAmount = pricedQuote.youReceive ?? 0;
 
   const formatNumber = (num: number, decimals = 2) => {
     return new Intl.NumberFormat('en-US', {
@@ -327,24 +336,13 @@ const ExchangeModal = ({ children }: ExchangeModalProps) => {
                           Direct
                         </button>
                       </span>
-                      <span className="tabular-nums">
-                        {rateQuote.label}
-                        {rateFromNomba && (
-                          <span className="ml-2 text-[10px] uppercase tracking-wide text-emerald-600 font-semibold">Live</span>
-                        )}
-                      </span>
                     </span>
                   </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Fee (0.5%)</span>
-                    <span className="text-foreground">{fromWallet?.symbol}{formatNumber(fee)}</span>
-                  </div>
-                  <div className="flex justify-between text-sm pt-2 border-t border-border">
-                    <span className="text-muted-foreground">You receive</span>
-                    <span className="text-primary font-semibold min-w-0 truncate text-right">
-                      {toWallet?.symbol}{formatNumber(receivedAmount)}
-                    </span>
-                  </div>
+                  <TransferSummary
+                    quote={pricedQuote}
+                    rateLabel={`${rateQuote.label}${rateFromNomba ? " · Live" : ""}`}
+                    compact
+                  />
                 </div>
               )}
 

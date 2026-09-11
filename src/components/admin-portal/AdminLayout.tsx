@@ -51,6 +51,7 @@ const NAV_GROUPS: NavGroup[] = [
       { to: "/admin/nomba-fincra", label: "Nomba & Fincra", icon: CreditCard },
       { to: "/admin/pricing?tab=partners", label: "Corridor rails", icon: Route },
       { to: "/admin/ops-queue", label: "Ops queue", icon: Scale },
+      { to: "/admin/pricing?tab=pricing-rates", label: "Pricing & Rates", icon: Tags },
       { to: "/admin/pricing?tab=rate-card", label: "Rate card", icon: Tags },
       { to: "/admin/api", label: "Payment APIs", icon: Settings },
     ],

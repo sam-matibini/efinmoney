@@ -1,6 +1,7 @@
 import { motion } from "framer-motion";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PricingSettingsPanel } from "@/components/settings/PricingSettingsPanel";
+import PricingRatesPanel from "@/components/settings/PricingRatesPanel";
 import { ModuleAccessPanel } from "@/components/settings/ModuleAccessPanel";
 import { SystemSettingsPanel } from "@/components/settings/SystemSettingsPanel";
 import { IntegrationsPanel } from "@/components/settings/IntegrationsPanel";
@@ -38,7 +39,8 @@ const SettingsDashboard = () => {
           <Tabs defaultValue="pricing" className="space-y-4">
             <div className="overflow-x-auto pb-2">
               <TabsList className="inline-flex w-auto min-w-full lg:min-w-0">
-                <TabsTrigger value="pricing">Pricing & Fees</TabsTrigger>
+                <TabsTrigger value="pricing">Pricing & Rates</TabsTrigger>
+                <TabsTrigger value="legacy-fees">Legacy fees</TabsTrigger>
                 <TabsTrigger value="currencies">Currencies</TabsTrigger>
                 <TabsTrigger value="modules">Module Access</TabsTrigger>
                 <TabsTrigger value="integrations">Integrations</TabsTrigger>
@@ -48,6 +50,10 @@ const SettingsDashboard = () => {
             </div>
 
             <TabsContent value="pricing" className="space-y-4">
+              <SectionBoundary name="PricingRatesPanel"><PricingRatesPanel /></SectionBoundary>
+            </TabsContent>
+
+            <TabsContent value="legacy-fees" className="space-y-4">
               <SectionBoundary name="PricingSettingsPanel"><PricingSettingsPanel /></SectionBoundary>
             </TabsContent>
 

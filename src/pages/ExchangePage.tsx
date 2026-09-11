@@ -21,8 +21,9 @@ import FeatureGate from "@/components/common/FeatureGate";
 import PageHeroBanner from "@/components/common/PageHeroBanner";
 import AppPage from "@/components/layout/AppPage";
 import { productFeatures } from "@/lib/productFeatures";
+import TransferSummary from "@/components/pricing/TransferSummary";
+import { invertSendAmount, quoteTransfer } from "@/lib/pricing/costRecoveryEngine";
 
-const FEE_RATE = 0.005;
 const MIN_AMOUNT = 0.01;
 const MAX_AMOUNT = 1_000_000;
 
@@ -114,9 +115,8 @@ const FxTradingPanel = () => {
     staleTime: 60_000,
   });
 
-  const effectiveRate = useMemo(() => {
+  const midMarketRate = useMemo(() => {
     if (!fromCode || !toCode) return null;
-    // Mid-market fx_rates first so corridors stay consistent with each other.
     const db = resolveEffectiveRate(fromCode, toCode, fxRates ?? []);
     if (db && db > 0) return db;
     if (nombaQuote?.effective_rate && nombaQuote.effective_rate > 0) {
@@ -124,6 +124,22 @@ const FxTradingPanel = () => {
     }
     return null;
   }, [fromCode, toCode, fxRates, nombaQuote?.effective_rate]);
+
+  const parsedSend = parseAmt(sendAmount);
+  const parsedRecv = parseAmt(recvAmount);
+  const pricedQuote = useMemo(
+    () =>
+      quoteTransfer({
+        sourceCurrency: fromCode,
+        destinationCurrency: toCode,
+        amount: parsedSend,
+        channel: "wallet",
+        payoutMethod: "WALLET_TO_WALLET",
+        midMarketRate: midMarketRate,
+      }),
+    [fromCode, toCode, parsedSend, midMarketRate],
+  );
+  const effectiveRate = pricedQuote.customerRate;
   const rateFromNomba = useMemo(() => {
     if (!fromCode || !toCode) return false;
     const db = resolveEffectiveRate(fromCode, toCode, fxRates ?? []);
@@ -133,18 +149,33 @@ const FxTradingPanel = () => {
 
   const quoteReceive = useCallback(
     (send: number) => {
-      if (!effectiveRate || send <= 0) return 0;
-      return (send - send * FEE_RATE) * effectiveRate;
+      if (!midMarketRate || send <= 0) return 0;
+      return (
+        quoteTransfer({
+          sourceCurrency: fromCode,
+          destinationCurrency: toCode,
+          amount: send,
+          channel: "wallet",
+          payoutMethod: "WALLET_TO_WALLET",
+          midMarketRate,
+        }).youReceive ?? 0
+      );
     },
-    [effectiveRate],
+    [fromCode, toCode, midMarketRate],
   );
 
   const quoteSend = useCallback(
     (recv: number) => {
-      if (!effectiveRate || recv <= 0) return 0;
-      return recv / effectiveRate / (1 - FEE_RATE);
+      if (!midMarketRate || recv <= 0) return 0;
+      return invertSendAmount(recv, {
+        sourceCurrency: fromCode,
+        destinationCurrency: toCode,
+        channel: "wallet",
+        payoutMethod: "WALLET_TO_WALLET",
+        midMarketRate,
+      });
     },
-    [effectiveRate],
+    [fromCode, toCode, midMarketRate],
   );
 
   const fmtRecv = (n: number) => n.toFixed(recvDecimals);
@@ -172,10 +203,8 @@ const FxTradingPanel = () => {
     else syncFromRecv(recvAmount);
   }, [effectiveRate, fromWallet?.currency_code, toWallet?.currency_code]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const parsedSend = parseAmt(sendAmount);
-  const parsedRecv = parseAmt(recvAmount);
-  const fee = parsedSend > 0 ? parsedSend * FEE_RATE : 0;
-  const receivedAmount = parsedSend > 0 ? quoteReceive(parsedSend) : parsedRecv;
+  const fee = pricedQuote.transferFee;
+  const receivedAmount = parsedSend > 0 ? (pricedQuote.youReceive ?? 0) : parsedRecv;
 
   const onSendChange = (v: string) => {
     const clean = v.replace(/[^0-9.,]/g, "");
@@ -432,32 +461,15 @@ const FxTradingPanel = () => {
           </div>
 
             {parsedSend > 0 && (
-              <div className="space-y-2 rounded-xl border border-border/60 bg-muted/30 p-4 text-sm">
-              <div className="flex justify-between gap-3">
-                  <span className="text-muted-foreground">{quoteConvention === "direct" ? "Direct quote" : "Indirect quote"}</span>
-                  <span className="font-medium tabular-nums flex min-w-0 items-center justify-end gap-2">
-                  {effectiveRate
-                    ? (
-                      <>
-                        <span className="truncate">{rateQuote?.label}</span>
-                        {rateFromNomba && (
-                          <span className="text-[10px] uppercase tracking-wide text-emerald-600 font-semibold">Live</span>
-                        )}
-                      </>
-                    )
-                    : <span className="text-destructive">Rate unavailable</span>}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Fee (0.5%)</span>
-                  <span className="tabular-nums">{fromWallet?.symbol}{fee.toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between border-t border-border/60 pt-2 font-semibold gap-3">
-                  <span className="shrink-0">You receive</span>
-                  <span className="min-w-0 truncate text-right text-primary tabular-nums">{toWallet?.symbol}{fmtRecv(receivedAmount)}</span>
-              </div>
-            </div>
-          )}
+              <TransferSummary
+                quote={pricedQuote}
+                rateLabel={
+                  effectiveRate
+                    ? `${rateQuote?.label ?? ""}${rateFromNomba ? " · Live" : ""}`
+                    : undefined
+                }
+              />
+            )}
 
           <Button 
               className="h-12 w-full text-base font-semibold shadow-[0_4px_20px_hsl(var(--primary)/0.25)]"

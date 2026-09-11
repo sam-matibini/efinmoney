@@ -1,8 +1,8 @@
 import { resolveEffectiveRate } from "@/lib/fxRatesCore";
 import { supabase } from "@/integrations/supabase/client";
 import { edgeFunctionErrorMessage, invokeEdgeFunction } from "@/lib/invokeEdgeFunction";
-
-export const WALLET_TRANSFER_FEE_RATE = 0.005;
+import { invertSendAmount, quoteTransfer, type TransferQuote } from "@/lib/pricing/costRecoveryEngine";
+import type { RateRow } from "@/lib/fxRatesCore";
 
 export type FxRateRow = {
   from_currency: string;
@@ -12,19 +12,58 @@ export type FxRateRow = {
   effective_rate: number;
 };
 
+function midMarketRows(rates: FxRateRow[] | undefined): RateRow[] {
+  return (rates ?? []).map((r) => ({
+    from_currency: r.from_currency,
+    to_currency: r.to_currency,
+    effective_rate: Number(r.rate) > 0 ? Number(r.rate) : Number(r.effective_rate),
+  }));
+}
+
+export function findMidMarketRate(
+  rates: FxRateRow[] | undefined,
+  from: string,
+  to: string,
+): number | null {
+  if (from === to) return 1;
+  const resolved = rates?.length ? resolveEffectiveRate(from, to, midMarketRows(rates)) : null;
+  return resolved && resolved > 0 ? resolved : null;
+}
+
+/** @deprecated Use quoteWalletTransfer. Kept as the mid-market lookup. */
 export function findEffectiveRate(
   rates: FxRateRow[] | undefined,
   from: string,
   to: string,
 ): { effective_rate: number; fee_rate: number } | null {
-  if (from === to) return { effective_rate: 1, fee_rate: 0 };
+  const mid = findMidMarketRate(rates, from, to);
+  if (mid == null) return null;
+  const quoted = quoteTransfer({
+    sourceCurrency: from,
+    destinationCurrency: to,
+    amount: 100,
+    channel: "wallet",
+    payoutMethod: "WALLET_TO_WALLET",
+    midMarketRate: mid,
+  });
+  return { effective_rate: quoted.customerRate ?? mid, fee_rate: quoted.transferFeePct };
+}
 
-  const resolved = rates?.length ? resolveEffectiveRate(from, to, rates) : null;
-  if (resolved && resolved > 0) {
-    return { effective_rate: resolved, fee_rate: WALLET_TRANSFER_FEE_RATE };
-  }
-
-  return null;
+export function quoteWalletTransfer(
+  fromAmount: number,
+  from: string,
+  to: string,
+  rates: FxRateRow[] | undefined,
+): TransferQuote {
+  const mid = findMidMarketRate(rates, from, to);
+  return quoteTransfer({
+    sourceCurrency: from,
+    destinationCurrency: to,
+    amount: fromAmount,
+    channel: "wallet",
+    payoutMethod: "WALLET_TO_WALLET",
+    midMarketRate: mid,
+  });
 }
 
 export function computeTransferQuote(
@@ -33,18 +72,30 @@ export function computeTransferQuote(
   to: string,
   rates: FxRateRow[] | undefined,
 ) {
-  const rateInfo = findEffectiveRate(rates, from, to);
-  if (!rateInfo || fromAmount <= 0) {
-    return { fee: 0, receive: 0, effective_rate: null as number | null, fee_rate: 0 };
-  }
-  const fee = fromAmount * rateInfo.fee_rate;
-  const receive = (fromAmount - fee) * rateInfo.effective_rate;
+  const quoted = quoteWalletTransfer(fromAmount, from, to, rates);
   return {
-    fee,
-    receive,
-    effective_rate: rateInfo.effective_rate,
-    fee_rate: rateInfo.fee_rate,
+    fee: quoted.transferFee,
+    receive: quoted.youReceive ?? 0,
+    effective_rate: quoted.customerRate,
+    fee_rate: quoted.transferFeePct,
+    quote: quoted,
   };
+}
+
+export function invertWalletSendAmount(
+  receiveAmount: number,
+  from: string,
+  to: string,
+  rates: FxRateRow[] | undefined,
+): number {
+  const mid = findMidMarketRate(rates, from, to);
+  return invertSendAmount(receiveAmount, {
+    sourceCurrency: from,
+    destinationCurrency: to,
+    channel: "wallet",
+    payoutMethod: "WALLET_TO_WALLET",
+    midMarketRate: mid,
+  });
 }
 
 export async function invokeTransferError(error: unknown): Promise<string> {

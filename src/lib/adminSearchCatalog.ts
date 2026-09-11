@@ -54,6 +54,7 @@ export const ADMIN_SEARCH_CATALOG: AdminSearchHit[] = [
   partner("api", "API partners", ""),
   partner("alerts", "Partner alerts", ""),
 
+  { id: "pricing-rates", label: "Pricing & Rates", group: "Partners & Pricing", to: "/admin/pricing?tab=pricing-rates", keywords: "fx corridor wallet volume discount cost recovery excel" },
   { id: "rate-card", label: "Rate card", group: "Partners & Pricing", to: "/admin/pricing?tab=rate-card", keywords: "customer fee" },
   { id: "nomba-fincra", label: "Nomba & Fincra", group: "Partners & Pricing", to: "/admin/nomba-fincra", keywords: "primary providers payout collect rates transactions interac" },
   { id: "ops", label: "Ops queue", group: "Partners & Pricing", to: "/admin/ops-queue", keywords: "transfers payout boost refund" },

@@ -1,5 +1,14 @@
 # Welcome to your Lovable project
 
+## eFinMoney pricing
+
+Cost-recovery pricing and the competitive CAD rate card live in
+[docs/pricing-cost-recovery.md](docs/pricing-cost-recovery.md).
+
+- Admin: **Settings → Pricing & Rates** (`/admin/pricing?tab=pricing-rates`)
+- Excel: `public/docs/eFinMoney-Rates-and-Pricing-Summary.xlsx` or `npm run export:rate-card`
+- Engine checks: `npm run test:pricing`
+
 ## Project info
 
 **URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
