@@ -14,7 +14,8 @@
     "export-nav-icons": "node scripts/export-nav-icons.mjs",
     "export:rate-card": "node --experimental-strip-types scripts/export-efinmoney-rate-card.ts",
     "test:pricing": "node --experimental-strip-types scripts/verify-cost-recovery.ts",
-    "test:cad-interac": "node --experimental-strip-types scripts/verify-cad-interac-payout.ts"
+    "test:cad-interac": "node --experimental-strip-types scripts/verify-cad-interac-payout.ts",
+    "test:fincra-rfi": "node --experimental-strip-types scripts/verify-fincra-rfi.ts"
   },
   "dependencies": {
     "@adyen/adyen-web": "^6.39.0",

@@ -2,6 +2,12 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { creditWalletViaFincra, isFincraWalletTopUp } from "../_shared/fincra-credit.ts";
 import { getFincraConfig } from "../_shared/fincra.ts";
 import { settleFincraCadInteracIntent } from "../_shared/fincraCad.ts";
+import {
+  answerFincraCollectionRfis,
+  fincraCollectionId,
+  reconcilePendingCadCollectionRfis,
+} from "../_shared/fincraCollectionRfi.ts";
+import { extractEfmPaymentCode } from "../_shared/fincraRfiAnswers.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -150,19 +156,59 @@ Deno.serve(async (req) => {
       }
     }
 
-    // CAD Interac / collection deposits → match open user intents by reference, then amount
+    // CAD Interac Autodeposit: answer Fincra RFIs immediately so the collection
+    // credits the merchant CAD wallet instead of sitting pending.
     const cadCcy = eventCurrency(data) === "CAD";
-    const isCadCollection =
+    const isRfiEvent =
+      eventName.includes("additional-info")
+      || eventName.includes("additional_info")
+      || eventName.includes("rfi");
+    const collectionStatus = String(data.status || "").toLowerCase();
+    const collectionPending =
+      collectionStatus.includes("pending")
+      || collectionStatus.includes("additional")
+      || collectionStatus.includes("processing");
+    const looksCadInterac =
       cadCcy
+      || /interac|efm-|@fincra\.ca|efm-cad/i.test(
+        `${data.description || ""} ${data.narration || ""} ${data.paymentScheme || ""} ${data.reference || ""} ${data.sessionId || ""}`,
+      );
+    if (looksCadInterac && (isRfiEvent || (eventName.includes("collection") && collectionPending))) {
+      const collectionId = fincraCollectionId(data);
+      try {
+        if (collectionId) {
+          await answerFincraCollectionRfis(collectionId, {
+            senderName: String(data.customerName || data.senderAccountName || ""),
+            amountCad: settleAmount(data) || undefined,
+            paymentCode: extractEfmPaymentCode(`${data.description || ""} ${data.narration || ""} ${data.memo || ""} ${data.reference || ""}`),
+            interacReference: String(data.sessionId || ""),
+          }, Array.isArray(data.additionalInfo) ? data.additionalInfo as Array<{ id?: unknown; request?: unknown }> : []);
+        } else {
+          await reconcilePendingCadCollectionRfis({
+            amountCad: settleAmount(data) || undefined,
+            paymentCode: extractEfmPaymentCode(`${data.description || ""} ${data.narration || ""} ${data.memo || ""} ${data.reference || ""}`),
+          });
+        }
+      } catch (rfiErr) {
+        console.error("fincra-webhook CAD RFI auto-answer failed", rfiErr);
+      }
+    }
+
+    // CAD Interac / collection deposits → match open user intents by reference, then amount
+    const isSuccessfulCadCollection =
+      cadCcy
+      && !isRfiEvent
+      && !collectionPending
       && (
-        eventName.includes("collection")
+        eventName.includes("collection.successful")
+        || (eventName.includes("collection") && ["successful", "success", "completed", "settled"].includes(collectionStatus))
         || eventName.includes("virtualaccount")
         || eventName.includes("virtual_account")
-        || eventName.includes("deposit")
-        || (eventName.includes("successful") && !eventName.includes("payout") && !eventName.includes("charge"))
+        || (eventName.includes("deposit") && eventName.includes("success"))
+        || (eventName.includes("successful") && !eventName.includes("payout") && !eventName.includes("charge") && !eventName.includes("collection"))
       );
 
-    if (isCadCollection || (eventName === "charge.successful" && cadCcy && !extractMeta(data).user_id)) {
+    if (isSuccessfulCadCollection || (eventName === "charge.successful" && cadCcy && !extractMeta(data).user_id && !isRfiEvent)) {
       const amount = settleAmount(data);
       const providerRef = String(data.chargeReference || data.reference || data.sessionId || data.id || "");
       const description = String(data.description || data.narration || data.memo || "");

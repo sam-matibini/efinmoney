@@ -17,6 +17,7 @@ import {
   CAD_INTERAC_TRANSFER_SELECT,
   requireCadInteracDestination,
 } from "../_shared/cadInteracPayout.ts";
+import { reconcilePendingCadCollectionRfis } from "../_shared/fincraCollectionRfi.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -132,6 +133,10 @@ Deno.serve(async (req) => {
       sender_region?: string;
       sender_postal_code?: string;
       sender_country?: string;
+      collection_id?: string;
+      collectionId?: string;
+      payment_code?: string;
+      reference?: string;
     };
 
     const interacRefHint = String(body.interac_reference || body.provider_reference || "").trim();
@@ -142,6 +147,30 @@ Deno.serve(async (req) => {
       || (interacRefHint && intentHint ? "complete" : "")
       || "create",
     ).toLowerCase();
+
+    if (action === "reconcile_rfi" || action === "settle_rfi") {
+      try {
+        const summary = await reconcilePendingCadCollectionRfis({
+          senderName: String(body.sender_name || ""),
+          senderEmail: String(body.sender_email || ""),
+          senderPhone: String(body.sender_phone || ""),
+          senderBank: String(body.sender_bank || ""),
+          paymentCode: String(body.payment_code || body.reference || ""),
+          interacReference: String(body.interac_reference || body.provider_reference || ""),
+          amountCad: Number(body.amount) || undefined,
+          purpose: String(body.purpose || "topup"),
+        }, {
+          collectionId: String(body.collection_id || body.collectionId || "").trim() || undefined,
+        });
+        return json({ ok: true, ...summary });
+      } catch (rfiErr) {
+        return fail(
+          "reconcile_rfi",
+          rfiErr instanceof Error ? rfiErr.message : "Could not answer Fincra collection RFIs",
+          502,
+        );
+      }
+    }
 
     if (action === "cancel") {
       const intentId = String(body.intent_id || "");
@@ -245,6 +274,20 @@ Deno.serve(async (req) => {
           interacRef,
           "user_interac_reference",
         );
+        try {
+          await reconcilePendingCadCollectionRfis({
+            senderName: String(current.sender_name || ""),
+            senderEmail: String(current.sender_email || ""),
+            senderPhone: String(current.sender_phone || ""),
+            senderBank: String(current.sender_bank || ""),
+            paymentCode: String(current.reference || current.public_id || ""),
+            interacReference: interacRef,
+            amountCad: Number(current.amount),
+            purpose: String(current.purpose || "topup"),
+          });
+        } catch (rfiErr) {
+          console.warn(`${LOG}: Fincra RFI auto-answer after complete failed`, rfiErr);
+        }
         const { data: fresh } = await admin
           .from(INTENT_TABLE)
           .select(INTENT_COLUMNS)

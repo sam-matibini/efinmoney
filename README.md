@@ -31,7 +31,8 @@ Send checkout and CAD wallet collections take Interac Autodeposit through Fincra
 - Deposit email: `support.cad.live-015@fincra.ca` (`FINCRA_CAD_INTERAC_ALIAS`)
 - Payment code: unique `EFM-YYYYMMDD-…` reference from `next_interac_public_id` — paste it in the Interac message
 - After sending, the customer enters the bank Interac reference (e.g. `CAh9ECkx`) and taps **Complete** — checkout closes onto the transfer success report
-- Edge function: `fincra-cad-interac` (`action: complete`); webhook: `fincra-webhook` (`collection.successful`)
+- Edge function: `fincra-cad-interac` (`action: complete` or `action: reconcile_rfi`); webhook: `fincra-webhook` (`collection.successful`, `collection.additional-info-requested`)
+- **Instant CAD wallet settlement:** Interac Autodeposit can land at Fincra and then sit pending an RFI (source of funds, purpose, frequency, relationship). The webhook answers those RFIs immediately via `PATCH /collections/{id}/additional-information` so funds credit the eFinMoney Fincra CAD wallet instead of waiting on the merchant email. Completing checkout also reconciles pending CAD collections. To unstick a held collection: `fincra-cad-interac` `{ "action": "reconcile_rfi", "collection_id": "36608277" }`. Check: `npm run test:fincra-rfi`. Redeploy: `fincra-webhook`, `fincra-cad-interac`.
 - Secrets: `FINCRA_SECRET_KEY`, `FINCRA_BUSINESS_ID`, `FINCRA_CAD_INTERAC_ALIAS`, optional `FINCRA_CAD_VIRTUAL_ACCOUNT_ID`
 - SQL: `supabase/migrations/20260911220000_fincra_interac_complete_status.sql`
 
