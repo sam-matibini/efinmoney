@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { resolveCadInteracDestination } from "../_shared/cadInteracPayout.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -208,6 +209,24 @@ Deno.serve(async (req) => {
     let security: { question: string; answer: string } | null = null;
 
     if (transfer.payout_method === "interac") {
+      const dest = resolveCadInteracDestination({
+        recipient_account: transfer.recipient_account,
+        recipient_phone: transfer.recipient_phone,
+        recipient_email: (transfer as Record<string, unknown>).recipient_email,
+      });
+      if (!dest.ok) {
+        const reason = dest.error;
+        const refunded = skipWalletRefund ? false : await refundWallet(supabase, transfer, reason);
+        await supabase.from("transfers").update({ status: "failed", failure_reason: reason }).eq("id", transfer.id);
+        return new Response(JSON.stringify({
+          success: false,
+          error: reason,
+          refunded,
+          code: "missing_interac_contact",
+        }), {
+          status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
       security = transfer.interac_security_question && transfer.interac_security_answer
         ? { question: transfer.interac_security_question, answer: transfer.interac_security_answer }
         : genSecurity();
@@ -218,8 +237,8 @@ Deno.serve(async (req) => {
         amount: amountCents,
         currencyCode: "CAD",
         interacETransfer: {
-          consumerId: transfer.recipient_account, // email
-          consumerIdType: "EMAIL",
+          consumerId: dest.dest.consumerId,
+          consumerIdType: dest.dest.consumerIdType,
           recipientName: transfer.recipient_name,
           securityQuestion: { question: security.question, answer: security.answer },
         },

@@ -13,6 +13,7 @@ import {
   normalizeNombaCountry,
   pickNombaInstitution,
 } from "../_shared/nomba-payout-corridors.ts";
+import { resolveCadInteracDestination } from "../_shared/cadInteracPayout.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -408,23 +409,33 @@ Deno.serve(async (req) => {
 
     // ── Global Interac ────────────────────────────────────────────────
     if (kind === "global_interac") {
-      const acctHint = String(transfer.recipient_account || "").trim();
-      const email = String(
-        transfer.recipient_email
+      const dest = resolveCadInteracDestination({
+        recipient_account: transfer.recipient_account,
+        recipient_phone: transfer.recipient_phone,
+        recipient_email: (transfer as Record<string, unknown>).recipient_email
           || (transfer as Record<string, unknown>).recipient_interac_email
-          || body.recipient_email
-          || (acctHint.includes("@") ? acctHint : "")
-          || "",
-      ).trim();
-      if (!email || !email.includes("@")) {
+          || body.recipient_email,
+      });
+      if (!dest.ok) {
         return json({
           success: false,
-          error: "Nomba Interac payout requires recipient email",
-          code: "invalid_interac_details",
+          error: dest.error,
+          code: "missing_interac_contact",
           rail: "nomba",
           error_class: "hard",
         }, 400);
       }
+      if (!dest.dest.email) {
+        // Nomba Interac needs an email. Soft-fail so Paysafe can send to mobile.
+        return json({
+          success: false,
+          error: "Nomba Interac payout requires recipient email; trying next rail",
+          code: "interac_email_required",
+          rail: "nomba",
+          error_class: "retryable",
+        }, 400);
+      }
+      const email = dest.dest.email;
 
       const payload: Record<string, unknown> = {
         amount: payoutAmount,

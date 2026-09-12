@@ -47,6 +47,7 @@ import {
   PAYSAFE_PAYOUTS_ENABLED,
   STRIPE_CANADA_RAILS_NOTE,
 } from "@/lib/canadaPayoutRails";
+import { CAD_INTERAC_MISSING_CONTACT, resolveCadInteracDestination } from "@/lib/cadInteracPayout";
 import {
   Elements,
   CardNumberElement,
@@ -497,20 +498,21 @@ const CanadaSendFlow = () => {
     setPickedBeneficiaryId(b.id);
     setRecipientName(b.eft_account_holder || b.name);
     setRecipientEmail(b.interac_email || b.email || "");
+    if (b.phone) setRecipientPhone(b.phone.replace(/[^\d+]/g, "").slice(0, 15));
     if (b.eft_institution) setInstitutionNumber(b.eft_institution);
     if (b.eft_transit) setTransitNumber(b.eft_transit);
     if (b.eft_account) setAccountNumber(b.eft_account);
     if (b.bank_name) setBankName(b.bank_name);
     if (b.payout_method === "eft" && b.eft_account) setMethod("eft");
-    else if (b.payout_method === "interac" && b.interac_email) setMethod("interac");
+    else if (b.payout_method === "interac" || b.interac_email || (b.phone && !b.eft_account && b.payout_method !== "card_push")) setMethod("interac");
     else if (b.eft_account) setMethod("eft");
-    else if (b.interac_email) setMethod("interac");
   };
 
   const clearSelectedContact = () => {
     setPickedBeneficiaryId(null);
     setRecipientName("");
     setRecipientEmail("");
+    setRecipientPhone("");
     setInstitutionNumber("");
     setTransitNumber("");
     setAccountNumber("");
@@ -583,7 +585,7 @@ const CanadaSendFlow = () => {
     ...(INTERAC_ETRANSFER_ENABLED ? [{
       id: "interac" as const,
       title: "Interac e-Transfer",
-      subtitle: "Email deposit · minutes",
+      subtitle: "Email or mobile · minutes",
       feeLabel: formatFeeLabel(feeForMethod("interac")),
       icon: Zap,
       badge: "Beta",
@@ -664,7 +666,10 @@ const CanadaSendFlow = () => {
             })
         : method === "interac"
           ? recipientName.trim().length > 1
-              && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipientEmail)
+              && resolveCadInteracDestination({
+                recipient_account: recipientEmail,
+                recipient_phone: recipientPhone,
+              }).ok
               && interacQAValid
           : recipientName.trim().length > 1
               && /^\d{3}$/.test(institutionNumber)
@@ -720,6 +725,17 @@ const CanadaSendFlow = () => {
     }
 
     try {
+      const cadInteracDest = method === "interac"
+        ? resolveCadInteracDestination({
+          recipient_account: recipientEmail,
+          recipient_phone: recipientPhone,
+        })
+        : null;
+      if (method === "interac" && !cadInteracDest?.ok) {
+        toast.error(cadInteracDest?.error || CAD_INTERAC_MISSING_CONTACT);
+        return;
+      }
+
       if (method === "stripe_connect") {
         setRefreshingConnect(true);
         const latest = (await refreshConnect()) ?? connectAcct ?? null;
@@ -778,7 +794,14 @@ const CanadaSendFlow = () => {
             ? (recipientEmail || `card-${recipientTok?.last4 || "xxxx"}`)
             : method === "stripe_connect"
               ? (connectAcct?.stripe_account_id || recipientEmail || "stripe_connect")
-              : recipientEmail,
+              : method === "interac"
+                ? (cadInteracDest?.ok
+                  ? (cadInteracDest.dest.email || cadInteracDest.dest.phone || "")
+                  : recipientEmail)
+                : recipientEmail,
+        recipient_phone: method === "interac"
+          ? (cadInteracDest?.ok ? cadInteracDest.dest.phone || undefined : recipientPhone || undefined)
+          : undefined,
         recipient_country: "CA",
         transfer_type: "domestic_canada",
         payout_method: method,
@@ -846,12 +869,17 @@ const CanadaSendFlow = () => {
             country_code: "CAD",
             currency_code: "CAD",
             payout_method: method,
-            email: recipientEmail || null,
+            email: (method === "interac" && cadInteracDest?.ok ? cadInteracDest.dest.email : recipientEmail) || null,
+            phone: method === "interac"
+              ? (cadInteracDest?.ok ? cadInteracDest.dest.phone || "" : recipientPhone)
+              : undefined,
             eft_institution: method === "eft" ? institutionNumber : null,
             eft_transit: method === "eft" ? transitNumber : null,
             eft_account: method === "eft" ? accountNumber : null,
             eft_account_holder: method === "eft" ? recipientName : null,
-            interac_email: method === "interac" ? recipientEmail : null,
+            interac_email: method === "interac"
+              ? (cadInteracDest?.ok ? cadInteracDest.dest.email : recipientEmail) || null
+              : null,
           });
           if (isNew) setSavePromptOpen(true);
         } catch { /* non-fatal */ }
@@ -863,12 +891,17 @@ const CanadaSendFlow = () => {
             country_code: "CAD",
             currency_code: "CAD",
             payout_method: method,
-            email: recipientEmail || null,
+            email: (method === "interac" && cadInteracDest?.ok ? cadInteracDest.dest.email : recipientEmail) || null,
+            phone: method === "interac"
+              ? (cadInteracDest?.ok ? cadInteracDest.dest.phone || "" : recipientPhone)
+              : undefined,
             eft_institution: method === "eft" ? institutionNumber : null,
             eft_transit: method === "eft" ? transitNumber : null,
             eft_account: method === "eft" ? accountNumber : null,
             eft_account_holder: method === "eft" ? recipientName : null,
-            interac_email: method === "interac" ? recipientEmail : null,
+            interac_email: method === "interac"
+              ? (cadInteracDest?.ok ? cadInteracDest.dest.email : recipientEmail) || null
+              : null,
           });
         } catch { /* non-fatal */ }
       }
@@ -881,7 +914,7 @@ const CanadaSendFlow = () => {
   const reset = () => {
     setStep(1);
     setAmount("");
-    setRecipientName(""); setRecipientEmail(""); setMessage("");
+    setRecipientName(""); setRecipientEmail(""); setRecipientPhone(""); setMessage("");
     setSecurityQuestion(""); setSecurityAnswer("");
     setInstitutionNumber(""); setTransitNumber(""); setAccountNumber(""); setBankName("");
     setCardNumComplete(false); setCardExpComplete(false); setCardCvcComplete(false);
@@ -1167,8 +1200,20 @@ const CanadaSendFlow = () => {
               {method === "interac" && (
                 <>
                   <div className="space-y-2">
-                    <Label>Interac email</Label>
+                    <Label>Interac email <span className="text-muted-foreground font-normal">(optional if mobile is set)</span></Label>
                     <Input type="email" value={recipientEmail} onChange={(e) => { setRecipientEmail(e.target.value); setPickedBeneficiaryId(null); }} placeholder="jane@example.com" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Mobile number <span className="text-muted-foreground font-normal">(optional if email is set)</span></Label>
+                    <Input
+                      type="tel"
+                      value={recipientPhone}
+                      onChange={(e) => { setRecipientPhone(e.target.value); setPickedBeneficiaryId(null); }}
+                      placeholder="(416) 555-0123"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Canadian Interac e-Transfer needs an email or a 10-digit mobile number — at least one. Email is preferred for Autodeposit. We will not collect payment if both are missing.
+                    </p>
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div className="space-y-2">
@@ -1248,9 +1293,12 @@ const CanadaSendFlow = () => {
               {method === "eft" && institutionNumber && (
                 <ReviewRow label="Bank" value={`${institutionNumber}-${transitNumber} ····${accountNumber.slice(-4)}`} />
               )}
-              {method === "interac" && recipientEmail && (
+              {method === "interac" && recipientEmail ? (
                 <ReviewRow label="Interac email" value={recipientEmail} />
-              )}
+              ) : null}
+              {method === "interac" && recipientPhone ? (
+                <ReviewRow label="Mobile" value={recipientPhone} />
+              ) : null}
             </div>
 
             {method !== "paylink" && (
@@ -1448,7 +1496,9 @@ const CanadaSendFlow = () => {
             )}
             {method === "interac" && (
               <p className="text-sm text-muted-foreground mb-6 max-w-md mx-auto">
-                Interac sent {recipientEmail} an email with a deposit link. Funds typically arrive within minutes once they accept.
+                {recipientEmail
+                  ? `Interac sent ${recipientEmail} an email with a deposit link. Funds typically arrive within minutes once they accept.`
+                  : `Interac will notify ${recipientPhone || recipientName} by mobile. Funds typically arrive within minutes once they accept.`}
                 {security && (
                   <span className="block mt-2 text-xs">
                     Security Q: <strong>{security.question}</strong> · A: <strong>{security.answer}</strong>
@@ -1519,7 +1569,7 @@ const CanadaSendFlow = () => {
           id: "",
           user_id: user?.id || "",
           name: recipientName,
-          phone: null,
+          phone: recipientPhone || null,
           country_code: "CAD",
           payout_method: method === "eft" ? "eft" : method === "interac" ? "interac" : null,
           network: null,
@@ -1543,7 +1593,7 @@ const CanadaSendFlow = () => {
           notes: null,
           tags: [],
           address: null,
-          tel: null,
+          tel: recipientPhone || null,
           mailing_address: null,
           mailing_city: null,
           mailing_region: null,

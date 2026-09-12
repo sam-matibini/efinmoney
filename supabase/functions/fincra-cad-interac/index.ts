@@ -13,6 +13,10 @@ import {
   resolveFincraCadAlias,
   settleFincraCadInteracIntent,
 } from "../_shared/fincraCad.ts";
+import {
+  CAD_INTERAC_TRANSFER_SELECT,
+  requireCadInteracDestination,
+} from "../_shared/cadInteracPayout.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -330,10 +334,14 @@ Deno.serve(async (req) => {
     if (purpose === "transfer") {
       const { data: tr } = await admin
         .from("transfers")
-        .select("id, sender_id")
+        .select(CAD_INTERAC_TRANSFER_SELECT)
         .eq("id", transferId)
         .maybeSingle();
       if (!tr || tr.sender_id !== user.id) return fail("transfer_lookup", "Transfer not found", 404, { transferId });
+      const gate = requireCadInteracDestination(tr);
+      if (gate.required && !gate.ok) {
+        return fail("recipient_contact", gate.error, 400, { transferId, code: "missing_interac_contact" });
+      }
     }
 
     const { data: wallet, error: wErr } = await admin

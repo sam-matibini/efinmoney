@@ -7,6 +7,7 @@ import {
   flovideListBanks,
 } from "../_shared/flovide.ts";
 import { normalizeNgCountry, resolveProviderBankCode } from "../_shared/ng-bank-codes.ts";
+import { resolveCadInteracDestination } from "../_shared/cadInteracPayout.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -179,10 +180,30 @@ Deno.serve(async (req) => {
 
     let beneficiaryBody: Record<string, unknown>;
     if (currency === "CAD" && (method.includes("interac") || String(transfer.recipient_email || "").includes("@"))) {
-      const email = String(transfer.recipient_email || transfer.recipient_account || "").trim();
-      if (!email.includes("@")) {
-        return json({ success: false, error: "CAD Interac payout needs a recipient email", rail: "flovide" }, 200);
+      const dest = resolveCadInteracDestination({
+        recipient_account: transfer.recipient_account,
+        recipient_phone: transfer.recipient_phone,
+        recipient_email: transfer.recipient_email,
+      });
+      if (!dest.ok) {
+        return json({
+          success: false,
+          error: dest.error,
+          rail: "flovide",
+          error_class: "hard",
+          code: "missing_interac_contact",
+        }, 200);
       }
+      if (!dest.dest.email) {
+        return json({
+          success: false,
+          error: "Flovide Interac payout requires recipient email; trying next rail",
+          rail: "flovide",
+          error_class: "retryable",
+          code: "interac_email_required",
+        }, 200);
+      }
+      const email = dest.dest.email;
       beneficiaryBody = {
         type: "individual",
         firstNames: first,

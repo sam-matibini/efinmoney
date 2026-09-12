@@ -15,6 +15,7 @@ import { ISO_COUNTRIES, findIsoCountry } from "@/lib/isoCountries";
 import { COUNTRY_ISO2 } from "@/lib/countryIso";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { getCorridorBanks, resolveCorridorAccount } from "@/lib/flovide";
+import { CAD_INTERAC_MISSING_CONTACT, resolveCadInteracDestination } from "@/lib/cadInteracPayout";
 
 interface Props {
   open: boolean;
@@ -219,18 +220,28 @@ const AddBeneficiaryModal = ({ open, onOpenChange, editing, onSaved, defaultCate
       return;
     }
     if (!name.trim()) { toast.error("Please enter a name"); return; }
-    if (!email.trim()) { toast.error("Please enter an email"); return; }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) { toast.error("Please enter a valid email"); return; }
-    if (!tel.trim()) { toast.error("Please enter a phone number"); return; }
+    const isInterac = method === "interac";
+    const interacDest = isInterac
+      ? resolveCadInteracDestination({
+        interac_email: interacEmail,
+        recipient_email: email,
+        recipient_phone: tel,
+      })
+      : null;
+    if (!isInterac) {
+      if (!email.trim()) { toast.error("Please enter an email"); return; }
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) { toast.error("Please enter a valid email"); return; }
+      if (!tel.trim()) { toast.error("Please enter a phone number"); return; }
+    } else if (!interacDest?.ok) {
+      toast.error(interacDest?.error || CAD_INTERAC_MISSING_CONTACT);
+      return;
+    }
     if (!address.trim()) { toast.error("Please enter an address"); return; }
     if (method === "eft") {
       if (!/^\d{3}$/.test(eftInst) || !/^\d{5}$/.test(eftTransit) || !/^\d{7,12}$/.test(eftAcct)) {
         toast.error("EFT requires 3-digit institution, 5-digit transit, and 7-12 digit account");
         return;
       }
-    }
-    if (method === "interac" && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(interacEmail)) {
-      toast.error("Interac requires a valid email"); return;
     }
     if (method === "mobile" && !tel.trim()) {
       toast.error("Mobile payout requires a phone number"); return;
@@ -242,14 +253,14 @@ const AddBeneficiaryModal = ({ open, onOpenChange, editing, onSaved, defaultCate
     const payload: any = {
       name: name.trim(),
       nickname: nickname.trim() || null,
-      email: email.trim() || null,
+      email: (isInterac ? (interacDest?.ok ? interacDest.dest.email : email.trim()) : email.trim()) || null,
       address: address.trim() || null,
-      tel: tel.trim() || null,
+      tel: (isInterac ? (interacDest?.ok ? interacDest.dest.phone : tel.trim()) : tel.trim()) || null,
       country_code: country.code,
       currency_code: country.code,
       payout_method: method === "mobile" ? (activeNetwork?.payout || country.payout) : method === "bank" ? "bank" : method === "eft" ? "eft" : method === "interac" ? "interac" : null,
       network: method === "mobile" ? (activeNetwork?.id || null) : null,
-      phone: tel.trim() || null,
+      phone: (isInterac ? (interacDest?.ok ? interacDest.dest.phone : tel.trim()) : tel.trim()) || null,
 
       bank_name: method === "bank" ? selectedBankName.trim() : null,
       bank_account: method === "bank" ? bankAccount.trim() : null,
@@ -258,7 +269,9 @@ const AddBeneficiaryModal = ({ open, onOpenChange, editing, onSaved, defaultCate
       eft_transit: method === "eft" ? eftTransit : null,
       eft_account: method === "eft" ? eftAcct : null,
       eft_account_holder: method === "eft" ? (eftHolder.trim() || name.trim()) : null,
-      interac_email: method === "interac" ? interacEmail.trim() : null,
+      interac_email: method === "interac"
+        ? (interacDest?.ok ? interacDest.dest.email : interacEmail.trim()) || null
+        : null,
       address_city: addressCity.trim() || null,
       address_region: addressRegion.trim() || null,
       address_postal_code: addressPostal.trim() || null,
@@ -333,20 +346,20 @@ const AddBeneficiaryModal = ({ open, onOpenChange, editing, onSaved, defaultCate
               <Input value={nickname} onChange={(e) => setNickname(e.target.value)} placeholder="e.g. Landlord" />
             </div>
             <div className="space-y-2">
-              <Label>Email</Label>
-              <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="payee@example.com" required />
+              <Label>Email{method === "interac" ? " (optional if mobile is set)" : ""}</Label>
+              <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="payee@example.com" required={method !== "interac"} />
             </div>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-2">
-              <Label>Phone</Label>
+              <Label>Phone{method === "interac" ? " (optional if email is set)" : ""}</Label>
               <Input
                 type="tel"
                 value={tel}
                 onChange={(e) => setTel(e.target.value)}
-                placeholder={method === "mobile" ? "+260 977 000 000" : "+1 (555) 000-0000"}
-                required
+                placeholder={method === "mobile" ? "+260 977 000 000" : method === "interac" ? "(416) 555-0123" : "+1 (555) 000-0000"}
+                required={method !== "interac"}
               />
               {method === "mobile" && (
                 <p className="text-xs text-muted-foreground">Also used as the mobile money payout number.</p>
@@ -548,8 +561,11 @@ const AddBeneficiaryModal = ({ open, onOpenChange, editing, onSaved, defaultCate
           )}
           {method === "interac" && (
             <div className="space-y-2">
-              <Label>Interac Email</Label>
+              <Label>Interac Autodeposit email <span className="text-muted-foreground font-normal">(optional if mobile is set)</span></Label>
               <Input type="email" value={interacEmail} onChange={(e) => setInteracEmail(e.target.value)} placeholder="payee@example.com" />
+              <p className="text-xs text-muted-foreground">
+                Canadian e-Transfers need an email or a 10-digit mobile — at least one. Leave this blank if you only have their cell number.
+              </p>
             </div>
           )}
 

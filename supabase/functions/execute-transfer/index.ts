@@ -8,6 +8,7 @@ import { payoutFnForRail, resolveCorridorRails } from "../_shared/corridor-rails
 import { explainPayoutError, notifyOpsBrief, notifyOpsFailoverPing } from "../_shared/ops-alert.ts";
 import { validatePayoutMin } from "../_shared/payoutMins.ts";
 import { nombaApiConfigured } from "../_shared/nomba-api.ts";
+import { requireCadInteracDestination } from "../_shared/cadInteracPayout.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -185,6 +186,38 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: "Transfer not found" }), {
         status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
+    }
+
+    // CAD Interac payout: require email or Canadian mobile BEFORE collecting
+    // (card charge, wallet debit, or Interac pay-in). Missing contact must not
+    // draw funds and then fail the recipient payout.
+    const cadInteracGate = requireCadInteracDestination(transfer);
+    if (cadInteracGate.required && !cadInteracGate.ok) {
+      await supabase
+        .from("fincra_cad_interac_intents")
+        .update({ status: "cancelled" })
+        .eq("transfer_id", transfer_id)
+        .in("status", ["pending", "awaiting_payment"]);
+      await supabase.from("transfers").update({
+        status: "failed",
+        failure_reason: cadInteracGate.error.slice(0, 500),
+      }).eq("id", transfer_id);
+      return new Response(JSON.stringify({
+        error: cadInteracGate.error,
+        code: "missing_interac_contact",
+      }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    if (cadInteracGate.required && cadInteracGate.ok) {
+      const dest = cadInteracGate.dest;
+      const account = dest.email || dest.phone;
+      await supabase.from("transfers").update({
+        recipient_account: account,
+        recipient_phone: dest.phone,
+      }).eq("id", transfer_id);
+      transfer.recipient_account = account;
+      transfer.recipient_phone = dest.phone;
     }
 
     // Block payout while a linked Interac/Loop pay-in is still unpaid.

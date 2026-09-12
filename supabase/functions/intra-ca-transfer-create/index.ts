@@ -5,6 +5,10 @@
  */
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { getLoopCadConfig } from "../_shared/loopCad.ts";
+import {
+  CAD_INTERAC_TRANSFER_SELECT,
+  requireCadInteracDestination,
+} from "../_shared/cadInteracPayout.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -74,11 +78,15 @@ Deno.serve(async (req) => {
     if (purpose === "transfer" && linkedTransferId) {
       const { data: tr } = await supabase
         .from("transfers")
-        .select("id, sender_id")
+        .select(CAD_INTERAC_TRANSFER_SELECT)
         .eq("id", linkedTransferId)
         .maybeSingle();
       if (!tr || tr.sender_id !== user.id) {
         return json({ error: "Transfer not found" }, 404);
+      }
+      const gate = requireCadInteracDestination(tr);
+      if (gate.required && !gate.ok) {
+        return json({ error: gate.error, code: "missing_interac_contact" }, 400);
       }
     }
 

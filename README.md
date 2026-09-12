@@ -35,6 +35,8 @@ Send checkout and CAD wallet collections take Interac Autodeposit through Fincra
 - Secrets: `FINCRA_SECRET_KEY`, `FINCRA_BUSINESS_ID`, `FINCRA_CAD_INTERAC_ALIAS`, optional `FINCRA_CAD_VIRTUAL_ACCOUNT_ID`
 - SQL: `supabase/migrations/20260911220000_fincra_interac_complete_status.sql`
 
+**CAD Interac payout (Canadian recipients):** email and mobile are each optional, but at least one is required. The APIs refuse collection (card charge, wallet debit, Interac pay-in) until a valid destination is on the transfer — so funds are not drawn if the recipient cannot be paid (for example a contact with no cell number). Phone-only payouts skip Nomba/Flovide (email-only rails) and go to Paysafe with `consumerIdType: PHONE`. Redeploy: `execute-transfer`, `fincra-cad-interac`, `wise-cad-interac`, `vopay-interac-request`, `intra-ca-transfer-create`, `nomba-payout`, `flovide-payout`, `paysafe-payout`. Check: `npm run test:cad-interac`.
+
 ## Bank tab: Plaid, Fincra, Verto, Nomba
 
 The Bank account page (`/wallet/receive`) lists company or personal linked banks.

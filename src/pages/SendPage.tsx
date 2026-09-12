@@ -117,6 +117,7 @@ import {
 } from "@/lib/swychrPay";
 import { productFeatures } from "@/lib/productFeatures";
 import { FINCRA_CAD_INTERAC_ALIAS } from "@/lib/fincraCad";
+import { CAD_INTERAC_MISSING_CONTACT, resolveCadInteracDestination } from "@/lib/cadInteracPayout";
 import {
   buildFincraCardSendRedirectUrl,
   isFincraCheckoutCurrency,
@@ -431,6 +432,13 @@ const SendPage = () => {
   const linkEligible = productFeatures.paymentLinks && isClaimCardCurrency(targetCountry.code) && !!linkWallet;
   const useLink = linkEligible && intlLinkMode;
   const isCanadaIntlPayout = targetCountry.code === "CAD" && !useLink;
+  const cadInteracDest = useMemo(() => {
+    if (!isCanadaIntlPayout || cadPayoutMode !== "interac") return null;
+    return resolveCadInteracDestination({
+      recipient_account: recipientEmail,
+      recipient_phone: recipientPhone,
+    });
+  }, [isCanadaIntlPayout, cadPayoutMode, recipientEmail, recipientPhone]);
 
   // Fetch Nigerian banks list when NGN destination is selected (Nomba primary, FLW fallback)
   useEffect(() => {
@@ -818,7 +826,9 @@ const SendPage = () => {
     const canadaPayoutMethod = cadPayoutMode === "interac" ? "interac" : "eft";
     const canadaAcct = isCanadaIntlPayout
       ? (cadPayoutMode === "interac"
-        ? recipientEmail.trim()
+        ? (cadInteracDest?.ok
+          ? (cadInteracDest.dest.email || cadInteracDest.dest.phone || "")
+          : (recipientEmail.trim() || recipientPhone.trim()))
         : `${caInstitutionNumber.replace(/\D/g, "")}-${caTransitNumber.replace(/\D/g, "")}-${caAccountNumber.replace(/\D/g, "")}`)
       : "";
     const funding = overrides?.funding_source ?? fundingSource;
@@ -845,7 +855,11 @@ const SendPage = () => {
     const transfer = await createTransfer.mutateAsync({
       sender_wallet_id: walletId,
       recipient_name: overrides?.recipient_name ?? recipientName,
-      recipient_phone: overrides?.recipient_phone ?? (isBankPayout || isCanadaIntlPayout ? undefined : recipientPhone),
+      recipient_phone: overrides?.recipient_phone ?? (
+        isCanadaIntlPayout && cadPayoutMode === "interac"
+          ? (cadInteracDest?.ok ? cadInteracDest.dest.phone || undefined : recipientPhone.trim() || undefined)
+          : isBankPayout || isCanadaIntlPayout ? undefined : recipientPhone
+      ),
       recipient_account: overrides?.recipient_account ?? (isBankPayout ? bankAcct : isCanadaIntlPayout ? canadaAcct : undefined),
       recipient_bank_code: overrides?.recipient_bank_code ?? (isBankPayout ? bankCode : isCanadaIntlPayout && cadPayoutMode === "eft" ? caInstitutionNumber.replace(/\D/g, "") : undefined),
       recipient_bank_name: overrides?.recipient_bank_name ?? (isBankPayout ? (bankName || undefined) : isCanadaIntlPayout && cadPayoutMode === "eft" ? (caBankName.trim() || undefined) : undefined),
@@ -874,7 +888,9 @@ const SendPage = () => {
         const { isNew } = await recordTransferRecipient({
           user_id: user.id,
           name: overrides?.recipient_name ?? recipientName,
-          phone: tType === "bank" || isCanadaIntlPayout ? "" : (overrides?.recipient_phone ?? recipientPhone),
+          phone: isCanadaIntlPayout && cadPayoutMode === "interac"
+            ? (cadInteracDest?.ok ? cadInteracDest.dest.phone || "" : recipientPhone)
+            : tType === "bank" || isCanadaIntlPayout ? "" : (overrides?.recipient_phone ?? recipientPhone),
           country_code: overrides?.recipient_country ?? destCurrency,
           payout_method: overrides?.payout_method ?? (isBankPayout ? "bank" : isCanadaIntlPayout ? canadaPayoutMethod : effectivePayoutMethod),
           network: tType === "bank" || isCanadaIntlPayout ? null : (activeNetwork?.id || null),
@@ -882,7 +898,9 @@ const SendPage = () => {
           bank_name: overrides?.recipient_bank_name ?? (isBankPayout ? bankName : isCanadaIntlPayout && cadPayoutMode === "eft" ? (caBankName.trim() || null) : null),
           bank_account: overrides?.recipient_account ?? (isBankPayout ? bankAcct : isCanadaIntlPayout && cadPayoutMode === "eft" ? caAccountNumber.replace(/\D/g, "") : null),
           bank_code: overrides?.recipient_bank_code ?? (isNGNBank ? ngnBankCode : null),
-          interac_email: isCanadaIntlPayout && cadPayoutMode === "interac" ? recipientEmail.trim() : null,
+          interac_email: isCanadaIntlPayout && cadPayoutMode === "interac"
+            ? (cadInteracDest?.ok ? cadInteracDest.dest.email : recipientEmail.trim()) || null
+            : null,
           eft_institution: isCanadaIntlPayout && cadPayoutMode === "eft" ? caInstitutionNumber.replace(/\D/g, "") : null,
           eft_transit: isCanadaIntlPayout && cadPayoutMode === "eft" ? caTransitNumber.replace(/\D/g, "") : null,
           eft_account: isCanadaIntlPayout && cadPayoutMode === "eft" ? caAccountNumber.replace(/\D/g, "") : null,
@@ -938,6 +956,12 @@ const SendPage = () => {
     if (confirming) return;
     setConfirming(true);
     const funding = fundingOverride ?? fundingSource;
+
+    if (isCanadaIntlPayout && cadPayoutMode === "interac" && !cadInteracDest?.ok) {
+      toast.error(cadInteracDest?.error || CAD_INTERAC_MISSING_CONTACT);
+      setConfirming(false);
+      return;
+    }
 
     // Bank transfer checkout: park the payout, then collect from the sender's bank.
     if (funding === "bank") {
@@ -1441,15 +1465,15 @@ const SendPage = () => {
       if (b.bank_code) setGhBankCode(String(b.bank_code));
     }
     if (b.country_code === "CAD" || isCanadaBeneficiary(b)) {
-      if (b.interac_email || b.payout_method === "interac") {
-        setCadPayoutMode("interac");
-        if (b.interac_email || b.email) setRecipientEmail(b.interac_email || b.email || "");
-      } else if (b.eft_account || b.payout_method === "eft") {
+      if (b.eft_account || b.payout_method === "eft") {
         setCadPayoutMode("eft");
         if (b.eft_institution) setCaInstitutionNumber(String(b.eft_institution).replace(/\D/g, "").slice(0, 3));
         if (b.eft_transit) setCaTransitNumber(String(b.eft_transit).replace(/\D/g, "").slice(0, 5));
         if (b.eft_account) setCaAccountNumber(String(b.eft_account).replace(/\D/g, ""));
         if (b.bank_name) setCaBankName(b.bank_name);
+      } else if (b.interac_email || b.email || b.phone || b.payout_method === "interac") {
+        setCadPayoutMode("interac");
+        if (b.interac_email || b.email) setRecipientEmail(b.interac_email || b.email || "");
       }
     }
     if (b.country_code) {
@@ -1534,10 +1558,7 @@ const SendPage = () => {
         }
       }
     } else if (targetCountry.code === "CAD") {
-      if (b.interac_email || b.email) {
-        setCadPayoutMode("interac");
-        if (!recipientEmail) setRecipientEmail(b.interac_email || b.email || "");
-      } else if (b.eft_account) {
+      if (b.eft_account || b.payout_method === "eft") {
         setCadPayoutMode("eft");
         if (b.eft_institution && !caInstitutionNumber) {
           setCaInstitutionNumber(String(b.eft_institution).replace(/\D/g, "").slice(0, 3));
@@ -1549,6 +1570,9 @@ const SendPage = () => {
           setCaAccountNumber(String(b.eft_account).replace(/\D/g, ""));
         }
         if (b.bank_name && !caBankName) setCaBankName(b.bank_name);
+      } else if (b.interac_email || b.email || b.phone || b.payout_method === "interac") {
+        setCadPayoutMode("interac");
+        if (!recipientEmail) setRecipientEmail(b.interac_email || b.email || "");
       }
     } else if (b.network || b.payout_method) {
       if (!availableNetworks || availableNetworks.length === 0) {
@@ -1594,6 +1618,7 @@ const SendPage = () => {
     } else if (isCanadaIntlPayout) {
       if (cadPayoutMode === "interac") {
         if (recipientEmail) parts.push(recipientEmail);
+        if (recipientPhone) parts.push(recipientPhone);
       } else {
         if (caInstitutionNumber && caTransitNumber) parts.push(`${caInstitutionNumber}-${caTransitNumber}`);
         if (caAccountNumber) parts.push(`···${caAccountNumber.slice(-4)}`);
@@ -2133,7 +2158,7 @@ const SendPage = () => {
     : isCanadaIntlPayout
     ? (cadPayoutMode === "interac"
       ? recipientName.trim().length > 1
-          && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipientEmail.trim())
+          && !!cadInteracDest?.ok
           && receivedAmount > 0
       : recipientName.trim().length > 1
           && /^\d{3}$/.test(caInstitutionNumber.replace(/\D/g, ""))
@@ -2193,8 +2218,8 @@ const SendPage = () => {
     } else if (isCanadaIntlPayout) {
       if (recipientName.trim().length <= 1) reasons.push("Enter the recipient’s full legal name");
       if (cadPayoutMode === "interac") {
-        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipientEmail.trim())) {
-          reasons.push("Enter their Interac autodeposit email");
+        if (!cadInteracDest?.ok) {
+          reasons.push(CAD_INTERAC_MISSING_CONTACT);
         }
       } else {
         if (!/^\d{3}$/.test(caInstitutionNumber.replace(/\D/g, ""))) reasons.push("Enter the 3-digit institution number");
@@ -2240,6 +2265,7 @@ const SendPage = () => {
     ghAccountNumber,
     isCanadaIntlPayout,
     cadPayoutMode,
+    cadInteracDest,
     caInstitutionNumber,
     caTransitNumber,
     caAccountNumber,
@@ -2818,7 +2844,7 @@ const SendPage = () => {
                                         <Label>How should they receive CAD?</Label>
                                         <div className="grid grid-cols-2 gap-2">
                                           {([
-                                            { v: "interac" as const, label: "Interac e-Transfer", sub: "Autodeposit email" },
+                                            { v: "interac" as const, label: "Interac e-Transfer", sub: "Email or Canadian mobile" },
                                             { v: "eft" as const, label: "Bank deposit", sub: "Institution + account" },
                                           ]).map(({ v, label, sub }) => {
                                             const active = cadPayoutMode === v;
@@ -2988,8 +3014,9 @@ const SendPage = () => {
                                       </>
                                     ) : isCanadaIntlPayout ? (
                                       cadPayoutMode === "interac" ? (
+                                        <>
                                         <motion.div custom={2} variants={fieldVariants} initial="hidden" animate="show" className="space-y-2">
-                                          <Label>Interac autodeposit email</Label>
+                                          <Label>Interac email <span className="text-muted-foreground font-normal">(optional if mobile is set)</span></Label>
                                           <Input
                                             type="email"
                                             value={recipientEmail}
@@ -2998,10 +3025,22 @@ const SendPage = () => {
                                             maxLength={254}
                                             className="transition-shadow focus-visible:ring-2 focus-visible:ring-primary/40"
                                           />
+                                        </motion.div>
+                                        <motion.div custom={2.2} variants={fieldVariants} initial="hidden" animate="show" className="space-y-2">
+                                          <Label>Mobile number <span className="text-muted-foreground font-normal">(optional if email is set)</span></Label>
+                                          <Input
+                                            type="tel"
+                                            value={recipientPhone}
+                                            onChange={(e) => setRecipientPhone(e.target.value.replace(/[^\d+()\-\s]/g, "").slice(0, 20))}
+                                            placeholder="(416) 555-0123"
+                                            maxLength={20}
+                                            className="transition-shadow focus-visible:ring-2 focus-visible:ring-primary/40"
+                                          />
                                           <p className="text-xs text-muted-foreground">
-                                            Use the email their Canadian bank has registered for Interac e-Transfer autodeposit. Legal first and last name must match their bank account.
+                                            Canadian Interac e-Transfer needs an email or a 10-digit mobile number — at least one. Email is preferred for Autodeposit. We will not collect payment if both are missing.
                                           </p>
                                         </motion.div>
+                                        </>
                                       ) : (
                                         <>
                                           <motion.div custom={2} variants={fieldVariants} initial="hidden" animate="show" className="grid grid-cols-2 gap-3">
@@ -3308,7 +3347,17 @@ const SendPage = () => {
                                         </>
                                       ) : isCanadaIntlPayout ? (
                                         cadPayoutMode === "interac" ? (
-                                          <div className="flex justify-between"><span className="text-muted-foreground">Interac email</span><span className="font-medium">{recipientEmail}</span></div>
+                                          <>
+                                            {recipientEmail.trim() ? (
+                                              <div className="flex justify-between"><span className="text-muted-foreground">Interac email</span><span className="font-medium">{recipientEmail}</span></div>
+                                            ) : null}
+                                            {recipientPhone.trim() ? (
+                                              <div className="flex justify-between"><span className="text-muted-foreground">Mobile</span><span className="font-medium">{recipientPhone}</span></div>
+                                            ) : null}
+                                            {!recipientEmail.trim() && !recipientPhone.trim() ? (
+                                              <div className="flex justify-between"><span className="text-muted-foreground">Interac contact</span><span className="font-medium text-destructive">Missing</span></div>
+                                            ) : null}
+                                          </>
                                         ) : (
                                           <>
                                             <div className="flex justify-between"><span className="text-muted-foreground">Bank</span><span className="font-medium">{caInstitutionNumber}-{caTransitNumber}{caBankName ? ` · ${caBankName}` : ""}</span></div>

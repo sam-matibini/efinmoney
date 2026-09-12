@@ -12,6 +12,10 @@ import {
   voPayPost,
   voPaySuccess,
 } from "../_shared/vopay.ts";
+import {
+  CAD_INTERAC_TRANSFER_SELECT,
+  requireCadInteracDestination,
+} from "../_shared/cadInteracPayout.ts";
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return corsPreflightResponse();
@@ -68,11 +72,15 @@ Deno.serve(async (req) => {
     if (purpose === "transfer" && linkedTransferId) {
       const { data: tr } = await supabase
         .from("transfers")
-        .select("id, sender_id")
+        .select(CAD_INTERAC_TRANSFER_SELECT)
         .eq("id", linkedTransferId)
         .maybeSingle();
       if (!tr || tr.sender_id !== user.id) {
         return jsonResponse({ error: "Transfer not found" }, 404);
+      }
+      const gate = requireCadInteracDestination(tr);
+      if (gate.required && !gate.ok) {
+        return jsonResponse({ error: gate.error, code: "missing_interac_contact" }, 400);
       }
     }
 
