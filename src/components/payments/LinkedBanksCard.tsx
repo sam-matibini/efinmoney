@@ -65,6 +65,7 @@ import {
 } from "@/lib/plaidLiveBalance";
 import { LOOP_CAD_INTERAC_ALIAS, LOOP_CAD_EFT, formatLoopEftLines } from "@/lib/loopCad";
 import BankPayInInstructions, { type PayInInstructions } from "@/components/payments/BankPayInInstructions";
+import BankAccountCheckout from "@/components/payments/BankAccountCheckout";
 import PartnerRailsPanel from "@/components/payments/PartnerRailsPanel";
 import {
   bestPayoutRail,
@@ -1289,10 +1290,23 @@ export default function LinkedBanksCard() {
                 ? "We’ll give you Loop Bank details so this Plaid-linked Canadian account can fund your CAD wallet."
                 : active?.currency === "USD"
                   ? "Send USD from this linked bank using the deposit details we generate for your USD wallet."
-                  : "Send from this linked bank to your eFinMoney receive account for this currency."}
+                  : active?.currency === "NGN" || active?.currency === "GHS"
+                    ? "Pay by bank transfer checkout, or send from this bank to your eFinMoney receive account."
+                    : "Send from this linked bank to your eFinMoney receive account for this currency."}
             </DialogDescription>
           </DialogHeader>
-          {active && (
+          {active && (active.currency === "NGN" || active.currency === "GHS") ? (
+            <BankAccountCheckout
+              purpose="topup"
+              walletId={walletFor(active.currency)?.wallet_id}
+              currency={active.currency}
+              fromBankLabel={`${active.institution} ····${active.lastFour}`}
+              destLabel={`eFinMoney ${active.currency} wallet`}
+              onComplete={() => {
+                setAmount("");
+              }}
+            />
+          ) : active && (
             <div className="space-y-3">
               <p className="text-sm">
                 From: <span className="font-medium">{active.institution} ····{active.lastFour}</span>
@@ -1325,6 +1339,13 @@ export default function LinkedBanksCard() {
               </div>
             </div>
           )}
+          {active && (active.currency === "NGN" || active.currency === "GHS") ? (
+            <DialogFooter>
+              <Button variant="ghost" onClick={() => setMode("closed")}>
+                Close
+              </Button>
+            </DialogFooter>
+          ) : (
           <DialogFooter>
             <Button variant="ghost" onClick={() => setMode("closed")}>
               Cancel
@@ -1345,6 +1366,7 @@ export default function LinkedBanksCard() {
               Continue
             </Button>
           </DialogFooter>
+          )}
         </DialogContent>
       </Dialog>
 

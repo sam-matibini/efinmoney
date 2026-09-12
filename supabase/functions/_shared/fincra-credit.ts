@@ -45,9 +45,12 @@ export function isFincraWalletTopUp(meta: Record<string, unknown> | null | undef
   if (meta?.type === "wallet_topup") return true;
   // Card-funded sends prepaid into wallet then execute-transfer (Zambia/etc.).
   if (meta?.type === "card_send" || meta?.purpose === "card_send") return true;
+  if (meta?.type === "bank_send" || meta?.type === "bank_move") return true;
+  if (meta?.purpose === "send" || meta?.purpose === "bank_send" || meta?.purpose === "bank_move" || meta?.purpose === "topup") return true;
   if (ref.startsWith("efm_fincra_")) return true;
   if (ref.startsWith("topup-fincra-")) return true;
   if (ref.startsWith("cardsend-fincra-")) return true;
+  if (ref.startsWith("banksend-fincra-") || ref.startsWith("banktopup-fincra-") || ref.startsWith("bankmove-fincra-")) return true;
   return false;
 }
 

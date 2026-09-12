@@ -18,7 +18,7 @@ export function buildFincraCardSendRedirectUrl(): { url: string; usesProductionR
   return buildFincraRedirectUrl("/send");
 }
 
-function buildFincraRedirectUrl(path: string): { url: string; usesProductionReturn: boolean } {
+export function buildFincraRedirectUrl(path: string): { url: string; usesProductionReturn: boolean } {
   const isLocal = /^(localhost|127\.0\.0\.1)$/i.test(window.location.hostname);
   const productionBase = (import.meta.env.VITE_APP_URL || "https://www.efin.money").replace(/\/+$/, "");
   if (isLocal) {
@@ -41,6 +41,6 @@ export function parseFincraReturnReference(search: string): string | null {
   const embedded = provider.match(/(?:^|\?)reference=(.+)$/);
   if (embedded?.[1]) return decodeURIComponent(embedded[1]);
 
-  const loose = search.match(/reference=((?:topup|cardsend)-fincra-[^&]+|efm_fincra_[^&]+)/i);
+  const loose = search.match(/reference=((?:topup|cardsend|banksend|banktopup|bankmove)-fincra-[^&]+|efm_fincra_[^&]+)/i);
   return loose?.[1] ? decodeURIComponent(loose[1]) : null;
 }

@@ -316,12 +316,17 @@ const MethodCheckoutPanel = ({
       <div className="space-y-3 rounded-xl border-2 border-pay-bank/30 bg-pay-bank/5 p-3.5">
         <div className="flex items-center gap-2">
           <Landmark className="w-4 h-4 text-pay-bank" />
-          <p className="text-sm font-semibold">Bank debit (ACH / EFT)</p>
+          <p className="text-sm font-semibold">Bank transfer checkout</p>
         </div>
+        <p className="text-sm text-muted-foreground">
+          Confirm to open a bank-transfer checkout. Pay the exact amount from your bank app.
+          We credit the matching wallet, then pay the recipient. Linking a bank is optional —
+          it only helps you remember which account you will send from.
+        </p>
         {bankSources.length > 0 ? (
           <>
             <div className="space-y-2">
-              <Label>From bank account</Label>
+              <Label>Paying from (optional)</Label>
               <Select value={selectedSourceId || bankSources[0]?.id} onValueChange={onSourceChange}>
                 <SelectTrigger><SelectValue placeholder="Select bank account" /></SelectTrigger>
                 <SelectContent>
@@ -348,21 +353,18 @@ const MethodCheckoutPanel = ({
             />
             <ChargeSummary
               amount={amount} fee={fee} total={total} currency={currency} symbol={symbol}
-              debitLabel="Debited from your bank"
+              debitLabel="You pay from your bank"
             />
-            <p className="text-[11px] text-muted-foreground">Bank debits settle in 1–2 business days.</p>
           </>
         ) : (
-          <div className="space-y-2 rounded-lg border border-dashed border-border bg-muted/40 p-3">
-            <div className="flex items-start gap-2">
-              <AlertCircle className="w-4 h-4 mt-0.5 text-muted-foreground shrink-0" />
-              <p className="text-sm text-muted-foreground">
-                No bank accounts linked. Connect your bank to fund transfers via ACH/EFT.
-              </p>
-            </div>
-            <Button type="button" size="sm" className="w-full" onClick={onLinkBank} disabled={linkingBank}>
+          <div className="space-y-2">
+            <ChargeSummary
+              amount={amount} fee={fee} total={total} currency={currency} symbol={symbol}
+              debitLabel="You pay from your bank"
+            />
+            <Button type="button" size="sm" variant="outline" className="w-full" onClick={onLinkBank} disabled={linkingBank}>
               <Landmark className="w-4 h-4 mr-2" />
-              {linkingBank ? "Starting…" : "Link bank account"}
+              {linkingBank ? "Starting…" : "Link a bank (optional)"}
             </Button>
           </div>
         )}

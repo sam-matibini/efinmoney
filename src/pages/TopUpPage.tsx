@@ -81,7 +81,9 @@ import {
 import { clearPendingSwychrTxn } from "@/lib/swychrPay";
 import FlutterwaveWesternTopUpHints from "@/components/wallets/FlutterwaveWesternTopUpHints";
 import BankVirtualAccountCard from "@/components/payments/BankVirtualAccountCard";
+import BankAccountCheckout from "@/components/payments/BankAccountCheckout";
 import { buildFincraTopupRedirectUrl, parseFincraReturnReference, isFincraCheckoutCurrency } from "@/lib/fincraTopup";
+import { supportsFincraBankCheckout } from "@/lib/bankCheckout";
 import { clearPendingNombaTxn, readPendingNombaTxn } from "@/lib/nombaPay";
 import { clearPendingPaytotaTxn, confirmPaytotaPayment, readPendingPaytotaTxn } from "@/lib/paytotaPay";
 import {
@@ -312,7 +314,13 @@ const TopUpPage = () => {
     setPolicyFailoverPartners([]);
     setSelectedMethodId("");
     const fromQuery = params.get("method") || params.get("provider") || params.get("rail");
-    if (fromQuery) return;
+    if (fromQuery) {
+      const q = fromQuery.toLowerCase();
+      if (q === "bank_checkout" || q === "bank-transfer" || q === "bank_transfer") {
+        setSelectedMethodId("bank_checkout");
+      }
+      return;
+    }
     void (async () => {
       try {
         const pref = await resolveCollectMethodPreference(currency);
@@ -871,6 +879,7 @@ const TopUpPage = () => {
     const primaryIds = collectPrimary ? collectPayMethodIds(collectPrimary) : [];
     const showRail = (id: string) => {
       if (id === "bank_va" && (ccyUpper === "NGN" || ccyUpper === "GHS") && productFeatures.flutterwave) return true;
+      if (id === "bank_checkout" && (supportsFincraBankCheckout(ccyUpper) || ccyUpper === "GHS")) return true;
       // Always offer Wise as its own top-level rail when the feature is on.
       if ((id === "wise" || id === "wise_link") && productFeatures.wise) return true;
       if (africaBackupId) {
@@ -889,6 +898,27 @@ const TopUpPage = () => {
 
     // link_bank (Plaid / manual save) temporarily hidden — it only stores a funding
     // source, it does not collect into the wallet on this page.
+    if (showRail("bank_checkout")) {
+      payMethods.push({
+        id: "bank_checkout",
+        tone: "bank",
+        label: "Bank transfer checkout",
+        description: "Pay the exact amount from your bank app",
+        content: (
+          <SectionBoundary name="BankAccountCheckout">
+            <BankAccountCheckout
+              purpose="topup"
+              walletId={walletId}
+              currency={ccyUpper}
+              amount={amountNum}
+              destLabel={`eFinMoney ${ccyUpper} wallet`}
+              onComplete={invalidateWallets}
+            />
+          </SectionBoundary>
+        ),
+      });
+    }
+
     if (showRail("bank_va") && productFeatures.flutterwave && (ccyUpper === "NGN" || ccyUpper === "GHS")) {
       payMethods.push({
         id: "bank_va",

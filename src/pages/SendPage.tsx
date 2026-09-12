@@ -46,7 +46,7 @@ import { resolveEffectiveRate } from "@/lib/fx";
 import { currencySymbol, countryToCurrency } from "@/lib/currency";
 import { useProfile } from "@/hooks/useProfile";
 import { toast } from "sonner";
-import { ArrowRight, CheckCircle, Wallet, CreditCard, AlertCircle, X, Search, Globe2, Lock, Loader2, Check, Shield, Users, UserPlus, ChevronDown, Banknote } from "lucide-react";
+import { ArrowRight, CheckCircle, Wallet, CreditCard, AlertCircle, X, Search, Globe2, Lock, Loader2, Check, Shield, Users, UserPlus, ChevronDown, Banknote, Landmark } from "lucide-react";
 import { BrandFlag, CountryFlag } from "@/components/ui/FlagImage";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import CanadaSendFlow from "@/components/send/CanadaSendFlow";
@@ -123,6 +123,7 @@ import {
   parseFincraReturnReference,
 } from "@/lib/fincraTopup";
 import LenhubFlutterTopUpCard from "@/components/payments/LenhubFlutterTopUpCard";
+import BankAccountCheckout from "@/components/payments/BankAccountCheckout";
 import { cn } from "@/lib/utils";
 import AppPage from "@/components/layout/AppPage";
 import TransferSuccess from "@/components/send/TransferSuccess";
@@ -192,6 +193,9 @@ const SendPage = () => {
   const [lastTransferId, setLastTransferId] = useState<string | null>(null);
   const [interacFunding, setInteracFunding] = useState<
     { transferId: string; walletId: string; amount: number } | null
+  >(null);
+  const [bankCheckoutFunding, setBankCheckoutFunding] = useState<
+    { transferId: string; walletId: string; amount: number; currency: string } | null
   >(null);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [saveModalOpen, setSaveModalOpen] = useState(false);     // pre-filled Add modal
@@ -368,7 +372,7 @@ const SendPage = () => {
 
   const sourceCurrency = fundingSource === 'interac'
     ? 'CAD'
-    : fundingSource === 'wallet' || fundingSource === 'wise'
+    : fundingSource === 'wallet' || fundingSource === 'wise' || fundingSource === 'bank'
     ? (selectedWallet?.currency_code || profileCurrency || SYSTEM_DEFAULT_CURRENCY)
     : fundingSource === 'card'
     ? (selectedWallet && isCardSendCollectCurrency(selectedWallet.currency_code)
@@ -604,7 +608,7 @@ const SendPage = () => {
   /** What the customer actually pays / is debited: amount + fee. */
   const totalCharge = parsedAmount > 0 ? parsedAmount + fee : 0;
 
-  const noLinkedSource = fundingSource === 'bank' && activeSources.length === 0;
+  const noLinkedSource = false;
   const insufficientFunds = fundingSource === 'wallet'
     && !!selectedWallet
     && parsedAmount > 0
@@ -822,7 +826,7 @@ const SendPage = () => {
       overrides?.sender_wallet_id
       ?? (funding === "interac"
         ? (cadWallet?.wallet_id || "")
-        : funding === "wallet" || funding === "card" || funding === "wise"
+        : funding === "wallet" || funding === "card" || funding === "wise" || funding === "bank"
         ? selectedWallet!.wallet_id
         : wallets?.[0]?.wallet_id || "");
     const destCurrency = overrides?.target_currency ?? targetCountry.code;
@@ -934,6 +938,40 @@ const SendPage = () => {
     if (confirming) return;
     setConfirming(true);
     const funding = fundingOverride ?? fundingSource;
+
+    // Bank transfer checkout: park the payout, then collect from the sender's bank.
+    if (funding === "bank") {
+      const wallet =
+        selectedWallet ||
+        (wallets ?? []).find((w) => String(w.currency_code).toUpperCase() === sourceCurrency.toUpperCase());
+      if (!wallet) {
+        toast.error(`Open a ${sourceCurrency} wallet first so we can match the bank deposit.`);
+        setConfirming(false);
+        return;
+      }
+      try {
+        const tid = await createTransferRecord({
+          funding_source: "bank",
+          sender_wallet_id: wallet.wallet_id,
+        });
+        if (sourceCurrency.toUpperCase() === "CAD") {
+          setInteracFunding({ transferId: tid, walletId: wallet.wallet_id, amount: totalCharge });
+        } else {
+          setBankCheckoutFunding({
+            transferId: tid,
+            walletId: wallet.wallet_id,
+            amount: totalCharge,
+            currency: sourceCurrency,
+          });
+        }
+        goToStep(4);
+      } catch (e: any) {
+        toast.error(e?.message || "Could not start bank checkout");
+      } finally {
+        setConfirming(false);
+      }
+      return;
+    }
 
     // CAD Interac pay-in: park the transfer, then open Fincra Autodeposit checkout.
     if (funding === 'interac') {
@@ -1624,7 +1662,7 @@ const SendPage = () => {
     const walletId = intent?.sourceWalletId ?? searchParams.get("sourceWalletId");
     if (walletId && wallets.some((w) => w.wallet_id === walletId)) {
       setSelectedWalletId(walletId);
-      setFundingSource("wallet");
+      if (funding !== "bank") setFundingSource("wallet");
     }
 
     const fromCode = intent?.from ?? searchParams.get("from");
@@ -2039,6 +2077,7 @@ const SendPage = () => {
     setIntlLinkMode(false);
     setLinkResult(null);
     setInteracFunding(null);
+    setBankCheckoutFunding(null);
     setFromQuickSend(false);
     clearSendHandoff();
     clearCardSendIntent();
@@ -2121,6 +2160,9 @@ const SendPage = () => {
       );
     }
     if (fundingSource === "wallet" && !selectedWallet) reasons.push("Select a wallet");
+    if (fundingSource === "bank" && !selectedWallet) {
+      reasons.push("Select a wallet so we can match the bank deposit");
+    }
     if (fundingSource === "interac" && !cadWallet) {
       reasons.push("Create a CAD wallet to pay with Interac e-Transfer");
     }
@@ -2232,6 +2274,7 @@ const SendPage = () => {
     ...(cardFundingAvailable
       ? [{ id: "card" as const, label: "Card", sublabel: "Debit or credit", icon: CreditCard, tone: "card" as const }]
       : []),
+    { id: "bank" as const, label: "Bank", sublabel: "Transfer from your bank", icon: Landmark, tone: "bank" as const },
     ...(interacFundingAvailable
       ? [{
           id: "interac" as const,
@@ -2259,10 +2302,6 @@ const SendPage = () => {
   ]);
 
   useEffect(() => {
-    if (fundingSource === "bank") {
-      setFundingSource("wallet");
-      return;
-    }
     if (fundingSource === "card") {
       setShowOtherFunding(true);
     }
@@ -3234,8 +3273,8 @@ const SendPage = () => {
                                               </span>
                                             ) : (
                                               <span className="inline-flex items-center gap-2">
-                                                {fundingSource === "card" ? <CreditCard className="w-4 h-4" /> : fundingSource === "interac" ? <Banknote className="w-4 h-4" /> : <Shield className="w-4 h-4" />}
-                                                {useLink ? "Send secure link" : fundingSource === "card" ? "Pay with card" : fundingSource === "interac" ? "Pay with Interac" : "Confirm Transfer"}
+                                                {fundingSource === "card" ? <CreditCard className="w-4 h-4" /> : fundingSource === "interac" ? <Banknote className="w-4 h-4" /> : fundingSource === "bank" ? <Landmark className="w-4 h-4" /> : <Shield className="w-4 h-4" />}
+                                                {useLink ? "Send secure link" : fundingSource === "card" ? "Pay with card" : fundingSource === "interac" ? "Pay with Interac" : fundingSource === "bank" ? "Pay from bank" : "Confirm Transfer"}
                                               </span>
                                             )}
                                           </Button>
@@ -3295,7 +3334,9 @@ const SendPage = () => {
                                       <div className="flex justify-between text-base pt-2 border-t border-border"><span>They receive</span><span className="font-bold">{targetSymbol} {receivedAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
                                     </div>
                                     {fundingSource === 'bank' && (
-                                      <p className="text-xs text-muted-foreground text-center">Bank transfer — funds will be debited within 1-2 business days.</p>
+                                      <p className="text-xs text-muted-foreground text-center">
+                                        Next you’ll pay from your bank app. We collect the amount, then send it to the recipient.
+                                      </p>
                                     )}
                                     {fundingSource === "card" && !inlineCardEntry && (
                                       <p className="text-xs text-muted-foreground text-center">
@@ -3382,6 +3423,33 @@ const SendPage = () => {
                                       }}
                                       onComplete={() => setInteracFunding(null)}
                                     />
+                                  </SectionBoundary>
+                                ) : bankCheckoutFunding ? (
+                                  <SectionBoundary name="BankSendCheckout">
+                                    <div className="space-y-3">
+                                      <BankAccountCheckout
+                                        purpose="send"
+                                        walletId={bankCheckoutFunding.walletId}
+                                        currency={bankCheckoutFunding.currency}
+                                        amount={bankCheckoutFunding.amount}
+                                        transferId={bankCheckoutFunding.transferId}
+                                        destLabel={recipientName || "recipient"}
+                                        fromBankLabel={
+                                          activeSources.find((s) => s.id === selectedSourceId)?.display_name
+                                        }
+                                      />
+                                      <Button
+                                        type="button"
+                                        variant="outline"
+                                        className="w-full"
+                                        onClick={() => {
+                                          setBankCheckoutFunding(null);
+                                          goToStep(3);
+                                        }}
+                                      >
+                                        Back
+                                      </Button>
+                                    </div>
                                   </SectionBoundary>
                                 ) : linkResult ? (
                                   <SectionBoundary name="PaymentLinkSuccess"><PaymentLinkSuccess

@@ -16,6 +16,7 @@ import AppPage from "@/components/layout/AppPage";
 import ZambiaMoMoReceiveLinks from "@/components/payments/ZambiaMoMoReceiveLinks";
 import BankVirtualAccountCard from "@/components/payments/BankVirtualAccountCard";
 import LinkedBanksCard from "@/components/payments/LinkedBanksCard";
+import BankCheckoutHub from "@/components/payments/BankCheckoutHub";
 import { productFeatures } from "@/lib/productFeatures";
 import { isBankVaCurrency } from "@/lib/bankVirtualAccounts";
 
@@ -68,6 +69,8 @@ const ReceivePage = () => {
             variant="emerald"
           />
 
+
+          <BankCheckoutHub />
 
           <LinkedBanksCard />
 

@@ -41,7 +41,8 @@ The Bank account page (`/wallet/receive`) lists company or personal linked banks
 
 - **Connect with Plaid** — Instant Auth for **Canada and the US**. After linking, eFinMoney stores EFT (CA) or ACH routing (US) numbers, caches live **available** / **current** balances, and can fund CAD wallet top-ups plus same-company bank-to-bank moves without a pre-funded wallet.
 - **Partner rails (business)** — Live disbursement balances from **Fincra**, **Verto**, and **Nomba**. Withdraw and same-company sends to linked Nigerian, Ghanaian, or Kenyan banks pay from the Fincra or Nomba partner wallet (NUBAN / bank-to-bank). You do not need a pre-funded eFinMoney wallet when that float covers the amount. Verto is shown for treasury; NUBAN payouts use Fincra then Nomba.
-- **Top up wallet** — Send from the linked bank to the matching eFinMoney wallet (Loop Interac/EFT for CAD Plaid, Wise ACH details for USD, virtual account for NGN/GHS).
+- **Bank transfer checkout** — Top up NGN/GHS from your bank app (`/wallet/topup?method=bank_checkout`), send to a recipient with **Pay with Bank** on Send (collect then payout), or move between company banks on this page. Fincra hosted `bank_transfer` for NGN; optional permanent receive account as a fallback.
+- **Top up wallet** — Send from the linked bank to the matching eFinMoney wallet (Loop Interac/EFT for CAD Plaid, Wise ACH details for USD, bank checkout / virtual account for NGN/GHS).
 - **Send to another bank** — When the source is a Plaid Canadian bank, we debit that bank (Loop pay-in) and pay the destination once the deposit matches. Africa corridors use partner rails, then the eFinMoney wallet.
 - **Link bank** — manual corridor details (NG/GH/KE) or country-specific fields.
 - Manual Nigerian / Ghanaian / Kenyan links cannot be **debited** by Plaid. Those banks are **paid** from Fincra/Nomba float (or a funded wallet).

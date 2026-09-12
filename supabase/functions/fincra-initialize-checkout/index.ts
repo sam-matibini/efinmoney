@@ -173,6 +173,26 @@ Deno.serve(async (req) => {
       paymentMethods: PAYMENT_METHODS_BY_CCY[chargeCurrency] ?? ["card", "bank_transfer"],
     };
 
+    const requestedMethods = Array.isArray(body?.paymentMethods)
+      ? (body.paymentMethods as unknown[]).map((m) => String(m).trim()).filter(Boolean)
+      : [];
+    const allowed = PAYMENT_METHODS_BY_CCY[chargeCurrency] ?? ["card", "bank_transfer"];
+    if (requestedMethods.length) {
+      const filtered = requestedMethods.filter((m) => allowed.includes(m) || m === "bank_transfer");
+      if (filtered.length) payload.paymentMethods = filtered;
+    }
+
+    const purpose = String(body?.purpose || body?.type || "wallet_topup");
+    const transferId = body?.transfer_id ? String(body.transfer_id) : "";
+    const meta = payload.metadata as Record<string, unknown>;
+    meta.purpose = purpose;
+    meta.type = purpose === "send" || purpose === "bank_send"
+      ? "bank_send"
+      : purpose === "bank_move"
+        ? "bank_move"
+        : (meta.type || "wallet_topup");
+    if (transferId) meta.transfer_id = transferId;
+
     const { ok, status, json } = await fincraFetch("/checkout/payments", {
       method: "POST",
       body: JSON.stringify(payload),

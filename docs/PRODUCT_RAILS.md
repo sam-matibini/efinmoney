@@ -11,6 +11,7 @@ This document reflects the **UI simplification pass** (July 2026). Edge function
 | **Swychr Connect** | Secondary payin, NGN payout fallback, vCards, airtime | `SwychrTopUpCard`, `SwychrCardsPanel`, `SwychrAirtimePanel` (flagged off) | `swychr-collection`, `swychr-payout`, `swychr-card-*`, `swychr-airtime-*` |
 | **Plaid** | Link CA/US banks, live balances, CAD top-up, same-company bank moves | Bank tab (`LinkedBanksCard`), Send funding | `plaid-create-link-token`, `plaid-exchange-token`, `plaid-refresh-balances`, `intra-ca-transfer-create` |
 | **Fincra / Nomba / Verto** | Live partner disbursement balances on Company banks; NG/GH/KE bank-to-bank payouts from Fincra then Nomba (Verto is balance-only) | Bank tab (`LinkedBanksCard`, `PartnerRailsPanel`) | `partner-rail-balances`, `linked-bank-rail-payout`, `fincra-payout`, `nomba-payout`, `partner-balance-verto` |
+| **Bank transfer checkout** | Amount-locked bank pay-in for wallet top-up and send-to-recipient (Fincra `bank_transfer`); company bank↔bank on the Bank tab | Top up (`BankAccountCheckout`), Send (Pay with Bank), Bank tab hub | `fincra-initialize-checkout`, `fincra-webhook`, `flw-create-virtual-account` |
 | **Wallets & FX** | Multi-currency balances, fiat exchange | `WalletsPage`, `ExchangePage` (Currency tab) | Wallet ledger, `execute-transfer` (wallet-funded) |
 
 Feature flags: `src/lib/productFeatures.ts` (override with `VITE_FEATURE_*` in `.env`).

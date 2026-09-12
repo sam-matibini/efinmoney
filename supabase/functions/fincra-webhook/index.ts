@@ -125,6 +125,27 @@ Deno.serve(async (req) => {
             supabase, userId, currency, amount, idempotencyRef, walletId,
             `Wallet top-up (${merchantRef || idempotencyRef})`,
           );
+          const transferId = String(meta.transfer_id || "");
+          const shouldPayout = Boolean(transferId) && (
+            meta.type === "bank_send" || meta.purpose === "send" || meta.purpose === "bank_send"
+          );
+          if (shouldPayout) {
+            const base = Deno.env.get("SUPABASE_URL")!;
+            const service = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+            const payout = await fetch(`${base}/functions/v1/execute-transfer`, {
+              method: "POST",
+              headers: {
+                Authorization: `Bearer ${service}`,
+                "Content-Type": "application/json",
+                apikey: Deno.env.get("SUPABASE_ANON_KEY") || "",
+                "x-internal-secret": service,
+              },
+              body: JSON.stringify({ transfer_id: transferId }),
+            });
+            if (!payout.ok) {
+              console.error("fincra-webhook bank_send execute-transfer failed", payout.status, await payout.text().catch(() => ""));
+            }
+          }
         }
       }
     }
