@@ -107,9 +107,16 @@ export async function initiateNombaCollection(params: {
     const providerMsg = String(
       payload.provider_response?.message
       ?? (payload.provider_response as { Data?: { message?: string } })?.Data?.message
+      ?? (payload as { detail?: string }).detail
       ?? "",
     ).trim();
-    throw new Error(providerMsg || payload.error);
+    const combined = `${payload.error} ${providerMsg} ${payload.code || ""}`;
+    if (payload.code === "nomba_email_blocked" || /email is blocked/i.test(combined)) {
+      throw new Error(
+        "Card checkout could not start. Pay with Interac, Wise, or wallet — or try card again in a moment.",
+      );
+    }
+    throw new Error(payload.error);
   }
   if (!payload.success || !payload.payment_link) {
     throw new Error(payload.message || "Checkout link unavailable");

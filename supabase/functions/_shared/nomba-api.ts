@@ -8,8 +8,7 @@
 
 import {
   isNombaEmailBlockedError,
-  nombaPayerEmail,
-  resolveNombaCustomerEmail,
+  nombaCheckoutEmailCandidates,
 } from "./nomba-customer-email.ts";
 
 export type NombaApiConfig = {
@@ -188,11 +187,7 @@ export async function createNombaCheckoutOrder(params: {
     ...(Deno.env.get("NOMBA_BLOCKED_CUSTOMER_EMAILS") || "").split(","),
   ];
   const userId = params.userId || "guest";
-  const first = resolveNombaCustomerEmail(params.customerEmail, userId, extraBlocked);
-  const emails = [first.email];
-  if (first.email !== nombaPayerEmail(userId)) {
-    emails.push(nombaPayerEmail(userId));
-  }
+  const emails = nombaCheckoutEmailCandidates(params.customerEmail, userId, extraBlocked);
 
   let lastError = "Nomba checkout failed";
   let lastStatus: number | undefined;

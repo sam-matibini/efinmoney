@@ -124,11 +124,11 @@ Deno.serve(async (req) => {
     const profileEmail = String(profile?.email || "").trim();
     // Never send the Interac Autodeposit mailbox as Nomba Checkout customerEmail.
     extraBlocked.push(interacEmail, jwtInterac);
-    if (walletCurrency === "CAD") {
-      extraBlocked.push(String(userEmail || ""), profileEmail);
-    }
+    // Use a real personal mailbox for Checkout. Do not blank CAD and mint
+    // @efin.money — Nomba blocks that domain ("The provided email is blocked").
+    // Interac Autodeposit stays extra-blocked so Checkout never uses it.
     const customerEmail = resolveNombaCustomerEmail(
-      walletCurrency === "CAD" ? "" : String(email || userEmail || ""),
+      String(email || userEmail || profileEmail || ""),
       userId,
       extraBlocked,
     ).email;
@@ -282,7 +282,7 @@ Deno.serve(async (req) => {
             : `${created.error}${accountHint}`,
           code: blockedEmail ? "nomba_email_blocked" : "nomba_checkout_failed",
           hint: accountHint ? "checkout_account_setup" : undefined,
-          detail: created.error,
+          ...(blockedEmail ? {} : { detail: created.error }),
         }, 200);
       }
 
