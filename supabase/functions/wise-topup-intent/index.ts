@@ -172,6 +172,7 @@ Deno.serve(async (req) => {
       amount?: number;
       wallet_id?: string;
       intent_id?: string;
+      transfer_id?: string;
     };
     const action = String(body.action || "create").toLowerCase();
 
@@ -256,18 +257,31 @@ Deno.serve(async (req) => {
       }
 
       const reference = `efm-wl-${user.id.slice(0, 8)}-${Date.now()}`;
-      const { data: linkIntent, error: linkErr } = await admin
+      const transferId = String(body.transfer_id || "").trim() || null;
+      const linkRow: Record<string, unknown> = {
+        user_id: user.id,
+        wallet_id: linkWalletId,
+        amount: Math.round(linkAmount * 100) / 100,
+        currency_code: String(linkWallet.currency_code).toUpperCase(),
+        reference,
+        status: "pending",
+      };
+      if (transferId) linkRow.transfer_id = transferId;
+      let { data: linkIntent, error: linkErr } = await admin
         .from("wise_topup_intents")
-        .insert({
-          user_id: user.id,
-          wallet_id: linkWalletId,
-          amount: Math.round(linkAmount * 100) / 100,
-          currency_code: String(linkWallet.currency_code).toUpperCase(),
-          reference,
-          status: "pending",
-        })
+        .insert(linkRow)
         .select("id, amount, currency_code, reference, status, created_at, expires_at")
         .single();
+      if (linkErr && transferId && /transfer_id/i.test(linkErr.message || "")) {
+        delete linkRow.transfer_id;
+        const retry = await admin
+          .from("wise_topup_intents")
+          .insert(linkRow)
+          .select("id, amount, currency_code, reference, status, created_at, expires_at")
+          .single();
+        linkIntent = retry.data;
+        linkErr = retry.error;
+      }
       if (linkErr || !linkIntent) {
         return json({ error: linkErr?.message || "Could not create Wise payment intent" }, 500);
       }

@@ -12,6 +12,10 @@ interface Props {
   walletId: string;
   walletCurrency: string;
   initialAmount?: string;
+  /** Parked send — when Wise credits the wallet we release this payout. */
+  transferId?: string;
+  recipientCountryHint?: string;
+  lockAmount?: boolean;
   onComplete?: () => void;
 }
 
@@ -24,7 +28,15 @@ type Intent = {
 };
 
 /** "Pay with Wise": creates a matching intent, then hands the payer to the hosted Wise pay page. */
-export default function WisePayLinkCard({ walletId, walletCurrency, initialAmount, onComplete }: Props) {
+export default function WisePayLinkCard({
+  walletId,
+  walletCurrency,
+  initialAmount,
+  transferId,
+  recipientCountryHint,
+  lockAmount,
+  onComplete,
+}: Props) {
   const currency = walletCurrency.toUpperCase();
   const [amount, setAmount] = useState(initialAmount ?? "");
   const [loading, setLoading] = useState(false);
@@ -49,7 +61,23 @@ export default function WisePayLinkCard({ walletId, walletCurrency, initialAmoun
       if (next && !cancelled) {
         setIntent(next);
         if (next.status === "completed") {
-          toast.success(`${next.currency_code} ${next.amount} credited to your wallet`);
+          if (transferId) {
+            const { data, error } = await supabase.functions.invoke("execute-transfer", {
+              body: {
+                transfer_id: transferId,
+                recipient_country_hint: recipientCountryHint,
+              },
+            });
+            if (error || data?.success === false || data?.error) {
+              toast.error(
+                String(data?.error || data?.payout?.error || error?.message || "Payment received, but sending failed. Open the transfer to retry."),
+              );
+              return;
+            }
+            toast.success("Wise payment received — sending to your recipient");
+          } else {
+            toast.success(`${next.currency_code} ${next.amount} credited to your wallet`);
+          }
           onComplete?.();
           return;
         }
@@ -62,7 +90,7 @@ export default function WisePayLinkCard({ walletId, walletCurrency, initialAmoun
       cancelled = true;
       clearTimeout(t);
     };
-  }, [intent?.id, intent?.status, onComplete]);
+  }, [intent?.id, intent?.status, onComplete, transferId, recipientCountryHint]);
 
   const start = async () => {
     const amt = Number(amount);
@@ -73,7 +101,12 @@ export default function WisePayLinkCard({ walletId, walletCurrency, initialAmoun
     setLoading(true);
     try {
       const { data, error } = await supabase.functions.invoke("wise-topup-intent", {
-        body: { action: "create_link", amount: amt, wallet_id: walletId },
+        body: {
+          action: "create_link",
+          amount: amt,
+          wallet_id: walletId,
+          transfer_id: transferId || undefined,
+        },
       });
       if (error) throw new Error(error.message);
       const created = (data as { intent?: Intent; error?: string } | null);
@@ -114,8 +147,10 @@ export default function WisePayLinkCard({ walletId, walletCurrency, initialAmoun
           Pay with Wise
         </CardTitle>
         <p className="text-sm text-muted-foreground">
-          Pay by bank transfer or card on our secure Wise page. Your {currency} wallet credits
-          automatically once the payment lands.
+          Pay by bank transfer or card on our secure Wise page.
+          {transferId
+            ? " We send to your recipient once the payment lands."
+            : ` Your ${currency} wallet credits automatically once the payment lands.`}
         </p>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -129,6 +164,8 @@ export default function WisePayLinkCard({ walletId, walletCurrency, initialAmoun
                 placeholder="0.00"
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
+                readOnly={lockAmount}
+                disabled={lockAmount}
               />
             </div>
             <Button className="w-full" size="lg" onClick={() => void start()} disabled={loading}>

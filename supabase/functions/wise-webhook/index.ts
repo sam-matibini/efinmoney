@@ -409,8 +409,20 @@ Deno.serve(async (req) => {
 
           console.log("wise-webhook: credited intent", intentTable, intent.id, result);
 
-          // Interac-funded sends: release the linked payout now that funds arrived
-          if (isInterac && intent.transfer_id) {
+          let payoutTransferId = intent.transfer_id || null;
+          if (!payoutTransferId && intentTable === "wise_topup_intents") {
+            const extra = await supabase
+              .from("wise_topup_intents")
+              .select("transfer_id")
+              .eq("id", intent.id)
+              .maybeSingle();
+            if (!extra.error) {
+              payoutTransferId = (extra.data as { transfer_id?: string | null } | null)?.transfer_id || null;
+            }
+          }
+
+          // Wise- or Interac-funded sends: release the linked payout now that funds arrived
+          if (payoutTransferId) {
             try {
               const res = await fetch(
                 `${Deno.env.get("SUPABASE_URL")}/functions/v1/execute-transfer`,
@@ -423,7 +435,7 @@ Deno.serve(async (req) => {
                     "x-internal-secret": Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
                     "x-idempotency-key": creditIdem,
                   },
-                  body: JSON.stringify({ transfer_id: intent.transfer_id }),
+                  body: JSON.stringify({ transfer_id: payoutTransferId }),
                 },
               );
               const payoutBody = await res.text();
@@ -432,9 +444,9 @@ Deno.serve(async (req) => {
                 await supabase.from("transfers").update({
                   status: "failed",
                   failure_reason: payoutBody.slice(0, 500),
-                }).eq("id", intent.transfer_id);
+                }).eq("id", payoutTransferId);
               } else {
-                console.log("wise-webhook: released Interac-funded transfer", intent.transfer_id, payoutBody.slice(0, 300));
+                console.log("wise-webhook: released funded transfer", payoutTransferId, payoutBody.slice(0, 300));
               }
             } catch (payoutErr) {
               console.error("wise-webhook: execute-transfer threw", payoutErr);

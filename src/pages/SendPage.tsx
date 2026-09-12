@@ -194,6 +194,9 @@ const SendPage = () => {
   const [interacFunding, setInteracFunding] = useState<
     { transferId: string; walletId: string; amount: number } | null
   >(null);
+  const [wiseFunding, setWiseFunding] = useState<
+    { transferId: string; walletId: string; amount: number; currency: string } | null
+  >(null);
   const [bankCheckoutFunding, setBankCheckoutFunding] = useState<
     { transferId: string; walletId: string; amount: number; currency: string } | null
   >(null);
@@ -1017,6 +1020,37 @@ const SendPage = () => {
         goToStep(4);
       } catch (e: any) {
         toast.error(e?.message || 'Could not start bank pay-in');
+      } finally {
+        setConfirming(false);
+      }
+      return;
+    }
+
+    // Wise pay-in: park the transfer, then open hosted Wise checkout.
+    if (funding === "wise") {
+      const wallet =
+        (selectedWallet && isWisePayCurrency(selectedWallet.currency_code) ? selectedWallet : null)
+        || (wallets ?? []).find((w) => isWisePayCurrency(w.currency_code));
+      if (!wallet) {
+        toast.error("Open a CAD, USD, EUR, or GBP wallet to pay with Wise.");
+        setConfirming(false);
+        return;
+      }
+      try {
+        const tid = await createTransferRecord({
+          funding_source: "wise",
+          sender_wallet_id: wallet.wallet_id,
+          source_currency: wallet.currency_code,
+        });
+        setWiseFunding({
+          transferId: tid,
+          walletId: wallet.wallet_id,
+          amount: totalCharge,
+          currency: wallet.currency_code,
+        });
+        goToStep(4);
+      } catch (e: any) {
+        toast.error(e?.message || "Could not start Wise pay-in");
       } finally {
         setConfirming(false);
       }
@@ -2140,6 +2174,7 @@ const SendPage = () => {
     setIntlLinkMode(false);
     setLinkResult(null);
     setInteracFunding(null);
+    setWiseFunding(null);
     setBankCheckoutFunding(null);
     setFromQuickSend(false);
     clearSendHandoff();
@@ -2228,6 +2263,12 @@ const SendPage = () => {
     }
     if (fundingSource === "interac" && !cadWallet) {
       reasons.push("Create a CAD wallet to pay with Interac e-Transfer");
+    }
+    if (fundingSource === "wise") {
+      if (!selectedWallet) reasons.push("Select a wallet to pay with Wise");
+      else if (!isWisePayCurrency(selectedWallet.currency_code)) {
+        reasons.push("Select a CAD, USD, EUR, or GBP wallet to pay with Wise");
+      }
     }
     if (fundingSource === "card") {
       if (!cardSendEnabled || !cardPayoutCodes.includes(targetCountry.code)) {
@@ -3351,8 +3392,8 @@ const SendPage = () => {
                                               </span>
                                             ) : (
                                               <span className="inline-flex items-center gap-2">
-                                                {fundingSource === "card" ? <CreditCard className="w-4 h-4" /> : fundingSource === "interac" ? <Banknote className="w-4 h-4" /> : fundingSource === "bank" ? <Landmark className="w-4 h-4" /> : <Shield className="w-4 h-4" />}
-                                                {useLink ? "Send secure link" : fundingSource === "card" ? "Pay with card" : fundingSource === "interac" ? "Pay with Interac" : fundingSource === "bank" ? "Pay from bank" : "Confirm Transfer"}
+                                                {fundingSource === "card" ? <CreditCard className="w-4 h-4" /> : fundingSource === "interac" ? <Banknote className="w-4 h-4" /> : fundingSource === "bank" ? <Landmark className="w-4 h-4" /> : fundingSource === "wise" ? <Wallet className="w-4 h-4" /> : <Shield className="w-4 h-4" />}
+                                                {useLink ? "Send secure link" : fundingSource === "card" ? "Pay with card" : fundingSource === "interac" ? "Pay with Interac" : fundingSource === "bank" ? "Pay from bank" : fundingSource === "wise" ? "Pay with Wise" : "Confirm Transfer"}
                                               </span>
                                             )}
                                           </Button>
@@ -3410,7 +3451,9 @@ const SendPage = () => {
                                             ? "Interac"
                                             : fundingSource === "card"
                                               ? "Card"
-                                              : fundingSource}
+                                              : fundingSource === "wise"
+                                                ? "Wise"
+                                                : fundingSource}
                                         </span>
                                       </div>
                                     </div>
@@ -3421,6 +3464,11 @@ const SendPage = () => {
                                       <div className="flex justify-between"><span className="text-muted-foreground">Rate</span><span className="font-medium">1 {sourceCurrency} = {effectiveRate.toFixed(4)} {targetCountry.code}</span></div>
                                       <div className="flex justify-between text-base pt-2 border-t border-border"><span>They receive</span><span className="font-bold">{targetSymbol} {receivedAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
                                     </div>
+                                    {fundingSource === "wise" && (
+                                      <p className="text-xs text-muted-foreground text-center">
+                                        Next you’ll pay on Wise by bank or card. We send to the recipient when the payment lands.
+                                      </p>
+                                    )}
                                     {fundingSource === 'bank' && (
                                       <p className="text-xs text-muted-foreground text-center">
                                         Next you’ll pay from your bank app. We collect the amount, then send it to the recipient.
@@ -3511,6 +3559,31 @@ const SendPage = () => {
                                       }}
                                       onComplete={() => setInteracFunding(null)}
                                     />
+                                  </SectionBoundary>
+                                ) : wiseFunding ? (
+                                  <SectionBoundary name="WiseSendCheckout">
+                                    <div className="space-y-3">
+                                      <WisePayLinkCard
+                                        walletId={wiseFunding.walletId}
+                                        walletCurrency={wiseFunding.currency}
+                                        initialAmount={wiseFunding.amount.toFixed(2)}
+                                        transferId={wiseFunding.transferId}
+                                        recipientCountryHint={targetCountry.country}
+                                        lockAmount
+                                        onComplete={() => setWiseFunding(null)}
+                                      />
+                                      <Button
+                                        type="button"
+                                        variant="outline"
+                                        className="w-full"
+                                        onClick={() => {
+                                          setWiseFunding(null);
+                                          goToStep(3);
+                                        }}
+                                      >
+                                        Back
+                                      </Button>
+                                    </div>
                                   </SectionBoundary>
                                 ) : bankCheckoutFunding ? (
                                   <SectionBoundary name="BankSendCheckout">

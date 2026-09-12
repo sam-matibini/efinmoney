@@ -460,7 +460,7 @@ const CanadaSendFlow = () => {
   const [funding, setFunding] = useState<FundingSource>("wallet");
   const [selectedSourceId, setSelectedSourceId] = useState("");
   const [cadPayIn, setCadPayIn] = useState<{
-    kind: "interac" | "bank" | "card";
+    kind: "interac" | "bank" | "card" | "wise";
     transferId: string;
     walletId: string;
     amount: number;
@@ -1063,7 +1063,61 @@ const CanadaSendFlow = () => {
     }
 
     if (funding === "wise") {
-      toast.message("Complete the Wise payment first, then send from your CAD wallet.");
+      const wallet = selectedWallet || (fallbackWallet && isWisePayCurrency(fallbackWallet.currency_code) ? fallbackWallet : null);
+      if (!wallet || !isWisePayCurrency(wallet.currency_code)) {
+        toast.error("Open a CAD wallet to pay with Wise.");
+        return;
+      }
+      const cadInteracDest = method === "interac"
+        ? resolveCadInteracDestination({
+            recipient_account: recipientEmail,
+            recipient_phone: recipientPhone,
+          })
+        : null;
+      if (method === "interac" && !cadInteracDest?.ok) {
+        toast.error(cadInteracDest?.error || CAD_INTERAC_MISSING_CONTACT);
+        return;
+      }
+      setCardSubmitting(true);
+      try {
+        const transfer = await createTransfer.mutateAsync({
+          sender_wallet_id: wallet.wallet_id,
+          recipient_name: recipientName,
+          recipient_account: method === "eft"
+            ? `${institutionNumber}-${transitNumber}-${accountNumber}`
+            : method === "interac"
+              ? (cadInteracDest?.ok
+                ? (cadInteracDest.dest.email || cadInteracDest.dest.phone || "")
+                : recipientEmail)
+              : recipientEmail,
+          recipient_phone: method === "interac"
+            ? (cadInteracDest?.ok ? cadInteracDest.dest.phone || undefined : recipientPhone || undefined)
+            : undefined,
+          recipient_country: "CA",
+          transfer_type: "domestic_canada",
+          payout_method: method === "eft" ? "eft" : method === "interac" ? "interac" : method,
+          funding_source: "bank",
+          source_currency: "CAD",
+          target_currency: "CAD",
+          source_amount: parsedAmount,
+          target_amount: receivedAmount,
+          exchange_rate: 1,
+          fee_amount: totalFee,
+        } as any);
+        setCadPayIn({
+          kind: "wise",
+          transferId: transfer.id,
+          walletId: wallet.wallet_id,
+          amount: totalCharged,
+        });
+        setLastTransferId(transfer.id);
+        setStep(4);
+        toast.success("Pay with Wise to complete this send");
+      } catch (e: any) {
+        toast.error(e?.message || "Could not start Wise pay-in");
+      } finally {
+        setCardSubmitting(false);
+      }
       return;
     }
 
@@ -1747,7 +1801,6 @@ const CanadaSendFlow = () => {
 
             <div className="flex gap-3">
               <Button variant="outline" className="flex-1" onClick={() => setStep(2)}>Back</Button>
-              {funding !== "wise" && (
               <Button
                 className="flex-1"
                 onClick={() => method === "paylink" ? handleSubmit() : requirePin(handleSubmit, `C$${parsedAmount.toFixed(2)}`)}
@@ -1763,9 +1816,10 @@ const CanadaSendFlow = () => {
                         ? "Continue to Interac"
                         : funding === "bank"
                           ? "Continue to bank pay-in"
-                          : `Send C$${parsedAmount.toFixed(2)}`}
+                          : funding === "wise"
+                            ? "Pay with Wise"
+                            : `Send C$${parsedAmount.toFixed(2)}`}
               </Button>
-              )}
             </div>
           </CardContent>
         </Card>
@@ -1850,7 +1904,27 @@ const CanadaSendFlow = () => {
         </Card>
       )}
 
-      {step === 4 && cadPayIn && method !== "paylink" && (
+      {step === 4 && cadPayIn && cadPayIn.kind === "wise" && method !== "paylink" && (
+        <div className="space-y-3">
+          <WisePayLinkCard
+            walletId={cadPayIn.walletId}
+            walletCurrency="CAD"
+            initialAmount={cadPayIn.amount.toFixed(2)}
+            transferId={cadPayIn.transferId}
+            recipientCountryHint="CA"
+            lockAmount
+            onComplete={() => {
+              setCadPayIn(null);
+              toast.success("Payment received — completing delivery");
+            }}
+          />
+          <Button variant="outline" className="w-full" onClick={() => { setCadPayIn(null); setStep(3); }}>
+            Back
+          </Button>
+        </div>
+      )}
+
+      {step === 4 && cadPayIn && cadPayIn.kind !== "wise" && method !== "paylink" && (
         <WiseInteracInvoiceCheckout
           walletId={cadPayIn.walletId}
           purpose="transfer"
