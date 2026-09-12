@@ -13,6 +13,5 @@ export const INTERAC_ETRANSFER_ENABLED =
 export const CAD_BANK_EFT_ENABLED =
   import.meta.env.VITE_CAD_EFT_PAYOUTS_ENABLED !== "false";
 
-/** Stripe-backed rails available as extra CAD delivery options. */
-export const STRIPE_CANADA_RAILS_NOTE =
-  "Instant debit-card and payment-link delivery use Stripe when that rail is on.";
+/** Stripe-backed rails are not offered on Canada domestic send. */
+export const STRIPE_CANADA_RAILS_NOTE = "";

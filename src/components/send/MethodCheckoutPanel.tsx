@@ -77,6 +77,12 @@ interface Props {
 
   insufficientBalance?: boolean;
   onTopUp?: () => void;
+  /** Override Interac panel heading. */
+  interacTitle?: string;
+  /** Override Interac panel body copy. */
+  interacDescription?: string;
+  /** Override card panel heading. */
+  cardTitle?: string;
 }
 
 type QuickTone = "card" | "bank" | "wallet";
@@ -156,6 +162,9 @@ const MethodCheckoutPanel = ({
 
   insufficientBalance,
   onTopUp,
+  interacTitle,
+  interacDescription,
+  cardTitle,
 }: Props) => {
   const walletSelect = (label: string, helper?: string) => (
     <div className="space-y-2">
@@ -191,12 +200,13 @@ const MethodCheckoutPanel = ({
         <div>
           <div className="flex items-center gap-2">
             <PayMethodMark kind="interac" className="h-8 w-8" />
-            <p className="text-sm font-semibold">{fincraOn ? "Interac" : "Interac (CAD)"}</p>
+            <p className="text-sm font-semibold">{interacTitle || (fincraOn ? "Interac e-Transfer" : "Interac (CAD)")}</p>
           </div>
           <p className="mt-1 text-xs text-muted-foreground">
-            {fincraOn
-              ? `Confirm to open Interac checkout for ${symbol}${money(total)} ${currency}. Send CAD to ${FINCRA_CAD_INTERAC_ALIAS}. We'll give you a unique payment code to paste in the Interac message. Fincra matches the deposit and releases your payout.`
-              : `Confirm to open checkout for ${symbol}${money(total)} ${currency}. Send Interac Autodeposit — your payout releases when the deposit matches.`}
+            {interacDescription
+              || (fincraOn
+                ? `Confirm to open Interac checkout for ${symbol}${money(total)} ${currency}. Send CAD Autodeposit to ${FINCRA_CAD_INTERAC_ALIAS} with your payment code. Nomba pays Interac or EFT once the deposit matches.`
+                : `Confirm to open checkout for ${symbol}${money(total)} ${currency}. Send Interac Autodeposit — Nomba pays out when the deposit matches.`)}
           </p>
         </div>
         <ChargeSummary amount={amount} fee={fee} total={total} currency={currency} symbol={symbol} debitLabel="Interac from your bank" />
@@ -210,7 +220,7 @@ const MethodCheckoutPanel = ({
       <div className="space-y-3 rounded-xl border-2 border-pay-card/30 bg-pay-card/5 p-3.5">
         <div className="flex items-center gap-2">
           <PayMethodMark kind="card" className="h-8 w-8" />
-          <p className="text-sm font-semibold">Card checkout</p>
+          <p className="text-sm font-semibold">{cardTitle || "Card checkout"}</p>
         </div>
 
         {wallets.length === 0 ? (

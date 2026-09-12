@@ -116,7 +116,6 @@ import {
   verifySwychrPayin,
 } from "@/lib/swychrPay";
 import { productFeatures } from "@/lib/productFeatures";
-import { FINCRA_CAD_INTERAC_ALIAS } from "@/lib/fincraCad";
 import { CAD_INTERAC_MISSING_CONTACT, resolveCadInteracDestination } from "@/lib/cadInteracPayout";
 import {
   buildFincraCardSendRedirectUrl,
@@ -2321,7 +2320,6 @@ const SendPage = () => {
     || productFeatures.paytota || productFeatures.swychr || productFeatures.flutterwave;
 
   const interacFundingAvailable = productFeatures.fincraInterac;
-  const interacUsesFincra = productFeatures.fincraInterac;
   const wisePayWallet = wallets?.find((w) => isWisePayCurrency(w.currency_code));
 
   useEffect(() => {
@@ -2332,16 +2330,14 @@ const SendPage = () => {
 
   const fundingMethodOptions: PaymentMethodOption<FundingSource>[] = [
     ...(cardFundingAvailable
-      ? [{ id: "card" as const, label: "Card", sublabel: "Debit or credit", icon: CreditCard, tone: "card" as const }]
+      ? [{ id: "card" as const, label: "Card", sublabel: "Nomba · debit or credit", icon: CreditCard, tone: "card" as const }]
       : []),
-    { id: "bank" as const, label: "Bank", sublabel: "Transfer from your bank", icon: Landmark, tone: "bank" as const },
+    { id: "bank" as const, label: "Bank", sublabel: "Link with Plaid or transfer from your bank", icon: Landmark, tone: "bank" as const },
     ...(interacFundingAvailable
       ? [{
           id: "interac" as const,
           label: "Interac",
-          sublabel: interacUsesFincra
-            ? `e-Transfer · ${FINCRA_CAD_INTERAC_ALIAS}`
-            : "e-Transfer · CAD",
+          sublabel: "e-Transfer · Nomba",
           icon: Banknote,
           tone: "bank" as const,
         }]
@@ -3215,7 +3211,9 @@ const SendPage = () => {
                                         currency={sourceCurrency}
                                         symbol={sourceSymbol}
                                         cardProviderReady={!!cardSendProvider}
-                                        cardChargeNote={null}
+                                        cardTitle={productFeatures.nombaNigeria ? "Card · Nomba" : undefined}
+                                        cardChargeNote={productFeatures.nombaNigeria ? "Visa, Mastercard, Amex or Verve on Nomba’s secure checkout." : null}
+                                        interacTitle="Interac e-Transfer · Nomba"
                                         cardMinNote={
                                           cardSendProvider
                                             ? `Minimum card send is ${cardSendMinAmount(cardSendProvider, sourceCurrency)} ${sourceCurrency}.`

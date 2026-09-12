@@ -1,12 +1,13 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState, type ReactNode } from "react";
 import { motion } from "framer-motion";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { usePlaidLink } from "react-plaid-link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useWallets } from "@/hooks/useWallets";
 import { useCreateTransfer } from "@/hooks/useTransfers";
 import { useProfile } from "@/hooks/useProfile";
@@ -45,10 +46,13 @@ import RecipientStripeKycFields, { buildRecipientKycPayload, isRecipientKycValid
 import {
   CAD_BANK_EFT_ENABLED,
   INTERAC_ETRANSFER_ENABLED,
-  STRIPE_CANADA_RAILS_NOTE,
 } from "@/lib/canadaPayoutRails";
 import PaymentMethodRow, { type PaymentMethodOption } from "@/components/money/PaymentMethodRow";
+import MethodCheckoutPanel from "@/components/send/MethodCheckoutPanel";
 import WisePayLinkCard from "@/components/payments/WisePayLinkCard";
+import CreateWalletModal from "@/components/modals/CreateWalletModal";
+import { useFundingSources } from "@/hooks/useFundingSources";
+import { useCreateWallet } from "@/hooks/useCreateWallet";
 import WiseInteracInvoiceCheckout from "@/components/payments/WiseInteracInvoiceCheckout";
 import { productFeatures } from "@/lib/productFeatures";
 import { FINCRA_CAD_INTERAC_ALIAS } from "@/lib/fincraCad";
@@ -444,12 +448,17 @@ const CanadaSendFlow = () => {
   const { requirePin, pinGate } = usePinGate();
   const { data: profile } = useProfile();
   const { user } = useAuth();
+  const qc = useQueryClient();
+  const createWallet = useCreateWallet();
+  const createWalletTriggerRef = useRef<HTMLButtonElement>(null);
+  const { data: linkedBankSources = [] } = useFundingSources("bank");
   const [searchParams, setSearchParams] = useSearchParams();
   const { data: beneficiaries } = useBeneficiaries();
 
   const [step, setStep] = useState(1);
   const [method, setMethod] = useState<DeliveryMethod>("interac");
   const [funding, setFunding] = useState<FundingSource>("wallet");
+  const [selectedSourceId, setSelectedSourceId] = useState("");
   const [cadPayIn, setCadPayIn] = useState<{
     kind: "interac" | "bank" | "card";
     transferId: string;
@@ -635,8 +644,100 @@ const CanadaSendFlow = () => {
   const cadWallets = (wallets || []).filter((w) => w.currency_code === "CAD");
   const selectedWallet = cadWallets.find((w) => w.wallet_id === walletId) || cadWallets[0];
   const noCadWallet = cadWallets.length === 0;
-  // Auto-switch to card funding if user has no CAD wallet
-  useEffect(() => { if (noCadWallet && funding === "wallet") setFunding("card"); }, [noCadWallet, funding]);
+
+  const { data: plaidAccounts = [] } = useQuery({
+    queryKey: ["plaid_accounts", user?.id],
+    queryFn: async () => {
+      if (!user) return [] as any[];
+      const { data, error } = await supabase
+        .from("plaid_accounts")
+        .select("id,name,mask,subtype,currency_code,available_balance,current_balance,balances_iso_currency,balances_updated_at,plaid_items(institution_name)")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!user,
+  });
+
+  const bankSources = useMemo(() => {
+    const fromPlaid = (plaidAccounts as any[]).map((a) => ({
+      id: a.id,
+      display_name: a.name || "Bank account",
+      institution: a.plaid_items?.institution_name || null,
+      last_four: a.mask || "",
+      liveAvailable: a.available_balance,
+      liveCurrent: a.current_balance,
+      liveCurrency: a.balances_iso_currency || a.currency_code,
+    }));
+    const fromLinked = linkedBankSources.map((s) => ({
+      id: s.id,
+      display_name: s.display_name,
+      institution: s.institution,
+      last_four: s.last_four,
+      liveAvailable: null as number | null,
+      liveCurrent: null as number | null,
+      liveCurrency: s.currency_code,
+    }));
+    return [...fromPlaid, ...fromLinked];
+  }, [plaidAccounts, linkedBankSources]);
+
+  const [plaidLinkToken, setPlaidLinkToken] = useState<string | null>(null);
+  const [plaidLinking, setPlaidLinking] = useState(false);
+  const startPlaidLink = useCallback(async () => {
+    if (!productFeatures.plaid) {
+      toast.error("Bank linking is unavailable right now.");
+      return;
+    }
+    setPlaidLinking(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("plaid-create-link-token", {
+        body: { country_codes: ["CA", "US"] },
+      });
+      if (error) throw error;
+      if ((data as any)?.error) throw new Error((data as any).error);
+      setPlaidLinkToken((data as any).link_token);
+    } catch (e: any) {
+      toast.error(e?.message || "Could not start bank link");
+    } finally {
+      setPlaidLinking(false);
+    }
+  }, []);
+  const onPlaidSuccess = useCallback(async (public_token: string, metadata: any) => {
+    try {
+      const { data, error } = await supabase.functions.invoke("plaid-exchange-token", {
+        body: { public_token, institution: metadata.institution },
+      });
+      if (error) throw error;
+      if ((data as any)?.error) throw new Error((data as any).error);
+      toast.success(`Linked ${metadata.institution?.name || "bank"}`);
+      qc.invalidateQueries({ queryKey: ["plaid_accounts", user?.id] });
+      qc.invalidateQueries({ queryKey: ["linked_funding_sources", user?.id] });
+    } catch (e: any) {
+      toast.error(e?.message || "Could not link bank");
+    }
+  }, [qc, user?.id]);
+  const { open: openPlaid, ready: plaidReady } = usePlaidLink({
+    token: plaidLinkToken || "",
+    onSuccess: onPlaidSuccess,
+  });
+  useEffect(() => {
+    if (plaidLinkToken && plaidReady) openPlaid();
+  }, [plaidLinkToken, plaidReady, openPlaid]);
+
+  const handleQuickAddWallet = useCallback(async () => {
+    if (!cadWallets.length) {
+      try {
+        const w = await createWallet.mutateAsync("CAD");
+        setWalletId(w.id);
+        toast.success("CAD wallet created");
+      } catch (e: any) {
+        toast.error(e?.message || "Could not create CAD wallet");
+      }
+      return;
+    }
+    createWalletTriggerRef.current?.click();
+  }, [cadWallets.length, createWallet]);
 
   // Auto-fill recipient = self when paying to your own connected account
   useEffect(() => {
@@ -651,8 +752,7 @@ const CanadaSendFlow = () => {
     if (method === "paylink" && funding !== "wallet") setFunding("wallet");
   }, [method, funding]);
 
-  // Interac and EFT are live CAD payout rails (Nomba → Flovide → Paysafe).
-  // Do not force Stripe card-push when Paysafe credentials are still in test.
+  // Interac and EFT pay out through Nomba. Stripe is not a Canada domestic rail.
 
   const applyCanadaBeneficiary = (b: Beneficiary) => {
     setPickedBeneficiaryId(b.id);
@@ -748,42 +848,11 @@ const CanadaSendFlow = () => {
       feeLabel: formatFeeLabel(feeForMethod("interac")),
       icon: Zap,
     }] : []),
-    {
-      id: "card_push",
-      title: "Instant to debit card",
-      subtitle: "Visa Direct · seconds",
-      feeLabel: formatFeeLabel(feeForMethod("card_push")),
-      icon: CreditCard,
-      badge: "Stripe",
-      disabled: !productFeatures.stripe,
-    },
-    {
-      id: "stripe_connect",
-      title: "My Stripe account",
-      subtitle: connectReady ? "Instant payout to your card" : "Finish setup at /stripe-connect",
-      feeLabel: formatFeeLabel(feeForMethod("stripe_connect")),
-      icon: Building2,
-      badge: connectReady ? "Stripe" : "Setup",
-      disabled: !productFeatures.stripe,
-    },
-    {
-      id: "paylink",
-      title: "Payment link",
-      subtitle: "Recipient chooses how to claim",
-      feeLabel: formatFeeLabel(feeForMethod("paylink")),
-      icon: Link2,
-      badge: "Stripe",
-      disabled: !productFeatures.stripe && !productFeatures.paymentLinks,
-    },
-  ], [connectReady, feeForMethod]);
+  ], [feeForMethod]);
 
   const handleDeliverySelect = (opt: DeliveryOption) => {
-    if (opt.id === "stripe_connect" && !connectReady) {
-      navigate("/stripe-connect");
-      return;
-    }
     if (opt.disabled) {
-      toast.info("That delivery method is not available right now. Choose Interac or another option.");
+      toast.info("That delivery method is not available right now. Choose Interac or bank transfer.");
       return;
     }
     setMethod(opt.id);
@@ -793,12 +862,20 @@ const CanadaSendFlow = () => {
   const fallbackWallet = (wallets || [])[0];
 
   const cadFundingOptions: PaymentMethodOption<FundingSource>[] = [
-    { id: "card", label: "Card", sublabel: "Debit or credit", icon: CreditCard, tone: "card" },
-    { id: "bank", label: "Bank", sublabel: "Transfer from your bank", icon: Landmark, tone: "bank" },
+    ...(productFeatures.nombaNigeria
+      ? [{ id: "card" as const, label: "Card", sublabel: "Nomba · debit or credit", icon: CreditCard, tone: "card" as const }]
+      : []),
+    {
+      id: "bank",
+      label: "Bank",
+      sublabel: productFeatures.plaid ? "Link with Plaid or transfer from your bank" : "Transfer from your bank",
+      icon: Landmark,
+      tone: "bank",
+    },
     {
       id: "interac",
       label: "Interac",
-      sublabel: `e-Transfer · ${FINCRA_CAD_INTERAC_ALIAS}`,
+      sublabel: "e-Transfer · Nomba",
       icon: Banknote,
       tone: "bank",
     },
@@ -808,10 +885,11 @@ const CanadaSendFlow = () => {
     {
       id: "wallet",
       label: "Wallet",
-      sublabel: noCadWallet ? "Open a CAD wallet first" : `Balance C$${Number(selectedWallet?.balance || 0).toFixed(2)}`,
+      sublabel: noCadWallet
+        ? "eFinMoney balance · add a CAD wallet"
+        : `eFinMoney · C$${Number(selectedWallet?.balance || 0).toFixed(2)}`,
       icon: Wallet,
       tone: "wallet",
-      disabled: noCadWallet,
     },
   ];
 
@@ -821,6 +899,76 @@ const CanadaSendFlow = () => {
   const totalCharged = parsedAmount + totalFee;
   const insufficient = funding === "wallet" && !!selectedWallet && parsedAmount > 0
     && (parsedAmount + totalFee) > Number(selectedWallet.balance);
+
+  const panelWallets = (cadWallets.length ? cadWallets : (wallets || [])).map((w) => ({
+    wallet_id: w.wallet_id,
+    currency_code: w.currency_code,
+    symbol: w.symbol,
+    balance: w.balance,
+    flag_emoji: w.flag_emoji,
+  }));
+
+  const renderFundingCheckout = () => (
+    <div className="overflow-hidden rounded-xl border border-border bg-card">
+      <div className="grid min-h-[22rem] sm:grid-cols-[minmax(12.5rem,15rem)_minmax(0,1fr)]">
+        <aside className="border-b border-border bg-muted/20 sm:border-b-0 sm:border-r">
+          <PaymentMethodRow
+            options={cadFundingOptions}
+            value={funding}
+            onChange={(v) => setFunding(v)}
+          />
+        </aside>
+        <div className="min-w-0 p-5 sm:p-6">
+          {funding === "wise" ? (
+            (selectedWallet || (fallbackWallet && isWisePayCurrency(fallbackWallet.currency_code))) ? (
+              <WisePayLinkCard
+                walletId={(selectedWallet || fallbackWallet)?.wallet_id || ""}
+                walletCurrency="CAD"
+                initialAmount={totalCharged > 0 ? totalCharged.toFixed(2) : ""}
+                onComplete={() => setFunding("wallet")}
+              />
+            ) : (
+              <div className="space-y-3 rounded-xl border-2 border-pay-wise/30 bg-pay-wise/5 p-3.5">
+                <p className="text-sm font-semibold">Wise</p>
+                <p className="text-sm text-muted-foreground">
+                  Add a CAD wallet first so Wise can credit the matching balance.
+                </p>
+                <Button type="button" size="sm" variant="outline" onClick={handleQuickAddWallet}>
+                  Quick add CAD wallet
+                </Button>
+              </div>
+            )
+          ) : (
+            <MethodCheckoutPanel
+              method={funding === "bank" || funding === "interac" || funding === "card" || funding === "wallet" ? funding : "wallet"}
+              wallets={panelWallets}
+              selectedWalletId={walletId || selectedWallet?.wallet_id}
+              onWalletChange={setWalletId}
+              bankSources={bankSources}
+              selectedSourceId={selectedSourceId || bankSources[0]?.id}
+              onSourceChange={setSelectedSourceId}
+              onLinkBank={startPlaidLink}
+              linkingBank={plaidLinking}
+              onAddWallet={handleQuickAddWallet}
+              amount={parsedAmount}
+              fee={totalFee}
+              total={totalCharged}
+              currency="CAD"
+              symbol="C$"
+              cardTitle="Card · Nomba"
+              cardProviderReady={productFeatures.nombaNigeria}
+              cardChargeNote="Pay with Visa, Mastercard, Amex or Verve on Nomba’s secure checkout. We credit your CAD wallet, then pay out Interac or EFT."
+              cardMinNote="Minimum card send is C$2.00 (Nomba checkout)."
+              interacTitle="Interac e-Transfer · Nomba"
+              interacDescription={`Confirm to open Interac checkout for C$${totalCharged.toFixed(2)}. After you confirm, send CAD Autodeposit to ${FINCRA_CAD_INTERAC_ALIAS} with your payment code. When the deposit matches, Nomba pays ${recipientName || "your recipient"}.`}
+              insufficientBalance={insufficient}
+              onTopUp={() => navigate("/wallet/topup")}
+            />
+          )}
+        </div>
+      </div>
+    </div>
+  );
 
   // Step 1: amount + delivery method
   const isStep1Valid = parsedAmount > 0;
@@ -1256,7 +1404,7 @@ const CanadaSendFlow = () => {
   };
 
   return (
-    <div className="space-y-8 max-w-2xl mx-auto">
+    <div className="space-y-8 max-w-4xl mx-auto">
       {step <= 3 && <StepIndicator step={step} />}
 
       {step === 1 && (
@@ -1266,27 +1414,16 @@ const CanadaSendFlow = () => {
             <p className="text-sm text-muted-foreground mt-1">Same-currency CAD transfer within Canada.</p>
           </CardHeader>
           <CardContent className="space-y-6 pt-6">
-            {noCadWallet ? (
+            {noCadWallet && (
               <div className="p-3 rounded-xl border border-amber-500/30 bg-amber-500/5 flex items-start gap-2">
                 <AlertCircle className="w-4 h-4 mt-0.5 text-amber-600 shrink-0" />
                 <p className="text-sm text-muted-foreground">
-                  No CAD wallet yet — you can still send by card on the confirm step, or{" "}
-                  <Link to="/wallet/topup" className="text-primary underline">top up CAD</Link> first.
+                  No CAD wallet yet — pay by Nomba card, Interac, Wise, or a linked bank, or{" "}
+                  <button type="button" className="text-primary underline" onClick={handleQuickAddWallet}>
+                    add a CAD wallet
+                  </button>
+                  .
                 </p>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                <Label>From wallet</Label>
-                <Select value={walletId || selectedWallet?.wallet_id} onValueChange={setWalletId}>
-                  <SelectTrigger className="h-11"><SelectValue placeholder="Select CAD wallet" /></SelectTrigger>
-                  <SelectContent>
-                    {cadWallets.map((w) => (
-                      <SelectItem key={w.wallet_id} value={w.wallet_id}>
-                        🇨🇦 CAD — C${Number(w.balance).toFixed(2)} available
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
               </div>
             )}
 
@@ -1316,12 +1453,6 @@ const CanadaSendFlow = () => {
 
             <div className="space-y-3">
               <Label>How should they receive it?</Label>
-              {STRIPE_CANADA_RAILS_NOTE && (
-                <div className="p-3 rounded-lg bg-primary/5 border border-primary/20 text-xs text-muted-foreground flex items-start gap-2">
-                  <Info className="w-4 h-4 shrink-0 mt-0.5 text-primary" />
-                  <span>{STRIPE_CANADA_RAILS_NOTE}</span>
-                </div>
-              )}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {deliveryOptions.map((opt) => {
                   const Icon = opt.icon;
@@ -1338,11 +1469,6 @@ const CanadaSendFlow = () => {
                           : "border-border hover:border-primary/40 bg-card"
                       } ${opt.disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
                     >
-                      {opt.badge && (
-                        <span className="absolute top-2 right-2 text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground">
-                          {opt.badge}
-                        </span>
-                      )}
                       {active && (
                         <span className="absolute top-2 left-2 w-5 h-5 rounded-full bg-primary text-primary-foreground flex items-center justify-center">
                           <Check className="w-3 h-3" />
@@ -1362,24 +1488,11 @@ const CanadaSendFlow = () => {
                   );
                 })}
               </div>
-              {(!connectReady || !connectState.hasAccount) && (
-                <p className="text-[11px] text-muted-foreground">
-                  {!connectState.hasAccount
-                    ? "Pay yourself via Stripe Connect — one-time setup required."
-                    : connectState.message || "Stripe Connect needs a status sync."}{" "}
-                  {connectAcct ? (
-                    <>
-                      <button type="button" onClick={handleManualRefresh} disabled={refreshingConnect} className="underline">
-                        {refreshingConnect ? "Refreshing…" : "Refresh"}
-                      </button>
-                      {" · "}
-                      <Link to="/stripe-connect" className="underline">Open setup</Link>
-                    </>
-                  ) : (
-                    <Link to="/stripe-connect" className="underline">Set up Stripe Connect</Link>
-                  )}
-                </p>
-              )}
+            </div>
+
+            <div className="space-y-3">
+              <Label>How will you pay?</Label>
+              {renderFundingCheckout()}
             </div>
 
             <div className="rounded-xl bg-gradient-to-br from-primary/8 via-background to-primary/5 border border-primary/20 p-5">
@@ -1535,7 +1648,7 @@ const CanadaSendFlow = () => {
                   </div>
                   <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/30 text-xs text-amber-700 dark:text-amber-400 flex items-start gap-2">
                     <Info className="w-4 h-4 mt-0.5 shrink-0" />
-                    <span>Interac is in <strong>beta</strong> — use EFT or instant card if it fails.</span>
+                    <span>Interac is in <strong>beta</strong> — use bank transfer (EFT) if it fails.</span>
                   </div>
                 </>
               )}
@@ -1572,6 +1685,11 @@ const CanadaSendFlow = () => {
               )}
             </div>
 
+            <div className="space-y-3">
+              <Label>How will you pay?</Label>
+              {renderFundingCheckout()}
+            </div>
+
             <div className="flex gap-3 pt-2">
               <Button variant="outline" className="flex-1" onClick={() => setStep(1)}>Back</Button>
               <Button className="flex-1 gap-2" onClick={() => setStep(3)} disabled={!isStep2Valid}>
@@ -1592,6 +1710,16 @@ const CanadaSendFlow = () => {
             <div className="rounded-xl border border-border bg-card p-4">
               <ReviewRow label="Recipient" value={recipientName || (method === "paylink" ? "Anyone with link" : "—")} />
               <ReviewRow label="Delivery" value={methodLabel} />
+              <ReviewRow
+                label="You pay with"
+                value={
+                  funding === "card" ? "Card · Nomba"
+                    : funding === "interac" ? "Interac e-Transfer · Nomba"
+                    : funding === "bank" ? "Bank account"
+                    : funding === "wise" ? "Wise"
+                    : "CAD wallet"
+                }
+              />
               <ReviewRow label="They receive" value={`C$${receivedAmount.toFixed(2)}`} />
               <ReviewRow label="Delivery fee" value={`+C$${deliveryFee.toFixed(2)}`} />
               {method === "eft" && institutionNumber && (
@@ -1605,82 +1733,7 @@ const CanadaSendFlow = () => {
               ) : null}
             </div>
 
-            {method !== "paylink" && (
-              <div className="overflow-hidden rounded-xl border border-border bg-card">
-                <div className="grid min-h-[18rem] sm:grid-cols-[minmax(12.5rem,15rem)_minmax(0,1fr)]">
-                  <aside className="border-b border-border bg-muted/20 sm:border-b-0 sm:border-r">
-                    <PaymentMethodRow
-                      options={cadFundingOptions}
-                      value={funding}
-                      onChange={(v) => setFunding(v)}
-                    />
-                  </aside>
-                  <div className="min-w-0 space-y-4 p-5 sm:p-6">
-                    {funding === "wise" && (
-                      <WisePayLinkCard
-                        walletId={(selectedWallet || fallbackWallet)?.wallet_id || ""}
-                        walletCurrency="CAD"
-                        initialAmount={totalCharged > 0 ? totalCharged.toFixed(2) : ""}
-                        onComplete={() => setFunding("wallet")}
-                      />
-                    )}
-                    {funding === "card" && productFeatures.nombaNigeria && !productFeatures.stripe && (
-                      <div className="space-y-3 rounded-xl border-2 border-pay-card/30 bg-pay-card/5 p-3.5">
-                        <div className="flex items-center gap-2">
-                          <CreditCard className="h-5 w-5 text-primary" />
-                          <p className="text-sm font-semibold">Card checkout</p>
-                        </div>
-                        <p className="text-sm text-muted-foreground">
-                          Pay C${totalCharged.toFixed(2)} CAD with Visa, Mastercard, Amex or Verve on Nomba’s secure page. We credit your CAD wallet, then pay out Interac or EFT.
-                        </p>
-                        <p className="text-[11px] text-muted-foreground">Minimum card send is C$2.00 (Nomba checkout).</p>
-                      </div>
-                    )}
-                    {funding === "card" && productFeatures.stripe && (
-                      <div ref={cardPanelRef}>
-                        <SenderCardSection
-                          ref={senderCardRef}
-                          onValidityChange={(v) => { setCardNumComplete(v); setCardExpComplete(v); setCardCvcComplete(v); }}
-                          elementStyle={elementStyle}
-                          totalCharged={totalCharged}
-                        />
-                      </div>
-                    )}
-                    {(funding === "bank" || funding === "interac") && (
-                      <div className="space-y-3 rounded-xl border-2 border-pay-bank/30 bg-pay-bank/5 p-3.5">
-                        <div className="flex items-center gap-2">
-                          <Banknote className="h-5 w-5 text-primary" />
-                          <p className="text-sm font-semibold">
-                            {funding === "interac" ? "Interac e-Transfer" : "Bank transfer"}
-                          </p>
-                        </div>
-                        <p className="text-sm text-muted-foreground">
-                          Confirm to open Interac Autodeposit for C${totalCharged.toFixed(2)}. Send CAD to {FINCRA_CAD_INTERAC_ALIAS}. We’ll give you a payment code to paste in the Interac message. When the deposit matches, we pay {recipientName || "your recipient"}.
-                        </p>
-                      </div>
-                    )}
-                    {funding === "wallet" && (
-                      <div className="space-y-3 rounded-xl border-2 border-pay-wallet/30 bg-pay-wallet/5 p-3.5">
-                        <div className="flex items-center gap-2">
-                          <Wallet className="h-5 w-5 text-primary" />
-                          <p className="text-sm font-semibold">CAD wallet</p>
-                        </div>
-                        <p className="text-sm text-muted-foreground">
-                          {noCadWallet
-                            ? "Open a CAD wallet first, or pay by card, Interac, bank, or Wise."
-                            : `We’ll debit C$${totalCharged.toFixed(2)} from your CAD balance (C$${Number(selectedWallet?.balance || 0).toFixed(2)} available).`}
-                        </p>
-                        {insufficient && (
-                          <p className="text-sm text-destructive flex items-center gap-1">
-                            <AlertCircle className="w-3.5 h-3.5" /> Insufficient wallet balance — pay by card, Interac, bank, or Wise
-                          </p>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            )}
+            {method !== "paylink" && renderFundingCheckout()}
 
             <div className="rounded-xl bg-muted/40 border border-border p-4">
               <div className="flex items-center justify-between">
@@ -1965,6 +2018,9 @@ const CanadaSendFlow = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      <CreateWalletModal>
+        <button type="button" ref={createWalletTriggerRef} className="hidden" aria-hidden="true" tabIndex={-1} />
+      </CreateWalletModal>
     </div>
   );
 };
