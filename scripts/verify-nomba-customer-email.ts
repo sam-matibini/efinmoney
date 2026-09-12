@@ -29,6 +29,9 @@ assert("substitutes extra blocked list", extra.substituted && extra.email === pa
 const ok = resolveNombaCustomerEmail("jane.customer@gmail.com", uid);
 assert("keeps a real customer email", !ok.substituted && ok.email === "jane.customer@gmail.com");
 
+const interacBlocked = resolveNombaCustomerEmail("autodeposit@gmail.com", uid, ["autodeposit@gmail.com"]);
+assert("does not use Interac mailbox as Nomba customerEmail", interacBlocked.substituted && interacBlocked.email === payer);
+
 const missing = resolveNombaCustomerEmail("", uid);
 assert("mints email when missing", missing.substituted && missing.email === payer);
 

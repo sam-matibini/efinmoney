@@ -224,7 +224,6 @@ const AddBeneficiaryModal = ({ open, onOpenChange, editing, onSaved, defaultCate
     const interacDest = isInterac
       ? resolveCadInteracDestination({
         interac_email: interacEmail,
-        recipient_email: email,
         recipient_phone: tel,
       })
       : null;
@@ -346,7 +345,7 @@ const AddBeneficiaryModal = ({ open, onOpenChange, editing, onSaved, defaultCate
               <Input value={nickname} onChange={(e) => setNickname(e.target.value)} placeholder="e.g. Landlord" />
             </div>
             <div className="space-y-2">
-              <Label>Email{method === "interac" ? " (optional if mobile is set)" : ""}</Label>
+              <Label>Email{method === "interac" ? " (receipts — not Interac)" : ""}</Label>
               <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="payee@example.com" required={method !== "interac"} />
             </div>
           </div>
@@ -564,7 +563,7 @@ const AddBeneficiaryModal = ({ open, onOpenChange, editing, onSaved, defaultCate
               <Label>Interac Autodeposit email <span className="text-muted-foreground font-normal">(optional if mobile is set)</span></Label>
               <Input type="email" value={interacEmail} onChange={(e) => setInteracEmail(e.target.value)} placeholder="payee@example.com" />
               <p className="text-xs text-muted-foreground">
-                Canadian e-Transfers need an email or a 10-digit mobile — at least one. Leave this blank if you only have their cell number.
+                Nomba pays this Autodeposit address. Do not use an eFinMoney login email — that mailbox is rejected. Leave blank if you only have their cell number.
               </p>
             </div>
           )}

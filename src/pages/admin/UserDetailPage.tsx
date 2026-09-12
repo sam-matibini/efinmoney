@@ -517,6 +517,7 @@ const UserDetailPage = () => {
                 <CardContent className="space-y-3 text-sm">
                   <Row label="Full name" value={profile.full_name || "—"} />
                   <Row label="Email" value={profile.email || "—"} />
+                  <Row label="Interac email" value={(profile as { interac_email?: string | null }).interac_email || "—"} />
                   <Row label="Phone" value={profile.phone_number || "—"} />
                   <Row
                     label="Date of birth"

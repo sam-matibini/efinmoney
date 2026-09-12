@@ -107,8 +107,20 @@ Deno.serve(async (req) => {
       Deno.env.get("NOMBA_MERCHANT_EMAIL") || "",
       ...(Deno.env.get("NOMBA_BLOCKED_CUSTOMER_EMAILS") || "").split(","),
     ];
+    const { data: profile } = await admin
+      .from("profiles")
+      .select("email, interac_email, address_country, country_code, default_currency")
+      .eq("user_id", userId)
+      .maybeSingle();
+    const interacEmail = String((profile as { interac_email?: string | null } | null)?.interac_email || "").trim();
+    const profileEmail = String((profile as { email?: string | null } | null)?.email || "").trim();
+    // Never send the Interac Autodeposit mailbox as Nomba Checkout customerEmail.
+    extraBlocked.push(interacEmail);
+    if (walletCurrency === "CAD") {
+      extraBlocked.push(String(userEmail || ""), profileEmail);
+    }
     const customerEmail = resolveNombaCustomerEmail(
-      String(email || userEmail || ""),
+      walletCurrency === "CAD" ? "" : String(email || userEmail || ""),
       userId,
       extraBlocked,
     ).email;

@@ -448,6 +448,7 @@ const CanadaSendFlow = () => {
   const { requirePin, pinGate } = usePinGate();
   const { data: profile } = useProfile();
   const { user } = useAuth();
+  const interacBlockedEmails = [user?.email, profile?.email];
   const qc = useQueryClient();
   const createWallet = useCreateWallet();
   const createWalletTriggerRef = useRef<HTMLButtonElement>(null);
@@ -561,6 +562,7 @@ const CanadaSendFlow = () => {
           ? resolveCadInteracDestination({
             recipient_account: intent.recipientEmail,
             recipient_phone: intent.recipientPhone,
+            blocked_emails: interacBlockedEmails,
           })
           : null;
         if (intent.method === "interac" && !cadInteracDest?.ok) {
@@ -998,9 +1000,10 @@ const CanadaSendFlow = () => {
             })
         : method === "interac"
           ? recipientName.trim().length > 1
-              && resolveCadInteracDestination({
+              &&             resolveCadInteracDestination({
                 recipient_account: recipientEmail,
                 recipient_phone: recipientPhone,
+                blocked_emails: interacBlockedEmails,
               }).ok
               && interacQAValid
           : recipientName.trim().length > 1
@@ -1117,10 +1120,11 @@ const CanadaSendFlow = () => {
         return;
       }
       const cadInteracDest = method === "interac"
-        ? resolveCadInteracDestination({
-          recipient_account: recipientEmail,
-          recipient_phone: recipientPhone,
-        })
+        ?             resolveCadInteracDestination({
+                recipient_account: recipientEmail,
+                recipient_phone: recipientPhone,
+                blocked_emails: interacBlockedEmails,
+              })
         : null;
       if (method === "interac" && !cadInteracDest?.ok) {
         toast.error(cadInteracDest?.error || CAD_INTERAC_MISSING_CONTACT);
@@ -1171,10 +1175,11 @@ const CanadaSendFlow = () => {
 
     try {
       const cadInteracDest = method === "interac"
-        ? resolveCadInteracDestination({
-          recipient_account: recipientEmail,
-          recipient_phone: recipientPhone,
-        })
+        ?             resolveCadInteracDestination({
+                recipient_account: recipientEmail,
+                recipient_phone: recipientPhone,
+                blocked_emails: interacBlockedEmails,
+              })
         : null;
       if (method === "interac" && !cadInteracDest?.ok) {
         toast.error(cadInteracDest?.error || CAD_INTERAC_MISSING_CONTACT);
@@ -1629,7 +1634,7 @@ const CanadaSendFlow = () => {
                       placeholder="(416) 555-0123"
                     />
                     <p className="text-xs text-muted-foreground">
-                      Canadian Interac e-Transfer needs an email or a 10-digit mobile number — at least one. Email is preferred for Autodeposit. We will not collect payment if both are missing.
+                      Canadian Interac e-Transfer needs an Autodeposit email or a 10-digit mobile — at least one. Use the recipient’s Interac email, not their eFinMoney login. We will not collect payment if both are missing.
                     </p>
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

@@ -9297,6 +9297,7 @@ export type Database = {
           email_opt_out: boolean
           full_name: string | null
           id: string
+          interac_email: string | null
           kyc_completed_at: string | null
           kyc_framework_version: number
           kyc_status: Database["public"]["Enums"]["kyc_status"]
@@ -9341,6 +9342,7 @@ export type Database = {
           email_opt_out?: boolean
           full_name?: string | null
           id?: string
+          interac_email?: string | null
           kyc_completed_at?: string | null
           kyc_framework_version?: number
           kyc_status?: Database["public"]["Enums"]["kyc_status"]
@@ -9385,6 +9387,7 @@ export type Database = {
           email_opt_out?: boolean
           full_name?: string | null
           id?: string
+          interac_email?: string | null
           kyc_completed_at?: string | null
           kyc_framework_version?: number
           kyc_status?: Database["public"]["Enums"]["kyc_status"]

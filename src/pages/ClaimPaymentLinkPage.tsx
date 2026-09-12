@@ -20,6 +20,7 @@ import { getStripe } from "@/lib/stripe";
 import { tokenizeDebitCard } from "@/lib/stripePayouts";
 import { getClaimKyc, isClaimCardCurrency } from "@/lib/stripeCorridors";
 import { CAD_BANK_EFT_ENABLED, INTERAC_ETRANSFER_ENABLED } from "@/lib/canadaPayoutRails";
+import { interacEmailRejectedReason } from "@/lib/cadInteracPayout";
 
 type ClaimErrorBody = {
   error?: string;
@@ -124,6 +125,10 @@ const ClaimInner = ({ link, code }: { link: Resolved; code: string }) => {
     if (rail === "interac" || rail === "card_push" || rail === "eft") {
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) hints.push("Enter a valid email");
     }
+    if (rail === "interac") {
+      const conflict = interacEmailRejectedReason(email);
+      if (conflict) hints.push(conflict);
+    }
     if (rail === "eft") {
       if (!/^\d{3}$/.test(inst)) hints.push("Institution number must be 3 digits");
       if (!/^\d{5}$/.test(transit)) hints.push("Transit number must be 5 digits");
@@ -160,6 +165,13 @@ const ClaimInner = ({ link, code }: { link: Resolved; code: string }) => {
 
   const handleSubmit = async () => {
     if (!link || !code) return;
+    if (rail === "interac") {
+      const conflict = interacEmailRejectedReason(email);
+      if (conflict) {
+        toast.error(conflict);
+        return;
+      }
+    }
     setSubmitting(true);
     try {
       let payload: any = {};
@@ -289,8 +301,11 @@ const ClaimInner = ({ link, code }: { link: Resolved; code: string }) => {
 
         {rail === "interac" && (
           <div className="space-y-2">
-            <Label>Your email (for Interac deposit)</Label>
-            <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" />
+            <Label>Your Interac Autodeposit email</Label>
+            <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@personalmail.com" />
+            <p className="text-xs text-muted-foreground">
+              The address registered for Interac Autodeposit — not an eFinMoney login email.
+            </p>
           </div>
         )}
 

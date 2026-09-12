@@ -25,6 +25,11 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { ISO_COUNTRIES, findIsoCountry } from "@/lib/isoCountries";
+import {
+  interacEmailRejectedReason,
+  isCanadianProfile,
+  parseInteracEmail,
+} from "@/lib/cadInteracPayout";
 
 const ProfileSettingsPage = () => {
   const { user } = useAuth();
@@ -32,6 +37,7 @@ const ProfileSettingsPage = () => {
   const queryClient = useQueryClient();
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
+  const [interacEmail, setInteracEmail] = useState("");
   const [efinTag, setEfinTag] = useState("");
   const [phoneNumber, setPhoneNumber] = useState("");
   const [dateOfBirth, setDateOfBirth] = useState("");
@@ -53,6 +59,7 @@ const ProfileSettingsPage = () => {
       const p = profile as any;
       setFullName(p.full_name || "");
       setEmail(p.email || user?.email || "");
+      setInteracEmail(p.interac_email || "");
       setEfinTag(p.efin_tag || "");
       setPhoneNumber(p.phone_number || "");
       setDateOfBirth(p.date_of_birth || "");
@@ -86,6 +93,28 @@ const ProfileSettingsPage = () => {
       toast.error("@tag must be 3-20 chars, start with a letter, letters/numbers/_ only");
       return;
     }
+    const canadian = isCanadianProfile({
+      address_country: addressCountry || (profile as any)?.address_country,
+      country_code: (profile as any)?.country_code,
+      default_currency: (profile as any)?.default_currency,
+    });
+    const loginEmail = (email || user.email || "").trim().toLowerCase();
+    const cleanedInterac = parseInteracEmail(interacEmail);
+    if (interacEmail.trim() && !cleanedInterac) {
+      toast.error("Enter a valid Interac Autodeposit email.");
+      return;
+    }
+    if (cleanedInterac) {
+      const conflict = interacEmailRejectedReason(cleanedInterac, [loginEmail]);
+      if (conflict) {
+        toast.error(conflict);
+        return;
+      }
+    } else if (canadian && interacEmail.trim()) {
+      toast.error("Enter a valid Interac Autodeposit email.");
+      return;
+    }
+
     setSaving(true);
     try {
       const country = addressCountry
@@ -127,6 +156,7 @@ const ProfileSettingsPage = () => {
         .update({
           email,
           efin_tag: cleanTag || null,
+          interac_email: cleanedInterac,
           ...identityFields,
         })
         .eq('user_id', user.id);
@@ -246,7 +276,7 @@ const ProfileSettingsPage = () => {
               <Lock className="w-4 h-4 mt-0.5 text-muted-foreground shrink-0" />
               <p className="text-xs text-muted-foreground">
                 Your identity has been verified. Legal name, date of birth, phone and address can only be changed by
-                support — contact us to request a correction. Your tag, email and avatar remain editable.
+                support — contact us to request a correction. Your tag, login email, Interac email and avatar remain editable.
               </p>
             </div>
           )}
@@ -287,9 +317,31 @@ const ProfileSettingsPage = () => {
               disabled={isLoading}
             />
             <p className="text-xs text-muted-foreground">
-              Changing your email requires confirmation via the new address.
+              Changing your email requires confirmation via the new address. This is your login — not the Interac Autodeposit address Nomba uses for CAD payouts.
             </p>
           </div>
+
+          {isCanadianProfile({
+            address_country: addressCountry || profile?.address_country,
+            country_code: profile?.country_code,
+            default_currency: profile?.default_currency,
+          }) && (
+            <div className="space-y-2">
+              <Label htmlFor="interacEmail">Interac e-Transfer email</Label>
+              <Input
+                id="interacEmail"
+                type="email"
+                value={interacEmail}
+                onChange={(e) => setInteracEmail(e.target.value)}
+                placeholder="you@personalmail.com"
+                disabled={isLoading}
+                autoComplete="off"
+              />
+              <p className="text-xs text-muted-foreground">
+                Autodeposit address Nomba uses to pay you in CAD. Must be different from your eFinMoney login email above — using the same mailbox causes Nomba Interac errors.
+              </p>
+            </div>
+          )}
 
           <div className="pt-4 border-t border-border space-y-1">
             <h2 className="font-display font-semibold">Billing address</h2>

@@ -437,8 +437,9 @@ const SendPage = () => {
     return resolveCadInteracDestination({
       recipient_account: recipientEmail,
       recipient_phone: recipientPhone,
+      blocked_emails: [user?.email, profile?.email],
     });
-  }, [isCanadaIntlPayout, cadPayoutMode, recipientEmail, recipientPhone]);
+  }, [isCanadaIntlPayout, cadPayoutMode, recipientEmail, recipientPhone, user?.email, profile?.email]);
 
   // Fetch Nigerian banks list when NGN destination is selected (Nomba primary, FLW fallback)
   useEffect(() => {
@@ -1528,8 +1529,12 @@ const SendPage = () => {
       const phone = b.phone.replace(/[^\d+]/g, "").slice(0, 15);
       if (!recipientPhone) setRecipientPhone(phone);
     }
-    if ((b.interac_email || b.email) && !recipientEmail) {
-      setRecipientEmail(b.interac_email || b.email || "");
+    if (!recipientEmail) {
+      if (isCanadaBeneficiary(b)) {
+        if (b.interac_email) setRecipientEmail(b.interac_email);
+      } else if (b.interac_email || b.email) {
+        setRecipientEmail(b.interac_email || b.email || "");
+      }
     }
 
     if (targetIsNGNBank) {
@@ -1594,9 +1599,9 @@ const SendPage = () => {
           setCaAccountNumber(String(b.eft_account).replace(/\D/g, ""));
         }
         if (b.bank_name && !caBankName) setCaBankName(b.bank_name);
-      } else if (b.interac_email || b.email || b.phone || b.payout_method === "interac") {
+      } else if (b.interac_email || b.phone || b.payout_method === "interac") {
         setCadPayoutMode("interac");
-        if (!recipientEmail) setRecipientEmail(b.interac_email || b.email || "");
+        if (!recipientEmail && b.interac_email) setRecipientEmail(b.interac_email);
       }
     } else if (b.network || b.payout_method) {
       if (!availableNetworks || availableNetworks.length === 0) {
@@ -3065,7 +3070,7 @@ const SendPage = () => {
                                             className="transition-shadow focus-visible:ring-2 focus-visible:ring-primary/40"
                                           />
                                           <p className="text-xs text-muted-foreground">
-                                            Canadian Interac e-Transfer needs an email or a 10-digit mobile number — at least one. Email is preferred for Autodeposit. We will not collect payment if both are missing.
+                                            Canadian Interac e-Transfer needs an Autodeposit email or a 10-digit mobile — at least one. Use the recipient’s Interac email, not their eFinMoney login. We will not collect payment if both are missing.
                                           </p>
                                         </motion.div>
                                         </>

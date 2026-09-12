@@ -213,6 +213,11 @@ Deno.serve(async (req) => {
     const narrative = String(transfer.description || `Transfer to ${accountName}`).slice(0, 120);
     const reference = `nomba-payout-${transfer_id}`;
     const senderId = transfer.sender_id as string;
+    const { data: senderProfile } = await supabase
+      .from("profiles")
+      .select("email, interac_email")
+      .eq("user_id", senderId)
+      .maybeSingle();
 
     // Debit currency must be a pair Nomba can actually trade for our account's
     // trade region (NG). The customer's wallet currency (e.g. CAD) is NOT a valid
@@ -391,9 +396,13 @@ Deno.serve(async (req) => {
       const dest = resolveCadInteracDestination({
         recipient_account: transfer.recipient_account,
         recipient_phone: transfer.recipient_phone,
+        interac_email: (transfer as Record<string, unknown>).recipient_interac_email
+          || (transfer as Record<string, unknown>).interac_email,
         recipient_email: (transfer as Record<string, unknown>).recipient_email
-          || (transfer as Record<string, unknown>).recipient_interac_email
           || body.recipient_email,
+        blocked_emails: [
+          senderProfile?.email,
+        ],
       });
       if (!dest.ok) {
         return json({
