@@ -2597,7 +2597,7 @@ const SendPage = () => {
                       <TabsContent value="international" forceMount className="mt-0 space-y-6">
 
                         {/* Step cards with directional slide */}
-                        <div className="relative max-w-lg mx-auto">
+                        <div className="relative max-w-3xl mx-auto">
                           <AnimatePresence mode="wait" custom={direction} initial={false}>
                             {step === 1 && (
                               <motion.div
@@ -2610,6 +2610,7 @@ const SendPage = () => {
                                 transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
                               >
                                 <MoneyFlowShell
+                                  className="max-w-3xl"
                                   steps={[
                                     { n: 1, label: "Details" },
                                     { n: 2, label: "Confirm" },
@@ -3072,19 +3073,20 @@ const SendPage = () => {
                                     )}
 
 
-                                    <motion.div custom={0} variants={fieldVariants} initial="hidden" animate="show" className="space-y-3">
-                                      <div id="send-pay-with" className="space-y-2 scroll-mt-24">
-                                        <Label>Pay with</Label>
-                                        <PaymentMethodRow
-                                          options={fundingMethodOptions}
-                                          value={fundingSource}
-                                          onChange={(v) => setFundingSource(v)}
-                                        />
-                                      </div>
-
-                                    </motion.div>
-
-                                    <motion.div custom={1} variants={fieldVariants} initial="hidden" animate="show">
+                                    <motion.div custom={0} variants={fieldVariants} initial="hidden" animate="show">
+                                      <div
+                                        id="send-pay-with"
+                                        className="scroll-mt-24 overflow-hidden rounded-xl border border-border bg-card"
+                                      >
+                                        <div className="grid min-h-[22rem] sm:grid-cols-[minmax(12.5rem,15rem)_minmax(0,1fr)]">
+                                          <aside className="border-b border-border bg-muted/20 sm:border-b-0 sm:border-r">
+                                            <PaymentMethodRow
+                                              options={fundingMethodOptions}
+                                              value={fundingSource}
+                                              onChange={(v) => setFundingSource(v)}
+                                            />
+                                          </aside>
+                                          <div className="min-w-0 p-5 sm:p-6">
                                       {fundingSource === "wise" ? (
                                         <SectionBoundary name="WisePayLinkSend">
                                           <WisePayLinkCard
@@ -3158,6 +3160,9 @@ const SendPage = () => {
                                         onTopUp={() => navigate("/wallet/topup")}
                                       />
                                       )}
+                                          </div>
+                                        </div>
+                                      </div>
                                     </motion.div>
 
 

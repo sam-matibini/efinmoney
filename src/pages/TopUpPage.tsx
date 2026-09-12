@@ -102,8 +102,7 @@ import { currencySymbol } from "@/lib/currency";
 import MoneyFlowShell from "@/components/money/MoneyFlowShell";
 import CheckoutShell from "@/components/money/CheckoutShell";
 import CheckoutMethodList, { type CheckoutMethod } from "@/components/money/CheckoutMethodList";
-import PaymentMethodRow, { type PaymentMethodOption, type PayTone } from "@/components/money/PaymentMethodRow";
-import { CreditCard as PayCardIcon, Landmark as PayBankIcon, Smartphone as PayMobileIcon, Wallet as PayWalletIcon } from "lucide-react";
+import { type PayTone } from "@/components/money/PaymentMethodRow";
 import { CurrencyFlag } from "@/components/ui/FlagImage";
 
 const MM_BY_CCY = Object.fromEntries(MM_COUNTRIES.map((c) => [c.currency, c]));
@@ -1387,24 +1386,9 @@ const TopUpPage = () => {
     || payMethods[0]?.id
     || "";
 
-  const payCategoryMeta: Record<PayTone, { label: string; sublabel: string; icon: typeof PayCardIcon }> = {
-    card: { label: "Card", sublabel: "Debit or credit", icon: PayCardIcon },
-    bank: { label: "Bank", sublabel: "Transfer or Interac", icon: PayBankIcon },
-    mobile: { label: "Mobile", sublabel: "Mobile money", icon: PayMobileIcon },
-    wallet: { label: "Wallet", sublabel: "Other methods", icon: PayWalletIcon },
-    wise: { label: "Wise", sublabel: "Bank or card", icon: PayWalletIcon },
-  };
-  const payCategories: PaymentMethodOption<PayTone>[] = (["card", "bank", "wise", "mobile", "wallet"] as PayTone[])
-    .filter((tone) => payMethods.some((m) => m.tone === tone))
-    .map((tone) => ({ id: tone, tone, ...payCategoryMeta[tone] }));
-
   const activeMethodId =
     payMethods.some((m) => m.id === selectedMethodId) ? selectedMethodId : defaultMethodId;
-  const activeCategory: PayTone =
-    payMethods.find((m) => m.id === activeMethodId)?.tone ?? "card";
-  const visibleMethods = payCategories.length > 1
-    ? payMethods.filter((m) => m.tone === activeCategory)
-    : payMethods;
+  const selectedPayMethod = payMethods.find((m) => m.id === activeMethodId) ?? payMethods[0];
 
 
 
@@ -1536,6 +1520,16 @@ const TopUpPage = () => {
               { label: "Total to pay", value: `${currencySymbol(currency)}${(amountNum || 0).toFixed(2)}`, emphasis: true },
             ]}
             contactEmail={user?.email || null}
+            methodNav={
+              payMethods.length > 0 ? (
+                <CheckoutMethodList
+                  methods={payMethods}
+                  value={activeMethodId}
+                  onChange={setSelectedMethodId}
+                  navOnly
+                />
+              ) : null
+            }
           >
             <div className="space-y-4">
               <div className="grid gap-4 sm:grid-cols-2">
@@ -1580,18 +1574,6 @@ const TopUpPage = () => {
                 </p>
               )}
 
-
-              {payMethods.length > 1 && payCategories.length > 1 && (
-                <PaymentMethodRow
-                  options={payCategories}
-                  value={activeCategory}
-                  onChange={(tone) => {
-                    const first = payMethods.find((m) => m.tone === tone);
-                    if (first) setSelectedMethodId(first.id);
-                  }}
-                />
-              )}
-
               {payMethods.length === 0 ? (
                 <Card>
                   <CardContent className="pt-6">
@@ -1601,12 +1583,7 @@ const TopUpPage = () => {
                   </CardContent>
                 </Card>
               ) : (
-                <CheckoutMethodList
-                  methods={visibleMethods}
-                  value={activeMethodId}
-                  onChange={setSelectedMethodId}
-                />
-
+                selectedPayMethod?.content
               )}
             </div>
           </CheckoutShell>

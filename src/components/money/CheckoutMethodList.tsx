@@ -1,11 +1,15 @@
 import { ReactNode } from "react";
+import { CreditCard, Globe, Landmark, Smartphone, Wallet } from "lucide-react";
 import { cn } from "@/lib/utils";
+import CheckoutMethodSidebar from "@/components/money/CheckoutMethodSidebar";
+import type { PayTone } from "@/components/money/PaymentMethodRow";
 
 export interface CheckoutMethod {
   id: string;
   label: string;
   description?: string;
   icon?: ReactNode;
+  tone?: PayTone;
   content: ReactNode;
 }
 
@@ -14,42 +18,61 @@ interface Props {
   value: string;
   onChange: (id: string) => void;
   className?: string;
+  /** Render only the vertical method list (pair with CheckoutShell `methodNav`). */
+  navOnly?: boolean;
+  title?: string;
 }
 
-/** Stripe-style radio rows; the selected row expands to hold its gateway form. */
-const CheckoutMethodList = ({ methods, value, onChange, className }: Props) => (
-  <div className={cn("divide-y divide-border rounded-xl border border-border overflow-hidden", className)}>
-    {methods.map((m) => {
-      const selected = m.id === value;
-      return (
-        <div key={m.id} className={cn(selected && "bg-muted/30")}>
-          <button
-            type="button"
-            onClick={() => onChange(m.id)}
-            aria-pressed={selected}
-            className="w-full flex items-center gap-3 px-4 py-3.5 text-left hover:bg-muted/40 transition-colors"
-          >
-            <span
-              className={cn(
-                "w-4 h-4 rounded-full border-2 shrink-0 flex items-center justify-center",
-                selected ? "border-primary" : "border-muted-foreground/40",
-              )}
-            >
-              {selected && <span className="w-2 h-2 rounded-full bg-primary" />}
-            </span>
-            <span className="flex-1 min-w-0">
-              <span className="block text-sm font-medium truncate">{m.label}</span>
-              {m.description && (
-                <span className="block text-xs text-muted-foreground truncate">{m.description}</span>
-              )}
-            </span>
-            {m.icon && <span className="shrink-0 text-muted-foreground">{m.icon}</span>}
-          </button>
-          {selected && <div className="px-4 pb-4">{m.content}</div>}
-        </div>
-      );
-    })}
-  </div>
-);
+const toneIcon: Record<PayTone, typeof CreditCard> = {
+  card: CreditCard,
+  bank: Landmark,
+  wallet: Wallet,
+  mobile: Smartphone,
+  wise: Globe,
+};
+
+function methodIcon(m: CheckoutMethod) {
+  if (m.icon) return m.icon;
+  const Icon = m.tone ? toneIcon[m.tone] : Landmark;
+  return <Icon className="h-4 w-4" />;
+}
+
+/** Nomba-style split: vertical method list on the left, selected method content on the right. */
+const CheckoutMethodList = ({
+  methods,
+  value,
+  onChange,
+  className,
+  navOnly = false,
+  title = "Payment methods",
+}: Props) => {
+  const selected = methods.find((m) => m.id === value) ?? methods[0];
+  const nav = (
+    <CheckoutMethodSidebar
+      title={title}
+      value={selected?.id ?? value}
+      onChange={onChange}
+      items={methods.map((m) => ({
+        id: m.id,
+        label: m.label,
+        description: m.description,
+        icon: methodIcon(m),
+      }))}
+    />
+  );
+
+  if (navOnly) return <div className={className}>{nav}</div>;
+
+  return (
+    <div className={cn("overflow-hidden rounded-xl border border-border bg-card", className)}>
+      <div className="grid min-h-[22rem] sm:grid-cols-[minmax(12.5rem,15rem)_minmax(0,1fr)]">
+        <aside className="border-b border-border bg-muted/20 sm:border-b-0 sm:border-r">
+          {nav}
+        </aside>
+        <section className="min-w-0 p-5 sm:p-6">{selected?.content}</section>
+      </div>
+    </div>
+  );
+};
 
 export default CheckoutMethodList;
