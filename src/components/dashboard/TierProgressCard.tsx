@@ -8,15 +8,18 @@ import { useKyc } from "@/hooks/useKyc";
 import { useProfile } from "@/hooks/useProfile";
 import { useDashboardStats } from "@/hooks/useDashboardStats";
 import { nextTier, tierLabel, upgradeRoute, type Tier } from "@/lib/tierLimits";
+import { useBusinessAccount } from "@/hooks/useBusinessAccount";
 
 const TierProgressCard = () => {
   const navigate = useNavigate();
   const { tier, kyc } = useKyc();
   const { data: profile } = useProfile();
   const { dailyUsed, monthlyUsed } = useDashboardStats();
+  const { isBusiness } = useBusinessAccount();
 
   // Only show for new-framework users; legacy users see KYCStatusCard if needed.
   if ((profile?.kyc_framework_version ?? 2) < 2) return null;
+  if (isBusiness) return null;
   if (!tier) return null;
 
   const current = tier.current_tier as Tier;

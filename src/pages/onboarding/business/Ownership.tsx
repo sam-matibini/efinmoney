@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { ArrowRight, Plus, Trash2, AlertTriangle } from "lucide-react";
 import KybShell from "@/components/kyb/KybShell";
+import KybStatusGate from "@/components/kyb/KybStatusGate";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -21,6 +22,7 @@ import {
   BusinessOwnerRole,
   UBO_THRESHOLD_PERCENT,
 } from "@/hooks/useKyb";
+import { useProfile } from "@/hooks/useProfile";
 
 const ROLES: { value: BusinessOwnerRole; label: string }[] = [
   { value: "beneficial_owner", label: "Beneficial owner" },
@@ -58,6 +60,7 @@ const Ownership = () => {
     saveBusiness,
   } = useKyb();
 
+  const { data: profile } = useProfile();
   const [draft, setDraft] = useState(EMPTY);
   const [adding, setAdding] = useState(false);
 
@@ -66,6 +69,9 @@ const Ownership = () => {
 
   const add = async () => {
     if (!draft.full_name.trim()) return toast.error("Full legal name is required.");
+    if (!draft.date_of_birth) return toast.error("Date of birth is required for each person.");
+    if (!draft.nationality.trim() || draft.nationality.trim().length !== 2)
+      return toast.error("Enter a 2-letter nationality code (for example CA).");
     const pct = Number(draft.ownership_percent || 0);
     if (draft.role === "beneficial_owner" && pct <= 0)
       return toast.error("A beneficial owner needs an ownership percentage.");
@@ -109,16 +115,26 @@ const Ownership = () => {
   };
 
   if (!business) {
-    navigate("/onboarding/business/details", { replace: true });
-    return null;
+    return <KybStatusGate page="ownership" />;
   }
+
+  const startAdding = (prefillName?: string) => {
+    setDraft({
+      ...EMPTY,
+      full_name: prefillName || profile?.full_name || "",
+      email: profile?.email || "",
+      phone: profile?.phone_number || "",
+    });
+    setAdding(true);
+  };
 
   return (
     <KybShell
       step={2}
       title="Who owns and controls the business?"
-      subtitle={`List every individual who owns ${UBO_THRESHOLD_PERCENT}% or more, plus all directors and signing officers. This is a regulatory requirement.`}
+      subtitle={`List every individual who owns ${UBO_THRESHOLD_PERCENT}% or more, plus all directors and signing officers. Identity is verified here as part of KYB — not through Persona or Interac.`}
     >
+      <KybStatusGate page="ownership" />
       <Card className="p-4 flex items-center justify-between">
         <div>
           <p className="text-sm font-medium text-foreground">Total declared ownership</p>
@@ -207,7 +223,7 @@ const Ownership = () => {
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
-              <Label htmlFor="date_of_birth">Date of birth</Label>
+              <Label htmlFor="date_of_birth">Date of birth *</Label>
               <Input
                 id="date_of_birth"
                 type="date"
@@ -216,7 +232,7 @@ const Ownership = () => {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="nationality">Nationality (2-letter code)</Label>
+              <Label htmlFor="nationality">Nationality (2-letter code) *</Label>
               <Input
                 id="nationality"
                 maxLength={2}
@@ -305,7 +321,7 @@ const Ownership = () => {
           </div>
         </Card>
       ) : (
-        <Button variant="outline" onClick={() => setAdding(true)} className="w-full">
+        <Button variant="outline" onClick={() => startAdding()} className="w-full">
           <Plus className="w-4 h-4 mr-2" />
           Add owner, director or signing officer
         </Button>

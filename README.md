@@ -39,7 +39,9 @@ Send checkout and CAD wallet collections take Interac Autodeposit through Fincra
 
 Personal identity can be verified with **Persona**, **Interac** (Canadian bank sign-in), or an optional **manual document review** (government ID + live selfie). Manual submissions land in Admin → KYC with provider `manual` and status `pending_review`.
 
-Business accounts use a **manual KYB** pipeline (company details, ownership, documents) reviewed by compliance — not Persona or Interac. Typical turnaround is 1–2 business days. Admin → KYB.
+**Business accounts skip personal KYC.** After signup they go to **KYB** (`/onboarding/business/…`): company details, ownership (including owner ID and selfie), and documents. Compliance reviews the pack — not Persona or Interac. Typical turnaround is 1–2 business days. Admin → KYB.
+
+If a jurisdiction has no seeded document list, a standard pack is used.
 
 ## Project info
 

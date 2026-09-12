@@ -13,11 +13,14 @@ import { Button } from "@/components/ui/button";
 import { ShieldCheck, ArrowLeft, Clock, Upload, Landmark } from "lucide-react";
 import { toast } from "sonner";
 import { Logo, Wordmark } from "@/components/Logo";
+import { useBusinessAccount } from "@/hooks/useBusinessAccount";
+import LoadingSpinner from "@/components/LoadingSpinner";
 
 const Identity = () => {
   const navigate = useNavigate();
   const { user, signOut } = useAuth();
   const { kyc, isVerified, hasPassedCoreChecks, refetch } = useKyc();
+  const { isBusiness, isLoading: businessLoading, resumePath } = useBusinessAccount();
   const queryClient = useQueryClient();
 
   const [searchParams, setSearchParams] = useSearchParams();
@@ -37,6 +40,7 @@ const Identity = () => {
   // Ensure a KYC row exists so subsequent webhook updates attach correctly
   useEffect(() => {
     if (!user) return;
+    if (isBusiness) return;
     if (isVerified || hasPassedCoreChecks) return;
     if (kyc?.verification_status && kyc.verification_status !== "not_started") return;
 
@@ -47,13 +51,20 @@ const Identity = () => {
         { onConflict: "user_id" }
       )
       .then(() => refetch());
-  }, [user, kyc?.verification_status, isVerified, hasPassedCoreChecks, refetch]);
+  }, [user, kyc?.verification_status, isVerified, hasPassedCoreChecks, refetch, isBusiness]);
 
   useEffect(() => {
+    if (isBusiness) return;
     if (isVerified || hasPassedCoreChecks) {
       navigate("/dashboard", { replace: true });
     }
-  }, [isVerified, hasPassedCoreChecks, navigate]);
+  }, [isVerified, hasPassedCoreChecks, navigate, isBusiness]);
+
+  useEffect(() => {
+    if (!businessLoading && isBusiness) {
+      navigate(resumePath, { replace: true });
+    }
+  }, [businessLoading, isBusiness, resumePath, navigate]);
 
   const openManual = () => {
     setManualOpen(true);
@@ -100,6 +111,14 @@ const Identity = () => {
       toast.error("Couldn't finalize verification. Please try again.", { id: FINALIZE_TOAST_ID });
     }
   };
+
+  if (businessLoading || isBusiness) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <LoadingSpinner size={80} />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center px-6 py-12">

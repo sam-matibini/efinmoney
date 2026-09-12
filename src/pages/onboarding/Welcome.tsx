@@ -1,4 +1,4 @@
-import { useNavigate } from "react-router-dom";
+import { Navigate, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useAuth } from "@/hooks/useAuth";
@@ -7,14 +7,21 @@ import { useState } from "react";
 import OnboardingShell from "@/components/kyc/OnboardingShell";
 import { Lock, ShieldCheck, Globe2, ArrowRight, Clock } from "lucide-react";
 import { toast } from "sonner";
+import { useBusinessAccount } from "@/hooks/useBusinessAccount";
+import LoadingSpinner from "@/components/LoadingSpinner";
 
 const Welcome = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { isBusiness, isLoading: businessLoading, resumePath } = useBusinessAccount();
   const [busy, setBusy] = useState(false);
 
   const begin = async () => {
     if (!user) return;
+    if (isBusiness) {
+      navigate(resumePath);
+      return;
+    }
     setBusy(true);
     const { error } = await supabase
       .from("kyc_verifications")
@@ -29,6 +36,20 @@ const Welcome = () => {
     }
     navigate("/onboarding/identity");
   };
+
+  if (businessLoading) {
+    return (
+      <OnboardingShell title="Let's verify your identity">
+        <div className="flex justify-center py-12">
+          <LoadingSpinner size={64} />
+        </div>
+      </OnboardingShell>
+    );
+  }
+
+  if (isBusiness) {
+    return <Navigate to={resumePath} replace />;
+  }
 
   return (
     <OnboardingShell

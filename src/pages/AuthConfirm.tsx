@@ -120,12 +120,17 @@ const AuthConfirm = () => {
             const { data } = await supabase.auth.getUser();
             confirmedUser = data.user;
             const at = (data.user?.user_metadata as { account_type?: string } | undefined)?.account_type;
-            const nextIsGeneric =
-              !nextParam ||
-              nextParam === "/" ||
-              nextParam === "/onboarding/account-type";
-            if (at === "business" && nextIsGeneric) finalTarget = "/onboarding/business/details";
-            else if (at === "individual" && nextIsGeneric) finalTarget = "/onboarding/identity";
+            const nextIsKyb = !!nextParam && nextParam.startsWith("/onboarding/business");
+            if (at === "business") {
+              finalTarget = nextIsKyb ? nextParam : "/onboarding/business/details";
+            } else if (at === "individual") {
+              const nextIsGeneric =
+                !nextParam ||
+                nextParam === "/" ||
+                nextParam === "/onboarding/account-type" ||
+                nextParam.startsWith("/onboarding/business");
+              if (nextIsGeneric) finalTarget = "/onboarding/identity";
+            }
           } catch {
             /* keep default target */
           }

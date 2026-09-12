@@ -35,6 +35,7 @@ import { productFeatures } from "@/lib/productFeatures";
 import PageHeroBanner from "@/components/common/PageHeroBanner";
 import AppPage from "@/components/layout/AppPage";
 import { useKyb, KybStep } from "@/hooks/useKyb";
+import { isBusinessPrimaryAccount, kybResumePath } from "@/lib/kybOnboarding";
 import { openAlice } from "@/components/alice/aliceBus";
 
 interface Row {
@@ -83,7 +84,7 @@ const SectionLabel = ({ children }: { children: React.ReactNode }) => (
 
 const MorePage = () => {
   const navigate = useNavigate();
-  const { signOut } = useAuth();
+  const { signOut, user } = useAuth();
   const { data: profile } = useProfile();
   const { isAdmin, isFinance, isCompliance } = useUserRoles();
   const { data: transfers } = useTransfers(500);
@@ -94,6 +95,11 @@ const MorePage = () => {
   const verified = profile?.kyc_status === "approved" || profile?.kyc_status === "verified";
 
   const { business, isApproved: businessApproved } = useKyb();
+  const businessPrimary = isBusinessPrimaryAccount(user, business);
+  const kybVerified = businessApproved;
+  const verificationPending = businessPrimary
+    ? !kybVerified
+    : !verified;
 
   // Persistent entry into the business flow, so a user who dismissed the
   // dashboard prompt can always come back. Mirrors BusinessPromptCard routing.
@@ -227,17 +233,17 @@ const MorePage = () => {
               { icon: UserIcon, label: "Your Profile", onClick: () => navigate("/profile") },
               {
                 icon: ShieldCheck,
-                label: "Account Verification",
-                onClick: () => navigate("/kyc"),
-                right: verified ? (
+                label: businessPrimary ? "Business verification (KYB)" : "Account Verification",
+                onClick: () => navigate(businessPrimary ? kybResumePath(business) : "/kyc"),
+                right: !verificationPending ? (
                   <Badge className="bg-primary/15 text-primary border-primary/30 hover:bg-primary/15">Verified</Badge>
                 ) : (
-                  <Badge variant="outline">Pending</Badge>
+                  <Badge variant="outline">{business?.kyb_status === "pending_review" ? "In review" : "Pending"}</Badge>
                 ),
               },
               { icon: Bell, label: "Notifications", onClick: () => navigate("/security") },
               { icon: Users, label: "Contacts & Beneficiaries", onClick: () => navigate("/contacts") },
-              businessRow,
+              ...(businessPrimary ? [] : [businessRow]),
             ]}
           />
 

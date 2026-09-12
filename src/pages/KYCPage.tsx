@@ -12,6 +12,8 @@ import { useKyc } from "@/hooks/useKyc";
 import { cn } from "@/lib/utils";
 import PageHeroBanner from "@/components/common/PageHeroBanner";
 import AppPage from "@/components/layout/AppPage";
+import { useBusinessAccount } from "@/hooks/useBusinessAccount";
+import { kybResumePath } from "@/lib/kybOnboarding";
 
 type TierKey = "tier_1" | "tier_2" | "tier_3";
 const VISIBLE_TIERS: TierKey[] = ["tier_1", "tier_2", "tier_3"];
@@ -21,6 +23,7 @@ const FEATURE_KEYS = ["receive", "send", "topup", "bills", "international", "vir
 const KYCPage = () => {
   const { data: profile, isLoading } = useProfile();
   const { tier: userTier, kyc } = useKyc();
+  const { isBusiness, business, isApproved, isPendingReview, isRejected } = useBusinessAccount();
   const navigate = useNavigate();
 
   const { data: tierLimits } = useQuery({
@@ -56,6 +59,44 @@ const KYCPage = () => {
 
   const cfg = statusConfig[status as keyof typeof statusConfig] || statusConfig.pending;
   const Icon = cfg.icon;
+
+  if (isBusiness) {
+    const kybStatus = business?.kyb_status || "not_started";
+    const kybLabel =
+      kybStatus === "approved"
+        ? "Approved"
+        : kybStatus === "pending_review"
+          ? "Waiting for compliance review"
+          : kybStatus === "rejected" || kybStatus === "suspended"
+            ? "Action needed"
+            : "KYB in progress";
+    const KybIcon = isApproved ? CheckCircle2 : isRejected ? AlertTriangle : Clock;
+    return (
+      <AppPage width="default" className="py-8" innerClassName="space-y-6">
+        <h1 className="text-2xl font-bold text-foreground">Business verification (KYB)</h1>
+        <PageHeroBanner
+          icon={Shield}
+          label="Company verification"
+          value={kybLabel}
+          meta={[
+            { icon: KybIcon, text: business?.legal_name || "Company account" },
+            { icon: Lock, text: isApproved ? "Business payments unlocked" : "Staff document review — not Persona or Interac" },
+          ]}
+          variant="cta"
+        />
+        <Card className="p-6 space-y-3">
+          <p className="text-sm text-muted-foreground">
+            Business accounts are verified through a manual KYB review: company details, ownership, and documents.
+            Personal KYC (Persona or Interac) is not used for company onboarding.
+          </p>
+          <Button onClick={() => navigate(kybResumePath(business))} className="gap-1.5">
+            {isApproved ? "Open business account" : isPendingReview ? "View status" : "Continue KYB"}
+            <ArrowRight className="h-4 w-4" />
+          </Button>
+        </Card>
+      </AppPage>
+    );
+  }
 
   return (
     <AppPage width="default" className="py-8" innerClassName="space-y-6">

@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { GENERIC_KYB_REQUIREMENTS } from "@/lib/kybOnboarding";
 
 // business_* tables are newer than the generated types.ts (same pattern as
 // usePricingRules).
@@ -215,9 +216,11 @@ export const useKyb = () => {
         .order("sort_order");
       if (error) throw error;
       // entity_type NULL means "applies to every entity type".
-      return (data || []).filter(
+      const rows = (data || []).filter(
         (r: any) => r.entity_type === null || r.entity_type === entityType
       ) as KybDocumentRequirement[];
+      // Jurisdictions without a seeded matrix still need a document pack.
+      return rows.length > 0 ? rows : GENERIC_KYB_REQUIREMENTS;
     },
   });
 

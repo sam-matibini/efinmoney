@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { ArrowRight, Check, ChevronsUpDown, FileText } from "lucide-react";
 import KybShell from "@/components/kyb/KybShell";
+import KybStatusGate from "@/components/kyb/KybStatusGate";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -30,6 +31,7 @@ import { useKyb, BusinessEntityType } from "@/hooks/useKyb";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
 import { supabase } from "@/integrations/supabase/client";
+import LoadingSpinner from "@/components/LoadingSpinner";
 
 const ENTITY_TYPES: { value: BusinessEntityType; label: string }[] = [
   { value: "sole_proprietorship", label: "Sole proprietorship" },
@@ -112,6 +114,21 @@ const Details = () => {
   }, [business]);
 
   useEffect(() => {
+    if (business || !profile) return;
+    setForm((f) => ({
+      ...f,
+      street_address: f.street_address || profile.street_address || "",
+      city: f.city || profile.city || "",
+      state_province: f.state_province || profile.state_province || "",
+      postal_code: f.postal_code || profile.postal_code || "",
+      incorporation_country:
+        f.incorporation_country || profile.address_country || profile.country_code || "",
+      business_phone: f.business_phone || profile.phone_number || "",
+      business_email: f.business_email || profile.email || "",
+    }));
+  }, [business, profile]);
+
+  useEffect(() => {
     const meta = user?.user_metadata as
       | { first_name?: string; last_name?: string; full_name?: string }
       | undefined;
@@ -136,8 +153,6 @@ const Details = () => {
     if (!form.legal_name.trim()) return toast.error("Legal business name is required.");
     if (!form.entity_type) return toast.error("Select the entity type.");
     if (!form.incorporation_country) return toast.error("Select the country of registration.");
-    if (countryUnsupported)
-      return toast.error("Business onboarding isn't available in this country yet.");
     if (!form.registration_number.trim())
       return toast.error("Business registration number is required.");
     if (!contactFirst.trim() || !contactLast.trim())
@@ -175,6 +190,7 @@ const Details = () => {
         postal_code: form.postal_code.trim() || null,
         address_country: form.incorporation_country,
         current_step: "ownership",
+        kyb_status: business?.kyb_status === "rejected" ? "in_progress" : business?.kyb_status || "in_progress",
       });
       navigate("/onboarding/business/ownership");
     } catch (e: any) {
@@ -182,12 +198,23 @@ const Details = () => {
     }
   };
 
+  if (isLoading) {
+    return (
+      <KybShell step={1} title="Tell us about your business">
+        <div className="flex justify-center py-16">
+          <LoadingSpinner size={64} />
+        </div>
+      </KybShell>
+    );
+  }
+
   return (
     <KybShell
       step={1}
       title="Tell us about your business"
       subtitle="This must match your registration documents exactly. Companies are verified by our compliance team — not Persona or Interac."
     >
+      <KybStatusGate page="details" />
       <Card className="p-5 flex items-start gap-3">
         <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
           <FileText className="w-5 h-5 text-primary" />
@@ -322,8 +349,8 @@ const Details = () => {
               </PopoverContent>
             </Popover>
             {countryUnsupported && (
-              <p className="text-xs text-destructive">
-                Business onboarding isn't available in this country yet.
+              <p className="text-xs text-muted-foreground">
+                We'll use a standard document pack for this country. A compliance officer reviews everything.
               </p>
             )}
           </div>

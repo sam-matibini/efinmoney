@@ -18,6 +18,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserRoles } from "@/hooks/useUserRoles";
 import { useKyb, KybStep } from "@/hooks/useKyb";
+import { isBusinessPrimaryAccount } from "@/lib/kybOnboarding";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import {
@@ -65,6 +66,7 @@ const Header = () => {
   const { signOut, user } = useAuth();
   const { isAdmin, isFinance, isCompliance } = useUserRoles();
   const { business, isApproved: hasBusiness } = useKyb();
+  const businessPrimary = isBusinessPrimaryAccount(user, business);
   const { data: wallets } = useWallets();
   const { data: profile } = useProfile();
   const defaultWallet = wallets?.find((w) => w.is_default) || wallets?.[0];
@@ -323,7 +325,9 @@ const Header = () => {
                 <DropdownMenuItem onClick={() => navigate("/dashboard")}>Home Page</DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={() => navigate("/profile")}>Profile Settings</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => navigate("/kyc")}>KYC Verification</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => navigate("/kyc")}>
+                  {businessPrimary ? "Business verification" : "KYC Verification"}
+                </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => navigate("/security")}>Security</DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={() => navigate(businessMenuTarget)}>

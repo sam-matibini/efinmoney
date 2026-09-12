@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { ArrowRight, Upload, Check, Trash2, Clock, X, Camera } from "lucide-react";
 import KybShell from "@/components/kyb/KybShell";
+import KybStatusGate from "@/components/kyb/KybStatusGate";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -113,8 +114,7 @@ const Documents = () => {
   };
 
   if (!business) {
-    navigate("/onboarding/business/details", { replace: true });
-    return null;
+    return <KybStatusGate page="documents" />;
   }
 
   const renderReq = (req: KybDocumentRequirement, ownerId?: string) => {
@@ -209,11 +209,16 @@ const Documents = () => {
       title="Upload your documents"
       subtitle="PDF or image, up to 15 MB each. These files go to our compliance team for a manual KYB review — they are not sent to Persona or Interac."
     >
+      <KybStatusGate page="documents" />
       <div className="space-y-4">
         <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
           Business documents
         </h3>
-        {businessReqs.map((r) => renderReq(r))}
+        {businessReqs.length === 0 ? (
+          <p className="text-sm text-muted-foreground">Loading document list…</p>
+        ) : (
+          businessReqs.map((r) => renderReq(r))
+        )}
       </div>
 
       {ownerReqs.length > 0 &&

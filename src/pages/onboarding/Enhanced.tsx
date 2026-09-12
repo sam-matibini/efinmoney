@@ -12,6 +12,7 @@ import { useKyc } from "@/hooks/useKyc";
 import { supabase } from "@/integrations/supabase/client";
 import { sanitizeStorageFilename } from "@/lib/storageKey";
 import { toast } from "sonner";
+import RedirectBusinessToKyb from "@/components/kyb/RedirectBusinessToKyb";
 
 const SOURCE_OPTIONS = [
   { value: "employment", label: "Employment (pay stub or T4)" },
@@ -92,6 +93,7 @@ const Enhanced = () => {
       title="Upgrade to Tier 3 — Enhanced"
       subtitle="Unlock $10,000+ balances, larger transfers, business and international payments."
     >
+      <RedirectBusinessToKyb />
       <Card className="p-4 flex items-center gap-3">
         <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
           <ShieldCheck className="w-5 h-5 text-primary" />

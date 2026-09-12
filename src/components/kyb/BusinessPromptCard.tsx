@@ -4,6 +4,8 @@ import { useNavigate } from "react-router-dom";
 import { Building2, ArrowRight, Clock, AlertTriangle, X, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useKyb, KybStep } from "@/hooks/useKyb";
+import { useAuth } from "@/hooks/useAuth";
+import { isBusinessPrimaryAccount } from "@/lib/kybOnboarding";
 import { cn } from "@/lib/utils";
 
 // Only the "register" state is dismissible — a user with no business may never
@@ -73,7 +75,9 @@ const BusinessPromptCard = () => {
   const navigate = useNavigate();
   const reduceMotion = useReducedMotion();
   const { business, isLoading } = useKyb();
+  const { user } = useAuth();
   const [dismissed, setDismissed] = useState(isDismissed);
+  const businessPrimary = isBusinessPrimaryAccount(user, business);
 
   if (isLoading) return null;
 
@@ -84,8 +88,16 @@ const BusinessPromptCard = () => {
     "Open a business account for your company. Verification takes 1–2 business days.";
   let cta = "Register a business";
   let href = "/onboarding/business/details";
-  let dismissible = true;
+  let dismissible = !businessPrimary;
   let perks = ["Higher limits", "Business payouts", "Multi-currency"];
+
+  if (businessPrimary && !business) {
+    title = "Verify your business";
+    message =
+      "Company accounts use KYB — a staff document review — not personal KYC (Persona or Interac).";
+    cta = "Start KYB";
+    perks = ["Company details", "Ownership", "Documents"];
+  }
 
   if (business) {
     dismissible = false;

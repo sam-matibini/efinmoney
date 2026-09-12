@@ -3,6 +3,9 @@ import { useKyc } from "@/hooks/useKyc";
 import { useUserRoles } from "@/hooks/useUserRoles";
 import { useProfile } from "@/hooks/useProfile";
 import { useAppSession } from "@/providers/AppBootstrap";
+import { useAuth } from "@/hooks/useAuth";
+import { useKyb } from "@/hooks/useKyb";
+import { isBusinessPrimaryAccount } from "@/lib/kybOnboarding";
 import { ReactNode } from "react";
 
 import LoadingSpinner from "@/components/LoadingSpinner";
@@ -27,6 +30,8 @@ const KYCGuard = ({ children }: { children: ReactNode }) => {
   const { kyc, isLoading, isVerified, hasPassedCoreChecks } = useKyc();
   const { roles, isLoading: rolesLoading } = useUserRoles();
   const { data: profile, isLoading: profileLoading } = useProfile();
+  const { user } = useAuth();
+  const { business } = useKyb();
   const { isBootstrapped } = useAppSession();
   const location = useLocation();
 
@@ -35,6 +40,9 @@ const KYCGuard = ({ children }: { children: ReactNode }) => {
   // Staff roles bypass KYC entirely
   const isStaff = roles?.some((r) => ["admin", "finance", "compliance"].includes(r));
   if (isStaff) return <>{children}</>;
+
+  // Company accounts are gated by KYB, not personal KYC.
+  if (isBusinessPrimaryAccount(user, business)) return <>{children}</>;
 
   // New 3-tier framework: never block app access at the route level.
   // Limit enforcement happens at action time via tierLimits helpers.

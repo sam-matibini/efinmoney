@@ -7,7 +7,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useKyc } from "@/hooks/useKyc";
 import { supabase } from "@/integrations/supabase/client";
 import { AlertTriangle, Mail, RefreshCw } from "lucide-react";
-import { toast } from "sonner";
+import RedirectBusinessToKyb from "@/components/kyb/RedirectBusinessToKyb";
 
 const Rejected = () => {
   const navigate = useNavigate();
@@ -34,6 +34,7 @@ const Rejected = () => {
 
   return (
     <OnboardingShell title="We need a few corrections" subtitle="Your verification couldn't be completed. Please review the details below.">
+      <RedirectBusinessToKyb />
       <Card className="p-5 flex items-start gap-3">
         <div className="w-10 h-10 rounded-xl bg-destructive/10 flex items-center justify-center flex-shrink-0">
           <AlertTriangle className="w-5 h-5 text-destructive" />

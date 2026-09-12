@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { ShieldCheck } from "lucide-react";
 import KybShell from "@/components/kyb/KybShell";
+import KybStatusGate from "@/components/kyb/KybStatusGate";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -22,8 +23,7 @@ const Review = () => {
   const [attested, setAttested] = useState(false);
 
   if (!business) {
-    navigate("/onboarding/business/details", { replace: true });
-    return null;
+    return <KybStatusGate page="review" />;
   }
 
   const submit = async () => {
@@ -42,6 +42,7 @@ const Review = () => {
       title="Review and submit"
       subtitle="Check everything below. You won't be able to edit while the application is under review."
     >
+      <KybStatusGate page="review" />
       <Card className="p-6">
         <h3 className="font-semibold text-foreground mb-3">Business</h3>
         <Row label="Legal name" value={business.legal_name} />

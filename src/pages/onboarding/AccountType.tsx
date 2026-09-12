@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { User, Building2, ArrowRight, Check } from "lucide-react";
@@ -6,6 +6,9 @@ import OnboardingShell from "@/components/kyc/OnboardingShell";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/hooks/useAuth";
+import { useBusinessAccount } from "@/hooks/useBusinessAccount";
+import LoadingSpinner from "@/components/LoadingSpinner";
 
 type AccountType = "personal" | "business";
 
@@ -37,12 +40,37 @@ const OPTIONS: {
 
 const AccountType = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const { isBusiness, isLoading, resumePath } = useBusinessAccount();
   const [selected, setSelected] = useState<AccountType | null>(null);
+
+  const metaType = user?.user_metadata?.account_type;
+
+  useEffect(() => {
+    if (isLoading) return;
+    if (isBusiness || metaType === "business") {
+      navigate(resumePath, { replace: true });
+      return;
+    }
+    if (metaType === "individual") {
+      navigate("/onboarding/identity", { replace: true });
+    }
+  }, [isLoading, isBusiness, metaType, resumePath, navigate]);
 
   const cont = () => {
     const opt = OPTIONS.find((o) => o.value === selected);
     if (opt) navigate(opt.href);
   };
+
+  if (isLoading || isBusiness || metaType === "business" || metaType === "individual") {
+    return (
+      <OnboardingShell title="How will you use eFinMoney?" hideSaveExit>
+        <div className="flex justify-center py-12">
+          <LoadingSpinner size={64} />
+        </div>
+      </OnboardingShell>
+    );
+  }
 
   return (
     <OnboardingShell

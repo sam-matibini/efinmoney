@@ -12,6 +12,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { useKyc } from "@/hooks/useKyc";
 import { useProfile } from "@/hooks/useProfile";
+import { useBusinessAccount } from "@/hooks/useBusinessAccount";
 import {
   dismissKycPrompt,
   getKycPromptConfig,
@@ -62,6 +63,7 @@ const KycPromptBanner = () => {
   const reduceMotion = useReducedMotion();
   const { kyc, tier, isLoading } = useKyc();
   const { data: profile } = useProfile();
+  const { isBusiness } = useBusinessAccount();
   const [dismissed, setDismissed] = useState(isKycPromptDismissed);
 
   const config = useMemo(
@@ -69,6 +71,7 @@ const KycPromptBanner = () => {
     [profile, tier, kyc],
   );
 
+  if (isBusiness) return null;
   if (isLoading || !config) return null;
   if (config.dismissible && dismissed) return null;
 

@@ -4,11 +4,14 @@ import { Badge } from "@/components/ui/badge";
 import { useKyc } from "@/hooks/useKyc";
 import { useNavigate } from "react-router-dom";
 import { Clock, AlertTriangle, CheckCircle2, ShieldCheck } from "lucide-react";
+import { useBusinessAccount } from "@/hooks/useBusinessAccount";
 
 const KYCStatusCard = () => {
   const { kyc, isLoading } = useKyc();
+  const { isBusiness } = useBusinessAccount();
   const navigate = useNavigate();
 
+  if (isBusiness) return null;
   if (isLoading || !kyc) return null;
   if (kyc.verification_status === "approved" || kyc.verification_status === "pending_review") return null;
 
