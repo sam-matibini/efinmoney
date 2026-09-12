@@ -21,7 +21,6 @@ import { Search, Plus, Send, Pencil, Trash2, Users, LayoutGrid, List as ListIcon
 
 import { formatDistanceToNow } from "date-fns";
 import { toast } from "sonner";
-import { productFeatures } from "@/lib/productFeatures";
 import PageHeroBanner from "@/components/common/PageHeroBanner";
 import AppPage from "@/components/layout/AppPage";
 
@@ -65,11 +64,6 @@ const ContactsPage = () => {
 
   const handleSendTo = (c: Beneficiary) => {
     if (isCanadaBeneficiary(c)) {
-      if (!productFeatures.canadaDomestic) {
-        toast.message("Canada domestic transfers are not available");
-        navigate("/send?mode=canada");
-        return;
-      }
       navigate(`/send?mode=canada&beneficiaryId=${c.id}`);
       return;
     }

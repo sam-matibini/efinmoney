@@ -72,6 +72,7 @@ function isNombaCardSendCorridor(
   const s = sourceCurrency.toUpperCase();
   const d = destCurrency.toUpperCase();
   if (!(NOMBA_CARD_COLLECT as readonly string[]).includes(s)) return false;
+  if (d === "CAD") return true;
   if (d === "NGN" && transferType === "bank") return true;
   return transferType === "mobile_money"
     && (NOMBA_CARD_MOMO_DEST as readonly string[]).includes(d);
@@ -93,6 +94,7 @@ export function cardSendProvidersForCorridor(
   // Dest must be a card-send payout corridor we support
   const destOk =
     (d === "NGN" && transferType === "bank") ||
+    (d === "CAD" && (transferType === "bank" || transferType === "mobile_money")) ||
     (transferType === "mobile_money" && ["GHS", "KES", "UGX", "RWF", "TZS", "ZMW"].includes(d));
   if (!destOk) return out;
 
@@ -156,6 +158,9 @@ export function cardSendProvidersForCorridor(
     if (d === "NGN" && transferType === "bank" && ["NGN", "USD", "CAD", "EUR", "GBP"].includes(s)) {
       out.push("flutterwave");
     }
+    if (d === "CAD" && (s === "CAD" || s === "USD")) {
+      out.push("flutterwave");
+    }
   }
 
   return out;
@@ -182,9 +187,9 @@ export function pickBestCardProvider(
 export function cardSendDestCurrencies(sourceCurrency: string): string[] {
   const s = sourceCurrency.toUpperCase();
   const dests = new Set<string>();
-  for (const d of ["NGN", "GHS", "KES", "UGX", "RWF", "TZS", "ZMW"] as const) {
+  for (const d of ["CAD", "NGN", "GHS", "KES", "UGX", "RWF", "TZS", "ZMW"] as const) {
     const types: Array<"bank" | "mobile_money"> =
-      d === "NGN" ? ["bank"] : ["mobile_money"];
+      d === "NGN" || d === "CAD" ? ["bank"] : ["mobile_money"];
     for (const t of types) {
       if (cardSendProvidersForCorridor(s, d, t).length > 0) dests.add(d);
     }

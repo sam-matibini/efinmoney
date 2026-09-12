@@ -401,6 +401,7 @@ const SendPage = () => {
     if (!countryChanged) return;
 
     if (pendingBeneficiary) {
+      if (isCanadaBeneficiary(pendingBeneficiary) && targetCountryId === "Canada") return;
       const c = pendingBeneficiary.country_code
         ? findCountryByCode(pendingBeneficiary.country_code)
         : null;
@@ -632,7 +633,7 @@ const SendPage = () => {
           return productFeatures.nombaNigeria || productFeatures.lenhubFlutter || productFeatures.flutterwave;
         }
         if (["USD", "CAD"].includes(c)) {
-          return productFeatures.lenhubFlutter || productFeatures.paytota || productFeatures.flutterwave;
+          return productFeatures.nombaNigeria || productFeatures.lenhubFlutter || productFeatures.paytota || productFeatures.flutterwave;
         }
         if (["EUR", "GBP"].includes(c)) {
           return productFeatures.lenhubFlutter || productFeatures.paytota;
@@ -659,7 +660,8 @@ const SendPage = () => {
     [sourceCurrency],
   );
   const cardTransferTypeForDest = useMemo((): "bank" | "mobile_money" => {
-    return targetCountry.code === "NGN" ? "bank" : "mobile_money";
+    if (targetCountry.code === "NGN" || targetCountry.code === "CAD") return "bank";
+    return "mobile_money";
   }, [targetCountry.code]);
   const availableCardProviders = useMemo(
     () =>
@@ -684,7 +686,10 @@ const SendPage = () => {
     const currentOk = cardWallets.some((w) => w.wallet_id === selectedWalletId);
     if (!currentOk) {
       const preferred =
-        cardWallets.find((w) => w.currency_code === "NGN") || cardWallets[0];
+        cardWallets.find((w) => w.currency_code === targetCountry.code)
+        || cardWallets.find((w) => w.currency_code === "CAD")
+        || cardWallets.find((w) => w.currency_code === "NGN")
+        || cardWallets[0];
       if (preferred) setSelectedWalletId(preferred.wallet_id);
     }
     if (cardPayoutCodes.length > 0 && !cardPayoutCodes.includes(targetCountry.code)) {
@@ -1203,12 +1208,33 @@ const SendPage = () => {
           exchangeRate: effectiveRate,
           feeAmount: fee,
           recipientName,
-          recipientPhone: isNGNBank ? "" : recipientPhone,
+          recipientPhone: isCanadaIntlPayout && cadPayoutMode === "interac"
+            ? (cadInteracDest?.ok ? cadInteracDest.dest.phone || "" : recipientPhone)
+            : isNGNBank ? "" : recipientPhone,
+          recipientEmail: isCanadaIntlPayout && cadPayoutMode === "interac"
+            ? (cadInteracDest?.ok ? cadInteracDest.dest.email || recipientEmail : recipientEmail)
+            : recipientEmail || undefined,
           payoutMethod,
           transferType,
-          recipientAccount: isNGNBank ? ngnAcct : undefined,
-          recipientBankCode: isNGNBank ? ngnBankCode : undefined,
-          recipientBankName: isNGNBank ? ngnBank : null,
+          recipientAccount: isNGNBank
+            ? ngnAcct
+            : isCanadaIntlPayout
+              ? (cadPayoutMode === "interac"
+                ? (cadInteracDest?.ok
+                  ? (cadInteracDest.dest.email || cadInteracDest.dest.phone || "")
+                  : (recipientEmail.trim() || recipientPhone.trim()))
+                : `${caInstitutionNumber.replace(/\D/g, "")}-${caTransitNumber.replace(/\D/g, "")}-${caAccountNumber.replace(/\D/g, "")}`)
+              : undefined,
+          recipientBankCode: isNGNBank
+            ? ngnBankCode
+            : isCanadaIntlPayout && cadPayoutMode === "eft"
+              ? caInstitutionNumber.replace(/\D/g, "")
+              : undefined,
+          recipientBankName: isNGNBank
+            ? ngnBank
+            : isCanadaIntlPayout && cadPayoutMode === "eft"
+              ? (caBankName.trim() || null)
+              : null,
           networkId: selectedNetworkId || null,
           ghPayoutMode: targetCountry.code === "GHS" ? ("mobile" as const) : undefined,
           useStellar: false,
@@ -1448,6 +1474,13 @@ const SendPage = () => {
   }, []);
 
   const applyBeneficiary = useCallback((b: Beneficiary) => {
+    if (isCanadaBeneficiary(b)) {
+      const next = new URLSearchParams(searchParams);
+      next.set("mode", "canada");
+      next.set("beneficiaryId", b.id);
+      setSearchParams(next, { replace: true });
+      return;
+    }
     setRecipientName(b.eft_account_holder || b.name);
     if (b.phone) setRecipientPhone(b.phone.replace(/[^\d+]/g, "").slice(0, 15));
     if (b.email || b.interac_email) setRecipientEmail(b.interac_email || b.email || "");
@@ -1468,23 +1501,11 @@ const SendPage = () => {
       }
       if (b.bank_code) setGhBankCode(String(b.bank_code));
     }
-    if (b.country_code === "CAD" || isCanadaBeneficiary(b)) {
-      if (b.eft_account || b.payout_method === "eft") {
-        setCadPayoutMode("eft");
-        if (b.eft_institution) setCaInstitutionNumber(String(b.eft_institution).replace(/\D/g, "").slice(0, 3));
-        if (b.eft_transit) setCaTransitNumber(String(b.eft_transit).replace(/\D/g, "").slice(0, 5));
-        if (b.eft_account) setCaAccountNumber(String(b.eft_account).replace(/\D/g, ""));
-        if (b.bank_name) setCaBankName(b.bank_name);
-      } else if (b.interac_email || b.email || b.phone || b.payout_method === "interac") {
-        setCadPayoutMode("interac");
-        if (b.interac_email || b.email) setRecipientEmail(b.interac_email || b.email || "");
-      }
-    }
     if (b.country_code) {
       const c = findCountryByCode(b.country_code);
       if (c) setTargetCountryId(c.id);
     }
-  }, []);
+  }, [searchParams, setSearchParams]);
 
   // Apply saved network / bank details for a picked beneficiary once the
   // destination country (and, for NGN/GHS, the banks list) is in place. The
@@ -1494,9 +1515,9 @@ const SendPage = () => {
     const b = pendingBeneficiary;
     if (!b) return;
     const targetIsNGNBank = targetCountry.code === "NGN";
-    const expectedCountry = b.country_code
-      ? findCountryByCode(b.country_code)
-      : null;
+    const expectedCountry = isCanadaBeneficiary(b)
+      ? (findCountryById("Canada") || findCountryByCode("CAD") || findCountryByCode(b.country_code))
+      : (b.country_code ? findCountryByCode(b.country_code) : null);
     // Country stored but not resolvable yet — keep the pending record and retry.
     if (b.country_code && !expectedCountry) return;
     if (expectedCountry && expectedCountry.id !== targetCountryId) return;
@@ -1648,17 +1669,22 @@ const SendPage = () => {
 
   useEffect(() => {
     const bid = searchParams.get("beneficiaryId");
-    if (bid && beneficiaries) {
-      const b = beneficiaries.find((x) => x.id === bid);
-      if (b) {
-        applyBeneficiary(b);
-        goToStep(1);
-        const next = new URLSearchParams(searchParams);
-        next.delete("beneficiaryId");
-        setSearchParams(next, { replace: true });
-      }
+    if (!bid || !beneficiaries) return;
+    if (searchParams.get("mode") === "canada") return;
+    const b = beneficiaries.find((x) => x.id === bid);
+    if (!b) return;
+    if (isCanadaBeneficiary(b)) {
+      const next = new URLSearchParams(searchParams);
+      next.set("mode", "canada");
+      setSearchParams(next, { replace: true });
+      return;
     }
-  }, [beneficiaries, searchParams, goToStep, applyBeneficiary]);
+    applyBeneficiary(b);
+    goToStep(1);
+    const next = new URLSearchParams(searchParams);
+    next.delete("beneficiaryId");
+    setSearchParams(next, { replace: true });
+  }, [beneficiaries, searchParams, goToStep, applyBeneficiary, setSearchParams]);
 
   // Handoff from dashboard quick-send modal (sessionStorage + URL; survives Strict Mode remount)
   const handoffApplyingRef = useRef(false);
@@ -2036,7 +2062,9 @@ const SendPage = () => {
           exchange_rate: intent.exchangeRate,
           fee_amount: intent.feeAmount,
           recipient_name: intent.recipientName,
-          recipient_phone: intent.transferType === "bank" ? undefined : intent.recipientPhone,
+          recipient_phone: intent.targetCurrency === "CAD" || intent.payoutMethod === "interac"
+            ? (intent.recipientPhone || undefined)
+            : intent.transferType === "bank" ? undefined : intent.recipientPhone,
           recipient_account: intent.recipientAccount,
           recipient_bank_code: intent.recipientBankCode,
           recipient_bank_name: intent.recipientBankName,
@@ -2292,7 +2320,7 @@ const SendPage = () => {
   const cardFundingAvailable = productFeatures.nombaNigeria || productFeatures.lenhubFlutter
     || productFeatures.paytota || productFeatures.swychr || productFeatures.flutterwave;
 
-  const interacFundingAvailable = productFeatures.fincraInterac;
+  const interacFundingAvailable = true;
   const interacUsesFincra = productFeatures.fincraInterac;
   const interacUsesFlovide = !interacUsesFincra && (productFeatures.flovide || productFeatures.flovideInterac);
   const wisePayWallet = wallets?.find((w) => isWisePayCurrency(w.currency_code));

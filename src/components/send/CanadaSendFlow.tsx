@@ -34,7 +34,7 @@ import { downloadTransferReceipt } from "@/lib/receipt";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { usePriceQuote } from "@/hooks/usePriceQuote";
-import { CheckCircle, Landmark, AlertCircle, Info, CreditCard, Wallet, Zap, Check, Building2, Link2, Copy, Share2, X, Users, ArrowRight, ChevronRight } from "lucide-react";
+import { CheckCircle, Landmark, AlertCircle, Info, CreditCard, Wallet, Zap, Check, Building2, Link2, Copy, Share2, X, Users, ArrowRight, ChevronRight, Banknote } from "lucide-react";
 import { useStripeConnectedAccount, isConnectReady, getConnectReadiness } from "@/hooks/useStripeConnectedAccount";
 import { tokenizeDebitCard } from "@/lib/stripePayouts";
 import { usePinGate } from "@/components/send/usePinGate";
@@ -43,11 +43,25 @@ import { getStripe } from "@/lib/stripe";
 import type { Stripe } from "@stripe/stripe-js";
 import RecipientStripeKycFields, { buildRecipientKycPayload, isRecipientKycValid } from "@/components/send/RecipientStripeKycFields";
 import {
+  CAD_BANK_EFT_ENABLED,
   INTERAC_ETRANSFER_ENABLED,
   PAYSAFE_PAYOUTS_ENABLED,
   STRIPE_CANADA_RAILS_NOTE,
 } from "@/lib/canadaPayoutRails";
+import PaymentMethodRow, { type PaymentMethodOption } from "@/components/money/PaymentMethodRow";
+import WisePayLinkCard from "@/components/payments/WisePayLinkCard";
+import WiseInteracInvoiceCheckout from "@/components/payments/WiseInteracInvoiceCheckout";
+import { productFeatures } from "@/lib/productFeatures";
+import { FINCRA_CAD_INTERAC_ALIAS } from "@/lib/fincraCad";
+import { isWisePayCurrency } from "@/lib/wisePayLink";
 import { CAD_INTERAC_MISSING_CONTACT, resolveCadInteracDestination } from "@/lib/cadInteracPayout";
+import {
+  clearPendingNombaTxn,
+  getNombaPayStatus,
+  initiateNombaCollection,
+  readPendingNombaTxn,
+  savePendingNombaTxn,
+} from "@/lib/nombaPay";
 import {
   Elements,
   CardNumberElement,
@@ -108,7 +122,45 @@ const elementWrapperClass =
   "w-full rounded-md border border-input bg-background px-3 py-3.5 min-h-[44px] text-sm ring-offset-background focus-within:outline-none focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 [&_.StripeElement]:w-full [&_.StripeElement]:min-h-[1.25rem]";
 
 type DeliveryMethod = "interac" | "eft" | "card_push" | "stripe_connect" | "paylink";
-type FundingSource = "wallet" | "card";
+type FundingSource = "wallet" | "card" | "bank" | "interac" | "wise";
+
+const CANADA_CARD_SEND_KEY = "efm_canada_card_send";
+
+type CanadaCardSendIntent = {
+  nombaTxnId: string;
+  walletId: string;
+  amount: number;
+  fee: number;
+  method: DeliveryMethod;
+  recipientName: string;
+  recipientEmail: string;
+  recipientPhone: string;
+  securityQuestion: string;
+  securityAnswer: string;
+  institutionNumber: string;
+  transitNumber: string;
+  accountNumber: string;
+};
+
+function saveCanadaCardSend(intent: CanadaCardSendIntent) {
+  try { sessionStorage.setItem(CANADA_CARD_SEND_KEY, JSON.stringify(intent)); } catch { /* ignore */ }
+}
+function readCanadaCardSend(): CanadaCardSendIntent | null {
+  try {
+    const raw = sessionStorage.getItem(CANADA_CARD_SEND_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw) as CanadaCardSendIntent;
+  } catch {
+    return null;
+  }
+}
+function clearCanadaCardSend() {
+  try { sessionStorage.removeItem(CANADA_CARD_SEND_KEY); } catch { /* ignore */ }
+}
+
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
 const DELIVERY_METHODS: DeliveryMethod[] = ["eft", "interac", "card_push", "stripe_connect", "paylink"];
 
@@ -397,8 +449,14 @@ const CanadaSendFlow = () => {
   const { data: beneficiaries } = useBeneficiaries();
 
   const [step, setStep] = useState(1);
-  const [method, setMethod] = useState<DeliveryMethod>(PAYSAFE_PAYOUTS_ENABLED ? "eft" : "card_push");
+  const [method, setMethod] = useState<DeliveryMethod>("interac");
   const [funding, setFunding] = useState<FundingSource>("wallet");
+  const [cadPayIn, setCadPayIn] = useState<{
+    kind: "interac" | "bank" | "card";
+    transferId: string;
+    walletId: string;
+    amount: number;
+  } | null>(null);
   const [amount, setAmount] = useState("");
   const [walletId, setWalletId] = useState("");
   const [pickedBeneficiaryId, setPickedBeneficiaryId] = useState<string | null>(null);
@@ -448,6 +506,109 @@ const CanadaSendFlow = () => {
 
   const { data: wallets } = useWallets();
   const createTransfer = useCreateTransfer();
+  const canadaCardResumeRef = useRef(false);
+
+  useEffect(() => {
+    if (canadaCardResumeRef.current) return;
+    const intent = readCanadaCardSend();
+    const flagged = searchParams.get("canadaCard") === "1" || searchParams.get("nomba") === "success";
+    const pending = readPendingNombaTxn();
+    if (!intent) return;
+    if (!flagged && !pending) return;
+    canadaCardResumeRef.current = true;
+
+    (async () => {
+      setCardSubmitting(true);
+      try {
+        const txnId = intent.nombaTxnId || pending;
+        if (!txnId) throw new Error("Missing card payment reference");
+        let paid = false;
+        for (let i = 0; i < 40; i++) {
+          const status = await getNombaPayStatus(txnId);
+          if (status?.status === "completed") {
+            paid = true;
+            break;
+          }
+          if (status?.status === "failed" || status?.status === "cancelled") {
+            throw new Error(status.failure_reason || "Card payment failed");
+          }
+          await sleep(1500);
+        }
+        if (!paid) {
+          throw new Error("Payment is still processing. We’ll finish the send once it clears — check back shortly.");
+        }
+
+        setMethod(intent.method);
+        setRecipientName(intent.recipientName);
+        setRecipientEmail(intent.recipientEmail);
+        setRecipientPhone(intent.recipientPhone);
+        setInstitutionNumber(intent.institutionNumber);
+        setTransitNumber(intent.transitNumber);
+        setAccountNumber(intent.accountNumber);
+        setAmount(String(intent.amount));
+        setWalletId(intent.walletId);
+        setFunding("wallet");
+
+        const cadInteracDest = intent.method === "interac"
+          ? resolveCadInteracDestination({
+            recipient_account: intent.recipientEmail,
+            recipient_phone: intent.recipientPhone,
+          })
+          : null;
+        if (intent.method === "interac" && !cadInteracDest?.ok) {
+          throw new Error(cadInteracDest?.error || "Add the recipient’s Interac email or mobile.");
+        }
+
+        const transfer = await createTransfer.mutateAsync({
+          sender_wallet_id: intent.walletId,
+          recipient_name: intent.recipientName,
+          recipient_account: intent.method === "eft"
+            ? `${intent.institutionNumber}-${intent.transitNumber}-${intent.accountNumber}`
+            : (cadInteracDest?.ok
+              ? (cadInteracDest.dest.email || cadInteracDest.dest.phone || "")
+              : intent.recipientEmail),
+          recipient_phone: intent.method === "interac"
+            ? (cadInteracDest?.ok ? cadInteracDest.dest.phone || undefined : intent.recipientPhone || undefined)
+            : undefined,
+          recipient_country: "CA",
+          transfer_type: "domestic_canada",
+          payout_method: intent.method === "eft" ? "eft" : intent.method === "interac" ? "interac" : intent.method,
+          funding_source: "wallet",
+          source_currency: "CAD",
+          target_currency: "CAD",
+          source_amount: intent.amount,
+          target_amount: intent.amount,
+          exchange_rate: 1,
+          fee_amount: intent.fee,
+        } as any);
+
+        const { data: execData } = await supabase.functions.invoke("execute-transfer", {
+          body: { transfer_id: transfer.id, funding_source: "wallet" },
+        });
+        if (execData?.success === false) {
+          throw new Error(execData?.error || "Transfer failed");
+        }
+
+        clearCanadaCardSend();
+        clearPendingNombaTxn();
+        setLastTransferId(transfer.id);
+        setCadPayIn(null);
+        setStep(4);
+        toast.success("Transfer sent");
+        const next = new URLSearchParams(searchParams);
+        next.delete("canadaCard");
+        next.delete("nomba");
+        setSearchParams(next, { replace: true });
+      } catch (e: any) {
+        canadaCardResumeRef.current = false;
+        toast.error(e?.message || "Could not finish card send");
+      } finally {
+        setCardSubmitting(false);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
+
   const { data: connectAcct, refresh: refreshConnect } = useStripeConnectedAccount();
   const connectReady = isConnectReady(connectAcct);
   const connectState = getConnectReadiness(connectAcct);
@@ -487,12 +648,8 @@ const CanadaSendFlow = () => {
     if (method === "paylink" && funding !== "wallet") setFunding("wallet");
   }, [method, funding]);
 
-  // Paysafe rails off during provider test — default to Stripe card push.
-  useEffect(() => {
-    if (!PAYSAFE_PAYOUTS_ENABLED && (method === "eft" || method === "interac")) {
-      setMethod("card_push");
-    }
-  }, [method]);
+  // Interac and EFT are live CAD payout rails (Nomba → Flovide → Paysafe).
+  // Do not force Stripe card-push when Paysafe credentials are still in test.
 
   const applyCanadaBeneficiary = (b: Beneficiary) => {
     setPickedBeneficiaryId(b.id);
@@ -576,11 +733,10 @@ const CanadaSendFlow = () => {
     {
       id: "eft",
       title: "Bank transfer",
-      subtitle: PAYSAFE_PAYOUTS_ENABLED ? "Direct deposit · 1–3 business days" : "Paysafe · unavailable in test",
+      subtitle: "Direct deposit · 1–3 business days",
       feeLabel: formatFeeLabel(feeForMethod("eft")),
       icon: Landmark,
-      disabled: !PAYSAFE_PAYOUTS_ENABLED,
-      badge: PAYSAFE_PAYOUTS_ENABLED ? undefined : "Paysafe test",
+      disabled: !CAD_BANK_EFT_ENABLED,
     },
     ...(INTERAC_ETRANSFER_ENABLED ? [{
       id: "interac" as const,
@@ -588,7 +744,6 @@ const CanadaSendFlow = () => {
       subtitle: "Email or mobile · minutes",
       feeLabel: formatFeeLabel(feeForMethod("interac")),
       icon: Zap,
-      badge: "Beta",
     }] : []),
     {
       id: "card_push",
@@ -597,6 +752,7 @@ const CanadaSendFlow = () => {
       feeLabel: formatFeeLabel(feeForMethod("card_push")),
       icon: CreditCard,
       badge: "Stripe",
+      disabled: !productFeatures.stripe,
     },
     {
       id: "stripe_connect",
@@ -605,6 +761,7 @@ const CanadaSendFlow = () => {
       feeLabel: formatFeeLabel(feeForMethod("stripe_connect")),
       icon: Building2,
       badge: connectReady ? "Stripe" : "Setup",
+      disabled: !productFeatures.stripe,
     },
     {
       id: "paylink",
@@ -613,6 +770,7 @@ const CanadaSendFlow = () => {
       feeLabel: formatFeeLabel(feeForMethod("paylink")),
       icon: Link2,
       badge: "Stripe",
+      disabled: !productFeatures.stripe && !productFeatures.paymentLinks,
     },
   ], [connectReady, feeForMethod]);
 
@@ -622,7 +780,7 @@ const CanadaSendFlow = () => {
       return;
     }
     if (opt.disabled) {
-      toast.info("Bank transfer and Interac need Paysafe, which is still in test. Use a Stripe option instead.");
+      toast.info("That delivery method is not available right now. Choose Interac or another option.");
       return;
     }
     setMethod(opt.id);
@@ -630,6 +788,29 @@ const CanadaSendFlow = () => {
 
   // Any wallet to satisfy the NOT NULL FK on transfers.sender_wallet_id when paying by card
   const fallbackWallet = (wallets || [])[0];
+
+  const cadFundingOptions: PaymentMethodOption<FundingSource>[] = [
+    { id: "card", label: "Card", sublabel: "Debit or credit", icon: CreditCard, tone: "card" },
+    { id: "bank", label: "Bank", sublabel: "Transfer from your bank", icon: Landmark, tone: "bank" },
+    {
+      id: "interac",
+      label: "Interac",
+      sublabel: `e-Transfer · ${FINCRA_CAD_INTERAC_ALIAS}`,
+      icon: Banknote,
+      tone: "bank",
+    },
+    ...(productFeatures.wise && isWisePayCurrency("CAD")
+      ? [{ id: "wise" as const, label: "Wise", sublabel: "Bank or card via Wise", icon: Wallet, tone: "wise" as const }]
+      : []),
+    {
+      id: "wallet",
+      label: "Wallet",
+      sublabel: noCadWallet ? "Open a CAD wallet first" : `Balance C$${Number(selectedWallet?.balance || 0).toFixed(2)}`,
+      icon: Wallet,
+      tone: "wallet",
+      disabled: noCadWallet,
+    },
+  ];
 
   const totalFee = deliveryFee + cardFee;
   // Fees are charged on top: the recipient always gets the full amount entered.
@@ -676,15 +857,21 @@ const CanadaSendFlow = () => {
               && /^\d{5}$/.test(transitNumber)
               && accountNumber.trim().length >= 4;
 
-  const cardFieldsValid = funding === "wallet"
+  const cardFieldsValid = funding !== "card"
     ? true
-    : cardNumComplete && cardExpComplete && cardCvcComplete;
+    : productFeatures.nombaNigeria || (cardNumComplete && cardExpComplete && cardCvcComplete);
 
   const isStep2Valid = recipientValid;
 
   const isStep3Valid = method === "paylink"
     ? !!selectedWallet && !insufficient
-    : (funding === "card" || (!!selectedWallet && !insufficient)) && cardFieldsValid;
+    : funding === "wise"
+      ? true
+      : funding === "bank" || funding === "interac"
+        ? !!(selectedWallet || fallbackWallet)
+        : funding === "card"
+          ? !!(selectedWallet || fallbackWallet) && cardFieldsValid
+          : !!selectedWallet && !insufficient;
 
   const methodLabel = method === "eft" ? "Bank transfer (EFT)"
     : method === "interac" ? "Interac e-Transfer"
@@ -720,6 +907,117 @@ const CanadaSendFlow = () => {
         toast.error(e?.message || "Could not create payment link");
       } finally {
         setPaylinkSubmitting(false);
+      }
+      return;
+    }
+
+    if (funding === "wise") {
+      toast.message("Complete the Wise payment first, then send from your CAD wallet.");
+      return;
+    }
+
+    if (funding === "card" && productFeatures.nombaNigeria && !productFeatures.stripe) {
+      const wallet = selectedWallet || fallbackWallet;
+      if (!wallet) {
+        toast.error("Open a CAD wallet first so we can credit the card payment.");
+        return;
+      }
+      if (!user?.email) {
+        toast.error("Your account email is required for card checkout.");
+        return;
+      }
+      setCardSubmitting(true);
+      try {
+        const returnUrl = `${window.location.origin}/send?mode=canada&canadaCard=1`;
+        const collection = await initiateNombaCollection({
+          credit_amount: totalCharged,
+          amount: totalCharged,
+          target_wallet_id: wallet.wallet_id,
+          email: user.email,
+          corridor: "international",
+          return_url: returnUrl,
+        });
+        if (!collection.payment_link) throw new Error("Checkout link was empty");
+        saveCanadaCardSend({
+          nombaTxnId: collection.transaction_id,
+          walletId: wallet.wallet_id,
+          amount: parsedAmount,
+          fee: totalFee,
+          method,
+          recipientName,
+          recipientEmail,
+          recipientPhone,
+          securityQuestion,
+          securityAnswer,
+          institutionNumber,
+          transitNumber,
+          accountNumber,
+        });
+        savePendingNombaTxn(collection.transaction_id);
+        toast.message("Opening secure card checkout…");
+        window.location.href = collection.payment_link;
+      } catch (e: any) {
+        toast.error(e?.message || "Could not start card checkout");
+        setCardSubmitting(false);
+      }
+      return;
+    }
+
+    if (funding === "bank" || funding === "interac") {
+      const wallet = selectedWallet || fallbackWallet;
+      if (!wallet) {
+        toast.error("Open a CAD wallet first so we can match the deposit.");
+        return;
+      }
+      const cadInteracDest = method === "interac"
+        ? resolveCadInteracDestination({
+          recipient_account: recipientEmail,
+          recipient_phone: recipientPhone,
+        })
+        : null;
+      if (method === "interac" && !cadInteracDest?.ok) {
+        toast.error(cadInteracDest?.error || CAD_INTERAC_MISSING_CONTACT);
+        return;
+      }
+      setCardSubmitting(true);
+      try {
+        const transfer = await createTransfer.mutateAsync({
+          sender_wallet_id: wallet.wallet_id,
+          recipient_name: recipientName,
+          recipient_account: method === "eft"
+            ? `${institutionNumber}-${transitNumber}-${accountNumber}`
+            : method === "interac"
+              ? (cadInteracDest?.ok
+                ? (cadInteracDest.dest.email || cadInteracDest.dest.phone || "")
+                : recipientEmail)
+              : recipientEmail,
+          recipient_phone: method === "interac"
+            ? (cadInteracDest?.ok ? cadInteracDest.dest.phone || undefined : recipientPhone || undefined)
+            : undefined,
+          recipient_country: "CA",
+          transfer_type: "domestic_canada",
+          payout_method: method === "eft" ? "eft" : method === "interac" ? "interac" : method,
+          funding_source: funding,
+          source_currency: "CAD",
+          target_currency: "CAD",
+          source_amount: parsedAmount,
+          target_amount: receivedAmount,
+          exchange_rate: 1,
+          fee_amount: totalFee,
+        } as any);
+        setCadPayIn({
+          kind: funding,
+          transferId: transfer.id,
+          walletId: wallet.wallet_id,
+          amount: totalCharged,
+        });
+        setLastTransferId(transfer.id);
+        setStep(4);
+        toast.success("Pay from your Canadian bank to complete this send");
+      } catch (e: any) {
+        toast.error(e?.message || "Could not start bank pay-in");
+      } finally {
+        setCardSubmitting(false);
       }
       return;
     }
@@ -919,8 +1217,9 @@ const CanadaSendFlow = () => {
     setInstitutionNumber(""); setTransitNumber(""); setAccountNumber(""); setBankName("");
     setCardNumComplete(false); setCardExpComplete(false); setCardCvcComplete(false);
     setRecipientCardComplete(false);
-    setMethod("eft");
+    setMethod("interac");
     setFunding("wallet");
+    setCadPayIn(null);
     setLastTransferId(null);
     setPaylinkResult(null);
     setPaylinkRevoked(false);
@@ -1302,69 +1601,79 @@ const CanadaSendFlow = () => {
             </div>
 
             {method !== "paylink" && (
-              <div className="space-y-3">
-                <Label>Pay with</Label>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setFunding("wallet")}
-                    disabled={noCadWallet}
-                    className={`relative text-left p-4 rounded-xl border-2 transition-all ${
-                      funding === "wallet" ? "border-primary ring-2 ring-primary/30 bg-primary/5" : "border-border hover:border-primary/40"
-                    } ${noCadWallet ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
-                  >
+              <div className="overflow-hidden rounded-xl border border-border bg-card">
+                <div className="grid min-h-[18rem] sm:grid-cols-[minmax(12.5rem,15rem)_minmax(0,1fr)]">
+                  <aside className="border-b border-border bg-muted/20 sm:border-b-0 sm:border-r">
+                    <PaymentMethodRow
+                      options={cadFundingOptions}
+                      value={funding}
+                      onChange={(v) => setFunding(v)}
+                    />
+                  </aside>
+                  <div className="min-w-0 space-y-4 p-5 sm:p-6">
+                    {funding === "wise" && (
+                      <WisePayLinkCard
+                        walletId={(selectedWallet || fallbackWallet)?.wallet_id || ""}
+                        walletCurrency="CAD"
+                        initialAmount={totalCharged > 0 ? totalCharged.toFixed(2) : ""}
+                        onComplete={() => setFunding("wallet")}
+                      />
+                    )}
+                    {funding === "card" && productFeatures.nombaNigeria && !productFeatures.stripe && (
+                      <div className="space-y-3 rounded-xl border-2 border-pay-card/30 bg-pay-card/5 p-3.5">
+                        <div className="flex items-center gap-2">
+                          <CreditCard className="h-5 w-5 text-primary" />
+                          <p className="text-sm font-semibold">Card checkout</p>
+                        </div>
+                        <p className="text-sm text-muted-foreground">
+                          Pay C${totalCharged.toFixed(2)} CAD with Visa, Mastercard, Amex or Verve on Nomba’s secure page. We credit your CAD wallet, then pay out Interac or EFT.
+                        </p>
+                        <p className="text-[11px] text-muted-foreground">Minimum card send is 1 CAD.</p>
+                      </div>
+                    )}
+                    {funding === "card" && productFeatures.stripe && (
+                      <div ref={cardPanelRef}>
+                        <SenderCardSection
+                          ref={senderCardRef}
+                          onValidityChange={(v) => { setCardNumComplete(v); setCardExpComplete(v); setCardCvcComplete(v); }}
+                          elementStyle={elementStyle}
+                          totalCharged={totalCharged}
+                        />
+                      </div>
+                    )}
+                    {(funding === "bank" || funding === "interac") && (
+                      <div className="space-y-3 rounded-xl border-2 border-pay-bank/30 bg-pay-bank/5 p-3.5">
+                        <div className="flex items-center gap-2">
+                          <Banknote className="h-5 w-5 text-primary" />
+                          <p className="text-sm font-semibold">
+                            {funding === "interac" ? "Interac e-Transfer" : "Bank transfer"}
+                          </p>
+                        </div>
+                        <p className="text-sm text-muted-foreground">
+                          Confirm to open Interac Autodeposit for C${totalCharged.toFixed(2)}. Send CAD to {FINCRA_CAD_INTERAC_ALIAS}. We’ll give you a payment code to paste in the Interac message. When the deposit matches, we pay {recipientName || "your recipient"}.
+                        </p>
+                      </div>
+                    )}
                     {funding === "wallet" && (
-                      <span className="absolute top-2 right-2 w-5 h-5 rounded-full bg-primary text-primary-foreground flex items-center justify-center">
-                        <Check className="w-3.5 h-3.5" />
-                      </span>
+                      <div className="space-y-3 rounded-xl border-2 border-pay-wallet/30 bg-pay-wallet/5 p-3.5">
+                        <div className="flex items-center gap-2">
+                          <Wallet className="h-5 w-5 text-primary" />
+                          <p className="text-sm font-semibold">CAD wallet</p>
+                        </div>
+                        <p className="text-sm text-muted-foreground">
+                          {noCadWallet
+                            ? "Open a CAD wallet first, or pay by card, Interac, bank, or Wise."
+                            : `We’ll debit C$${totalCharged.toFixed(2)} from your CAD balance (C$${Number(selectedWallet?.balance || 0).toFixed(2)} available).`}
+                        </p>
+                        {insufficient && (
+                          <p className="text-sm text-destructive flex items-center gap-1">
+                            <AlertCircle className="w-3.5 h-3.5" /> Insufficient wallet balance — pay by card, Interac, bank, or Wise
+                          </p>
+                        )}
+                      </div>
                     )}
-                    <div className="flex items-center gap-2 mb-1">
-                      <Wallet className="w-5 h-5 text-primary" />
-                      <span className="font-medium text-sm">CAD wallet</span>
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      {noCadWallet ? "Unavailable" : `Balance C$${Number(selectedWallet?.balance || 0).toFixed(2)}`}
-                    </p>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setFunding("card");
-                      setTimeout(() => cardPanelRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" }), 50);
-                    }}
-                    className={`relative text-left p-4 rounded-xl border-2 transition-all cursor-pointer ${
-                      funding === "card" ? "border-primary ring-2 ring-primary/30 bg-primary/5" : "border-border hover:border-primary/40"
-                    }`}
-                  >
-                    {funding === "card" && (
-                      <span className="absolute top-2 right-2 w-5 h-5 rounded-full bg-primary text-primary-foreground flex items-center justify-center">
-                        <Check className="w-3.5 h-3.5" />
-                      </span>
-                    )}
-                    <div className="flex items-center gap-2 mb-1">
-                      <CreditCard className="w-5 h-5 text-primary" />
-                      <span className="font-medium text-sm">Debit / credit card</span>
-                      <span className="ml-auto text-[10px] font-semibold px-2 py-0.5 rounded-full bg-muted">+C$1.50</span>
-                    </div>
-                    <p className="text-xs text-muted-foreground">Secured by Stripe</p>
-                  </button>
+                  </div>
                 </div>
-                {insufficient && funding === "wallet" && (
-                  <p className="text-sm text-destructive flex items-center gap-1">
-                    <AlertCircle className="w-3.5 h-3.5" /> Insufficient wallet balance — pay by card or top up
-                  </p>
-                )}
-              </div>
-            )}
-
-            {method !== "paylink" && funding === "card" && (
-              <div ref={cardPanelRef}>
-                <SenderCardSection
-                  ref={senderCardRef}
-                  onValidityChange={(v) => { setCardNumComplete(v); setCardExpComplete(v); setCardCvcComplete(v); }}
-                  elementStyle={elementStyle}
-                  totalCharged={totalCharged}
-                />
               </div>
             )}
 
@@ -1380,6 +1689,7 @@ const CanadaSendFlow = () => {
 
             <div className="flex gap-3">
               <Button variant="outline" className="flex-1" onClick={() => setStep(2)}>Back</Button>
+              {funding !== "wise" && (
               <Button
                 className="flex-1"
                 onClick={() => method === "paylink" ? handleSubmit() : requirePin(handleSubmit, `C$${parsedAmount.toFixed(2)}`)}
@@ -1389,8 +1699,15 @@ const CanadaSendFlow = () => {
                   ? "Processing…"
                   : method === "paylink"
                     ? `Create link · C$${parsedAmount.toFixed(2)}`
-                    : `Send C$${parsedAmount.toFixed(2)}`}
+                    : funding === "card"
+                      ? `Pay C$${parsedAmount.toFixed(2)} with card`
+                      : funding === "interac"
+                        ? "Continue to Interac"
+                        : funding === "bank"
+                          ? "Continue to bank pay-in"
+                          : `Send C$${parsedAmount.toFixed(2)}`}
               </Button>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -1475,7 +1792,28 @@ const CanadaSendFlow = () => {
         </Card>
       )}
 
-      {step === 4 && method !== "paylink" && (
+      {step === 4 && cadPayIn && method !== "paylink" && (
+        <WiseInteracInvoiceCheckout
+          walletId={cadPayIn.walletId}
+          purpose="transfer"
+          transferId={cadPayIn.transferId}
+          amount={cadPayIn.amount}
+          lineItem={`Send C$${parsedAmount.toFixed(2)} to ${recipientName || "recipient"}`}
+          invoiceId={cadPayIn.transferId}
+          payeeName={recipientName || "Recipient"}
+          payerName={profile?.full_name || user?.email || null}
+          onExit={() => {
+            setCadPayIn(null);
+            setStep(3);
+          }}
+          onComplete={() => {
+            setCadPayIn(null);
+            toast.success("Payment received — completing delivery");
+          }}
+        />
+      )}
+
+      {step === 4 && method !== "paylink" && !cadPayIn && (
         <Card>
           <CardContent className="py-12 text-center">
             <motion.div

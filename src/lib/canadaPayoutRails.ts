@@ -1,14 +1,19 @@
 // Canada domestic payout rail toggles.
-// Paysafe powers EFT + Interac; Stripe powers debit card, Connect, and payment-link card claims.
-// Set VITE_PAYSAFE_PAYOUTS_ENABLED=true when Paysafe production credentials are live.
+// Interac + EFT pay out through Nomba → Flovide → Paysafe.
+// Stripe still powers optional debit-card push, Connect, and payment-link claims.
 
 export const PAYSAFE_PAYOUTS_ENABLED =
   import.meta.env.VITE_PAYSAFE_PAYOUTS_ENABLED === "true";
 
+/** Interac e-Transfer payout (CAD). On unless explicitly disabled. */
 export const INTERAC_ETRANSFER_ENABLED =
-  PAYSAFE_PAYOUTS_ENABLED && import.meta.env.VITE_INTERAC_ETRANSFER_ENABLED !== "false";
+  import.meta.env.VITE_INTERAC_ETRANSFER_ENABLED !== "false";
 
-/** Stripe-backed rails available while Paysafe is in test. */
+/** Canadian bank EFT payout. On unless explicitly disabled. */
+export const CAD_BANK_EFT_ENABLED =
+  import.meta.env.VITE_CAD_EFT_PAYOUTS_ENABLED !== "false";
+
+/** Stripe-backed rails available as extra CAD delivery options. */
 export const STRIPE_CANADA_RAILS_NOTE = PAYSAFE_PAYOUTS_ENABLED
   ? null
-  : "Bank transfer and Interac use Paysafe (still in test). Use Instant to debit card, Payment link, or My Stripe account.";
+  : "Instant debit-card and payment-link delivery use Stripe when that rail is on.";

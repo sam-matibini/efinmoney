@@ -8,14 +8,6 @@ import { CardFieldsInputs, type CardFieldsValue } from "@/components/payments/ca
 import { productFeatures } from "@/lib/productFeatures";
 import { FINCRA_CAD_INTERAC_ALIAS } from "@/lib/fincraCad";
 import PayMethodMark, { CardBrandMark } from "@/components/money/PayMethodMark";
-import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import { cn } from "@/lib/utils";
-import { CurrencyFlag } from "@/components/ui/FlagImage";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { CardFieldsInputs, type CardFieldsValue } from "@/components/payments/cardFields";
-import { productFeatures } from "@/lib/productFeatures";
-import { FINCRA_CAD_INTERAC_ALIAS } from "@/lib/fincraCad";
 
 export interface PanelWallet {
   wallet_id: string;

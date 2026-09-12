@@ -46,7 +46,7 @@ export interface CreateTransferInput {
   target_amount: number;
   exchange_rate: number;
   fee_amount: number;
-  funding_source?: 'wallet' | 'card' | 'bank';
+  funding_source?: 'wallet' | 'card' | 'bank' | 'interac' | 'wise';
 }
 
 export const useTransfers = (limit = 10) => {

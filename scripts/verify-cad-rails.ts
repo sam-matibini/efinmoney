@@ -6,6 +6,7 @@ import {
   resolvePayoutNetwork,
   sanitizeCanadaPayoutRails,
 } from "../supabase/functions/_shared/nomba-payout-corridors.ts";
+import { findCountryByCode, isCanadaCountryCode } from "../src/lib/countries.ts";
 
 function assert(name: string, ok: boolean, detail?: unknown) {
   if (!ok) {
@@ -66,6 +67,13 @@ assert("sanitize drops flutterwave", !cleaned.includes("flutterwave"));
 assert("sanitize drops fincra", !cleaned.includes("fincra"));
 assert("sanitize keeps nomba", cleaned.includes("nomba"));
 assert("sanitize adds paysafe", cleaned.includes("paysafe"));
+
+assert("CAD currency maps to Canada", findCountryByCode("CAD")?.id === "Canada");
+assert("CA ISO2 maps to Canada", findCountryByCode("CA")?.id === "Canada");
+assert("CANADA word maps to Canada", findCountryByCode("Canada")?.id === "Canada");
+assert("isCanadaCountryCode CAD", isCanadaCountryCode("CAD"));
+assert("isCanadaCountryCode CA", isCanadaCountryCode("ca"));
+assert("NGN is not Canada country code", !isCanadaCountryCode("NGN"));
 
 if (process.exitCode) {
   console.error("CAD rail checks failed");

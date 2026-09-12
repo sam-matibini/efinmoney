@@ -880,6 +880,10 @@ const TopUpPage = () => {
       if (id === "flw_momo" && ccyUpper === "CAD") return false;
       if (id === "bank_va" && (ccyUpper === "NGN" || ccyUpper === "GHS") && productFeatures.flutterwave) return true;
       if (id === "bank_checkout" && (supportsFincraBankCheckout(ccyUpper) || ccyUpper === "GHS")) return true;
+      // CAD pay-in: Card, Bank (Plaid), Interac, and Wise are all live — never hide behind Nomba-only.
+      if (ccyUpper === "CAD" && ["nomba", "interac", "plaid", "wise", "wise_link", "dodo"].includes(id)) {
+        return true;
+      }
       // Always offer Wise as its own top-level rail when the feature is on.
       if ((id === "wise" || id === "wise_link") && productFeatures.wise) return true;
       if (africaBackupId) {

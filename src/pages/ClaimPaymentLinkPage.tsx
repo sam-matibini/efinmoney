@@ -19,7 +19,7 @@ import type { Stripe as StripeJs } from "@stripe/stripe-js";
 import { getStripe } from "@/lib/stripe";
 import { tokenizeDebitCard } from "@/lib/stripePayouts";
 import { getClaimKyc, isClaimCardCurrency } from "@/lib/stripeCorridors";
-import { PAYSAFE_PAYOUTS_ENABLED } from "@/lib/canadaPayoutRails";
+import { CAD_BANK_EFT_ENABLED, INTERAC_ETRANSFER_ENABLED } from "@/lib/canadaPayoutRails";
 
 type ClaimErrorBody = {
   error?: string;
@@ -73,7 +73,8 @@ const ClaimInner = ({ link, code }: { link: Resolved; code: string }) => {
   const cardAvailable = isClaimCardCurrency(link.currency);
 
   const [rail, setRail] = useState<Rail>(() => {
-    if (cardAvailable && (!PAYSAFE_PAYOUTS_ENABLED || link.currency !== "CAD")) return "card_push";
+    if (link.currency === "CAD" && INTERAC_ETRANSFER_ENABLED) return "interac";
+    if (cardAvailable) return "card_push";
     return "interac";
   });
   const [name, setName] = useState("");
@@ -253,7 +254,7 @@ const ClaimInner = ({ link, code }: { link: Resolved; code: string }) => {
               variant={rail === "interac" ? "default" : "outline"}
               onClick={() => setRail("interac")}
               className="flex-col h-auto py-3"
-              disabled={link.currency !== "CAD" || !PAYSAFE_PAYOUTS_ENABLED}
+              disabled={link.currency !== "CAD" || !INTERAC_ETRANSFER_ENABLED}
             >
               <Zap className="w-5 h-5 mb-1" /><span className="text-xs">Interac</span>
             </Button>
@@ -269,14 +270,14 @@ const ClaimInner = ({ link, code }: { link: Resolved; code: string }) => {
               variant={rail === "eft" ? "default" : "outline"}
               onClick={() => setRail("eft")}
               className="flex-col h-auto py-3"
-              disabled={link.currency !== "CAD" || !PAYSAFE_PAYOUTS_ENABLED}
+              disabled={link.currency !== "CAD" || !CAD_BANK_EFT_ENABLED}
             >
               <Landmark className="w-5 h-5 mb-1" /><span className="text-xs">Bank (EFT)</span>
             </Button>
           </div>
-          {link.currency === "CAD" && !PAYSAFE_PAYOUTS_ENABLED && (
+          {link.currency === "CAD" && (!INTERAC_ETRANSFER_ENABLED && !CAD_BANK_EFT_ENABLED) && (
             <p className="text-[11px] text-muted-foreground mt-2">
-              Interac and bank transfer are unavailable while Paysafe is in test. Use debit card (Stripe).
+              Interac and bank transfer are temporarily unavailable. Use debit card if it is offered.
             </p>
           )}
         </div>

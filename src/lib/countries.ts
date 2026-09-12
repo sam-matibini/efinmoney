@@ -168,9 +168,33 @@ export const REGION_ORDER: Exclude<CountryRegion, "Popular">[] = [
 export const findCountryById = (id?: string | null): CountryInfo | undefined =>
   id ? COUNTRIES.find((c) => c.id === id) : undefined;
 
-/** Best-effort lookup by currency code (returns first match). Useful for legacy values. */
-export const findCountryByCode = (code?: string | null): CountryInfo | undefined =>
-  code ? COUNTRIES.find((c) => c.code === code) : undefined;
+const ISO2_TO_COUNTRY_ID: Record<string, string> = {
+  CA: "Canada",
+  CAN: "Canada",
+  CANADA: "Canada",
+  US: "United States",
+  USA: "United States",
+  NG: "Nigeria",
+  NGA: "Nigeria",
+  GH: "Ghana",
+  KE: "Kenya",
+  ZM: "Zambia",
+};
+
+/** True for CAD currency, ISO2/ISO3, or the word Canada. */
+export const isCanadaCountryCode = (code?: string | null): boolean => {
+  const raw = String(code || "").trim().toUpperCase();
+  return raw === "CAD" || raw === "CA" || raw === "CAN" || raw === "CANADA";
+};
+
+/** Best-effort lookup by currency code or ISO2 (returns first match). */
+export const findCountryByCode = (code?: string | null): CountryInfo | undefined => {
+  if (!code) return undefined;
+  const raw = code.trim().toUpperCase();
+  const byId = ISO2_TO_COUNTRY_ID[raw];
+  if (byId) return COUNTRIES.find((c) => c.id === byId);
+  return COUNTRIES.find((c) => c.code === raw);
+};
 
 export const filterCountries = (q: string, pool: CountryInfo[] = COUNTRIES): CountryInfo[] => {
   const s = q.trim().toLowerCase();

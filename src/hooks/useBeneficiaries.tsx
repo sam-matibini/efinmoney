@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { isCanadaCountryCode } from "@/lib/countries";
 
 export type BeneficiaryCategory = "person" | "supplier" | "employee" | "contractor" | "payee" | "other";
 
@@ -152,7 +153,7 @@ export const useDeleteBeneficiary = () => {
 
 /** Find an existing beneficiary by phone (or name) for the current user, or create one. */
 export const isCanadaBeneficiary = (b: Beneficiary) =>
-  b.country_code === "CAD"
+  isCanadaCountryCode(b.country_code)
   || !!b.eft_account
   || !!b.interac_email
   || b.payout_method === "eft"
