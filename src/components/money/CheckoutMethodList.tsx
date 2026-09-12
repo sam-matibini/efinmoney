@@ -1,7 +1,7 @@
 import { ReactNode } from "react";
-import { CreditCard, Globe, Landmark, Smartphone, Wallet } from "lucide-react";
 import { cn } from "@/lib/utils";
 import CheckoutMethodSidebar from "@/components/money/CheckoutMethodSidebar";
+import PayMethodMark from "@/components/money/PayMethodMark";
 import type { PayTone } from "@/components/money/PaymentMethodRow";
 
 export interface CheckoutMethod {
@@ -23,18 +23,9 @@ interface Props {
   title?: string;
 }
 
-const toneIcon: Record<PayTone, typeof CreditCard> = {
-  card: CreditCard,
-  bank: Landmark,
-  wallet: Wallet,
-  mobile: Smartphone,
-  wise: Globe,
-};
-
 function methodIcon(m: CheckoutMethod) {
   if (m.icon) return m.icon;
-  const Icon = m.tone ? toneIcon[m.tone] : Landmark;
-  return <Icon className="h-4 w-4" />;
+  return <PayMethodMark id={m.id} tone={m.tone} />;
 }
 
 /** Nomba-style split: vertical method list on the left, selected method content on the right. */

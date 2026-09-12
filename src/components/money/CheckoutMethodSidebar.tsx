@@ -51,14 +51,7 @@ export default function CheckoutMethodSidebar({
                   : "border-l-transparent text-muted-foreground hover:bg-muted/50 hover:text-foreground",
               )}
             >
-              <span
-                className={cn(
-                  "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg",
-                  selected
-                    ? "bg-[hsl(var(--accent-amber))] text-foreground"
-                    : "bg-muted text-muted-foreground",
-                )}
-              >
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-white shadow-sm ring-1 ring-black/[0.08]">
                 {item.icon}
               </span>
               <span className="min-w-0 flex-1">

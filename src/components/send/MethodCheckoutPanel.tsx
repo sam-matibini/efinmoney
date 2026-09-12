@@ -1,4 +1,13 @@
-import { AlertCircle, CreditCard, Landmark, Lock, Plus, Wallet as WalletIcon } from "lucide-react";
+import { AlertCircle, CreditCard, Landmark, Lock, Plus } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { cn } from "@/lib/utils";
+import { CurrencyFlag } from "@/components/ui/FlagImage";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { CardFieldsInputs, type CardFieldsValue } from "@/components/payments/cardFields";
+import { productFeatures } from "@/lib/productFeatures";
+import { FINCRA_CAD_INTERAC_ALIAS } from "@/lib/fincraCad";
+import PayMethodMark, { CardBrandMark } from "@/components/money/PayMethodMark";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
@@ -189,7 +198,10 @@ const MethodCheckoutPanel = ({
     return (
       <div className="rounded-xl border-2 border-pay-bank/30 bg-pay-bank/5 p-4 space-y-3">
         <div>
-          <p className="text-sm font-semibold">{fincraOn || flovideOn ? "Interac" : "Interac (CAD)"}</p>
+          <div className="flex items-center gap-2">
+            <PayMethodMark kind="interac" className="h-8 w-8" />
+            <p className="text-sm font-semibold">{fincraOn || flovideOn ? "Interac" : "Interac (CAD)"}</p>
+          </div>
           <p className="mt-1 text-xs text-muted-foreground">
             {fincraOn
               ? `Confirm to open Interac checkout for ${symbol}${money(total)} ${currency}. Send CAD to ${FINCRA_CAD_INTERAC_ALIAS}. We'll give you a unique payment code to paste in the Interac message. Fincra matches the deposit and releases your payout.`
@@ -208,7 +220,7 @@ const MethodCheckoutPanel = ({
     return (
       <div className="space-y-3 rounded-xl border-2 border-pay-card/30 bg-pay-card/5 p-3.5">
         <div className="flex items-center gap-2">
-          <CreditCard className="w-4 h-4 text-pay-card" />
+          <PayMethodMark kind="card" className="h-8 w-8" />
           <p className="text-sm font-semibold">Card checkout</p>
         </div>
 
@@ -248,7 +260,7 @@ const MethodCheckoutPanel = ({
                         )}>
                           {selected && <span className="h-2 w-2 rounded-full bg-pay-card" />}
                         </span>
-                        <CreditCard className="h-4 w-4 shrink-0 text-muted-foreground" />
+                        <CardBrandMark brand={c.card_brand} />
                         <span className="min-w-0 flex-1 truncate text-xs font-medium capitalize">
                           {c.card_brand || "Card"} •••• {c.last_four || "----"}
                         </span>
@@ -315,7 +327,7 @@ const MethodCheckoutPanel = ({
     return (
       <div className="space-y-3 rounded-xl border-2 border-pay-bank/30 bg-pay-bank/5 p-3.5">
         <div className="flex items-center gap-2">
-          <Landmark className="w-4 h-4 text-pay-bank" />
+          <PayMethodMark kind="bank" className="h-8 w-8" />
           <p className="text-sm font-semibold">Bank transfer checkout</p>
         </div>
         <p className="text-sm text-muted-foreground">
@@ -375,7 +387,7 @@ const MethodCheckoutPanel = ({
   return (
     <div className="space-y-3 rounded-xl border-2 border-pay-wallet/30 bg-pay-wallet/5 p-3.5">
       <div className="flex items-center gap-2">
-        <WalletIcon className="w-4 h-4 text-pay-wallet" />
+        <PayMethodMark kind="wallet" className="h-8 w-8" />
         <p className="text-sm font-semibold">Pay from wallet balance</p>
       </div>
       {wallets.length === 0 ? (

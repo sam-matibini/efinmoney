@@ -1,5 +1,6 @@
 import { ComponentType } from "react";
 import CheckoutMethodSidebar from "@/components/money/CheckoutMethodSidebar";
+import PayMethodMark from "@/components/money/PayMethodMark";
 
 export type PayTone = "card" | "bank" | "wallet" | "mobile" | "wise";
 
@@ -36,16 +37,13 @@ function PaymentMethodRow<T extends string = string>({
       className={className}
       value={value}
       onChange={(id) => onChange(id as T)}
-      items={options.map((o) => {
-        const Icon = o.icon;
-        return {
-          id: o.id,
-          label: o.label,
-          description: o.sublabel,
-          disabled: o.disabled,
-          icon: <Icon className="h-4 w-4" />,
-        };
-      })}
+      items={options.map((o) => ({
+        id: o.id,
+        label: o.label,
+        description: o.sublabel,
+        disabled: o.disabled,
+        icon: <PayMethodMark id={o.id} tone={o.tone} />,
+      }))}
     />
   );
 }
