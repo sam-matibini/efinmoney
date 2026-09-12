@@ -30,6 +30,7 @@ import {
   isCanadianProfile,
   parseInteracEmail,
 } from "@/lib/cadInteracPayout";
+import { isIgnorableInteracEmailPersistError } from "@/lib/postgrestErrors";
 
 const ProfileSettingsPage = () => {
   const { user } = useAuth();
@@ -59,7 +60,11 @@ const ProfileSettingsPage = () => {
       const p = profile as any;
       setFullName(p.full_name || "");
       setEmail(p.email || user?.email || "");
-      setInteracEmail(p.interac_email || "");
+      setInteracEmail(
+        p.interac_email
+        || String((user?.user_metadata as { interac_email?: string } | undefined)?.interac_email || "")
+        || "",
+      );
       setEfinTag(p.efin_tag || "");
       setPhoneNumber(p.phone_number || "");
       setDateOfBirth(p.date_of_birth || "");
@@ -156,17 +161,44 @@ const ProfileSettingsPage = () => {
         .update({
           email,
           efin_tag: cleanTag || null,
-          interac_email: cleanedInterac,
           ...identityFields,
         })
         .eq('user_id', user.id);
-
 
       if (error) {
         if (error.message.includes('duplicate') || error.code === '23505') {
           throw new Error(`@${cleanTag} is already taken`);
         }
         throw error;
+      }
+
+      const { error: metaErr } = await supabase.auth.updateUser({
+        data: {
+          ...(user.user_metadata || {}),
+          interac_email: cleanedInterac,
+        },
+      });
+      if (metaErr) {
+        console.warn("Could not store Interac email on the session:", metaErr.message);
+      }
+
+      const { error: colErr } = await supabase
+        .from("profiles")
+        .update({ interac_email: cleanedInterac })
+        .eq("user_id", user.id);
+      if (colErr) {
+        if (colErr.message.includes("duplicate") || colErr.code === "23505") {
+          throw new Error("That Interac email is already used on another account.");
+        }
+        const { error: rpcErr } = await supabase.rpc("update_own_interac_email", {
+          p_email: cleanedInterac ?? "",
+        });
+        if (rpcErr && !isIgnorableInteracEmailPersistError(colErr) && !isIgnorableInteracEmailPersistError(rpcErr)) {
+          if (rpcErr.message.includes("duplicate") || rpcErr.code === "23505") {
+            throw new Error("That Interac email is already used on another account.");
+          }
+          throw rpcErr;
+        }
       }
 
       if (email !== user.email) {

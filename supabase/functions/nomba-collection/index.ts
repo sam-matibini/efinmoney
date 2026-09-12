@@ -14,6 +14,7 @@ import {
   type FxRateRow,
 } from "../_shared/nomba-topup-quote.ts";
 import { resolveNombaCustomerEmail } from "../_shared/nomba-customer-email.ts";
+import { selectProfileRow } from "../_shared/postgrestErrors.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -107,15 +108,22 @@ Deno.serve(async (req) => {
       Deno.env.get("NOMBA_MERCHANT_EMAIL") || "",
       ...(Deno.env.get("NOMBA_BLOCKED_CUSTOMER_EMAILS") || "").split(","),
     ];
-    const { data: profile } = await admin
-      .from("profiles")
-      .select("email, interac_email, address_country, country_code, default_currency")
-      .eq("user_id", userId)
-      .maybeSingle();
-    const interacEmail = String((profile as { interac_email?: string | null } | null)?.interac_email || "").trim();
-    const profileEmail = String((profile as { email?: string | null } | null)?.email || "").trim();
+    const profile = await selectProfileRow<{
+      email?: string | null;
+      interac_email?: string | null;
+    }>(
+      admin,
+      userId,
+      "email, interac_email, address_country, country_code, default_currency",
+      "email, address_country, country_code, default_currency",
+    );
+    const jwtInterac = String(
+      (userData.user?.user_metadata as { interac_email?: string } | undefined)?.interac_email || "",
+    ).trim();
+    const interacEmail = String(profile?.interac_email || jwtInterac || "").trim();
+    const profileEmail = String(profile?.email || "").trim();
     // Never send the Interac Autodeposit mailbox as Nomba Checkout customerEmail.
-    extraBlocked.push(interacEmail);
+    extraBlocked.push(interacEmail, jwtInterac);
     if (walletCurrency === "CAD") {
       extraBlocked.push(String(userEmail || ""), profileEmail);
     }

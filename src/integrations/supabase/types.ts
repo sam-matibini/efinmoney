@@ -14856,6 +14856,7 @@ export type Database = {
         Args: { p_since: string; p_user_id: string }
         Returns: number
       }
+      update_own_interac_email: { Args: { p_email: string }; Returns: string }
       validate_compliance_parameters: {
         Args: { p_parameters: Json; p_rule_type: string }
         Returns: boolean

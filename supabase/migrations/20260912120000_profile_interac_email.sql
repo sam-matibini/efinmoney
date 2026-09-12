@@ -22,3 +22,5 @@ ALTER TABLE public.profiles
     OR email IS NULL
     OR lower(btrim(interac_email)) <> lower(btrim(email))
   );
+
+NOTIFY pgrst, 'reload schema';

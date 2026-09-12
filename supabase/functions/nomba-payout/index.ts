@@ -16,6 +16,7 @@ import {
   resolvePayoutNetwork,
 } from "../_shared/nomba-payout-corridors.ts";
 import { resolveCadInteracDestination } from "../_shared/cadInteracPayout.ts";
+import { selectProfileRow } from "../_shared/postgrestErrors.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -213,11 +214,10 @@ Deno.serve(async (req) => {
     const narrative = String(transfer.description || `Transfer to ${accountName}`).slice(0, 120);
     const reference = `nomba-payout-${transfer_id}`;
     const senderId = transfer.sender_id as string;
-    const { data: senderProfile } = await supabase
-      .from("profiles")
-      .select("email, interac_email")
-      .eq("user_id", senderId)
-      .maybeSingle();
+    const senderProfile = await selectProfileRow<{
+      email?: string | null;
+      interac_email?: string | null;
+    }>(supabase, senderId, "email, interac_email", "email");
 
     // Debit currency must be a pair Nomba can actually trade for our account's
     // trade region (NG). The customer's wallet currency (e.g. CAD) is NOT a valid
