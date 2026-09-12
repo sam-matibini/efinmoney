@@ -35,6 +35,12 @@ Send checkout and CAD wallet collections take Interac Autodeposit through Fincra
 - Secrets: `FINCRA_SECRET_KEY`, `FINCRA_BUSINESS_ID`, `FINCRA_CAD_INTERAC_ALIAS`, optional `FINCRA_CAD_VIRTUAL_ACCOUNT_ID`
 - SQL: `supabase/migrations/20260911220000_fincra_interac_complete_status.sql`
 
+## KYC and KYB
+
+Personal identity can be verified with **Persona**, **Interac** (Canadian bank sign-in), or an optional **manual document review** (government ID + live selfie). Manual submissions land in Admin → KYC with provider `manual` and status `pending_review`.
+
+Business accounts use a **manual KYB** pipeline (company details, ownership, documents) reviewed by compliance — not Persona or Interac. Typical turnaround is 1–2 business days. Admin → KYB.
+
 ## Project info
 
 **URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID

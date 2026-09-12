@@ -14,7 +14,7 @@ const STEPS = [
   {
     icon: ShieldCheck,
     title: "Verify your identity",
-    desc: "Complete a quick identity check (KYC). This keeps your money safe and is required before you can send — most verifications are fast.",
+    desc: "Complete a quick identity check (KYC) with Persona, Interac, or by uploading documents for staff review. This keeps your money safe and is required before you can send.",
   },
   {
     icon: Wallet,
@@ -114,7 +114,7 @@ export default function HowItWorks() {
             </div>
             <h3 className="text-xl font-bold text-[hsl(var(--brand-900))] mb-2">For businesses</h3>
             <p className="text-[15px] text-neutral-600 leading-relaxed">
-              Onboard your organisation, fund your treasury, and run bulk payouts to suppliers and staff with
+              Onboard your organisation with a manual KYB document review (not Persona or Interac), fund your treasury, and run bulk payouts to suppliers and staff with
               approval controls — then reconcile every movement with a full audit trail and receipts.
             </p>
           </div>

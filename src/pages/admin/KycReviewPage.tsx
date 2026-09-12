@@ -17,6 +17,7 @@ import { toast } from "sonner";
 import { ArrowLeft, AlertTriangle, Clock, FileText, ShieldAlert, ZoomIn, ZoomOut } from "lucide-react";
 import { format, formatDistanceToNow } from "date-fns";
 import { extractRiskTags } from "@/lib/personaTags";
+import { kycProviderLabel } from "@/lib/kycProvider";
 import { KycRiskTagChip } from "@/components/admin/KycRiskTagChip";
 import { z } from "zod";
 import SumsubCard from "@/components/admin/SumsubCard";
@@ -314,6 +315,9 @@ const KycReviewPage = () => {
           </div>
           <div className="flex items-center gap-2">
             <KycStatusBadge status={kyc.verification_status} />
+            <span className="text-xs px-2 py-1 rounded border bg-muted/50 text-foreground">
+              {kycProviderLabel(kyc.verification_provider, kyc)}
+            </span>
             {kyc.escalated && (
               <span className="text-xs bg-amber-500/10 text-amber-600 dark:text-amber-400 px-2 py-1 rounded border border-amber-500/20">Escalated</span>
             )}
@@ -367,7 +371,11 @@ const KycReviewPage = () => {
                 {isOverdue && <div className="flex items-center gap-2 text-red-600 dark:text-red-400"><AlertTriangle className="w-4 h-4" /> Submission older than 24 hours ({overdueHours}h)</div>}
                 {countryMismatch && <div className="flex items-center gap-2 text-red-600 dark:text-red-400"><AlertTriangle className="w-4 h-4" /> ID country ({idCountry}) ≠ address country ({addrCountry})</div>}
                 {attempts > 1 && <div className="flex items-center gap-2 text-amber-600 dark:text-amber-400"><AlertTriangle className="w-4 h-4" /> Multiple submission attempts ({attempts})</div>}
-                <div className="flex items-center gap-2 text-muted-foreground text-xs pt-2 border-t">Selfie/ID face match: pending Persona integration</div>
+                <div className="flex items-center gap-2 text-muted-foreground text-xs pt-2 border-t">
+                  {kyc.verification_provider === "manual"
+                    ? "Manual ID + selfie — compare the live photo to the document photo."
+                    : "Selfie/ID face match: pending Persona integration"}
+                </div>
               </CardContent>
             </Card>
           </div>

@@ -44,11 +44,13 @@ const KYCPage = () => {
   const tier = currentTier;
 
   const isVerified = status === 'verified' || status === 'approved';
+  const isPending = status === 'pending' || status === 'submitted';
 
   const statusConfig = {
     verified: { icon: CheckCircle2, color: 'text-primary', label: 'Verified' },
     approved: { icon: CheckCircle2, color: 'text-primary', label: 'Approved' },
     pending: { icon: Clock, color: 'text-yellow-500', label: 'Pending Review' },
+    submitted: { icon: Clock, color: 'text-yellow-500', label: 'Waiting for compliance review' },
     rejected: { icon: AlertTriangle, color: 'text-destructive', label: 'Rejected' },
   } as const;
 
@@ -80,7 +82,7 @@ const KYCPage = () => {
                 "relative overflow-hidden p-6 border",
                 isVerified
                   ? "border-primary/30"
-                  : status === "pending"
+                  : isPending
                   ? "border-amber-500/30"
                   : status === "rejected"
                   ? "border-destructive/30"
@@ -92,7 +94,7 @@ const KYCPage = () => {
                   "absolute inset-x-0 top-0 h-1",
                   isVerified
                     ? "bg-primary"
-                    : status === "pending"
+                    : isPending
                     ? "bg-amber-500"
                     : status === "rejected"
                     ? "bg-destructive"
@@ -105,7 +107,7 @@ const KYCPage = () => {
                     "flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl",
                     isVerified
                       ? "bg-primary/10 text-primary"
-                      : status === "pending"
+                      : isPending
                       ? "bg-amber-500/10 text-amber-500"
                       : status === "rejected"
                       ? "bg-destructive/10 text-destructive"
@@ -126,7 +128,7 @@ const KYCPage = () => {
                         "inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium",
                         isVerified
                           ? "bg-primary/10 text-primary"
-                          : status === "pending"
+                          : isPending
                           ? "bg-amber-500/10 text-amber-600 dark:text-amber-400"
                           : status === "rejected"
                           ? "bg-destructive/10 text-destructive"
@@ -155,7 +157,7 @@ const KYCPage = () => {
                   const isLocked = !isUnlocked;
                   const upgradePath =
                     tKey === "tier_2"
-                      ? "/onboarding/identity?autostart=persona"
+                      ? "/onboarding/identity"
                       : tKey === "tier_3"
                       ? "/onboarding/enhanced"
                       : null;
@@ -259,7 +261,11 @@ const KYCPage = () => {
                             <span className="inline-flex items-center gap-1.5 text-sm font-medium text-amber-600 dark:text-amber-400">
                               <Clock className="h-4 w-4" /> Submitted — under review
                             </span>
-                            <span className="text-[10px] text-muted-foreground">We'll get back within 24 hrs</span>
+                            <span className="text-[10px] text-muted-foreground">
+                              {kyc?.verification_provider === "manual"
+                                ? "Typical review is 1–2 business days"
+                                : "We'll get back within 24 hrs"}
+                            </span>
                           </div>
                         ) : isRejected ? (
                           <Button

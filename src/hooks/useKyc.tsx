@@ -49,6 +49,7 @@ export interface KycRecord {
   address_rejection_reason: string | null;
   selfie_url: string | null;
   liveness_check_status: "pending" | "approved" | "rejected";
+  verification_provider: string | null;
   submitted_at: string | null;
   persona_inquiry_id: string | null;
   persona_inquiry_status: string | null;

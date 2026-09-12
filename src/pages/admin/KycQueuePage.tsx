@@ -14,23 +14,25 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { formatDistanceToNow } from "date-fns";
 import { Search, Eye } from "lucide-react";
+import { kycProviderLabel } from "@/lib/kycProvider";
 
 const PAGE_SIZE = 25;
 
 const KycQueuePage = () => {
   const navigate = useNavigate();
   const [statusFilter, setStatusFilter] = useState<string>("pending_review");
+  const [providerFilter, setProviderFilter] = useState<string>("all");
   const [docTypeFilter, setDocTypeFilter] = useState<string>("all");
   const [countryFilter, setCountryFilter] = useState<string>("all");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(0);
 
   const { data, isLoading } = useQuery({
-    queryKey: ["admin-kyc-queue", statusFilter, docTypeFilter, countryFilter, search, page],
+    queryKey: ["admin-kyc-queue", statusFilter, providerFilter, docTypeFilter, countryFilter, search, page],
     queryFn: async () => {
       let q = supabase
         .from("kyc_verifications")
-        .select("id, user_id, verification_status, id_document_type, id_document_country, submitted_at, reviewed_by, created_at, persona_decision, persona_verification_data", { count: "exact" });
+        .select("id, user_id, verification_status, verification_provider, id_document_type, id_document_country, submitted_at, reviewed_by, created_at, persona_inquiry_id, persona_decision, persona_verification_data", { count: "exact" });
 
       if (statusFilter === "needs_signoff") {
         // Persona auto-decided but no admin has reviewed yet
@@ -38,6 +40,9 @@ const KycQueuePage = () => {
       } else if (statusFilter !== "all") {
         q = q.eq("verification_status", statusFilter as "pending_review");
       }
+      if (providerFilter === "manual") q = q.eq("verification_provider", "manual");
+      else if (providerFilter === "persona") q = q.or("verification_provider.eq.persona,persona_inquiry_id.not.is.null");
+      else if (providerFilter === "interac") q = q.eq("verification_provider", "interac");
       if (docTypeFilter !== "all") q = q.eq("id_document_type", docTypeFilter as "passport");
       if (countryFilter !== "all") q = q.eq("id_document_country", countryFilter);
 
@@ -93,7 +98,7 @@ const KycQueuePage = () => {
         <div className="flex items-end justify-between flex-wrap gap-2">
           <div>
             <h1 className="font-display text-3xl font-bold tracking-tight">KYC Queue</h1>
-            <p className="text-sm text-muted-foreground">Review user identity verifications</p>
+            <p className="text-sm text-muted-foreground">Review Persona, Interac, and manual document submissions</p>
           </div>
         </div>
 
@@ -116,6 +121,15 @@ const KycQueuePage = () => {
                 <SelectItem value="rejected">Rejected</SelectItem>
               </SelectContent>
 
+            </Select>
+            <Select value={providerFilter} onValueChange={(v) => { setProviderFilter(v); setPage(0); }}>
+              <SelectTrigger className="w-40"><SelectValue placeholder="Provider" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All providers</SelectItem>
+                <SelectItem value="manual">Manual</SelectItem>
+                <SelectItem value="persona">Persona</SelectItem>
+                <SelectItem value="interac">Interac</SelectItem>
+              </SelectContent>
             </Select>
             <Select value={docTypeFilter} onValueChange={(v) => { setDocTypeFilter(v); setPage(0); }}>
               <SelectTrigger className="w-44"><SelectValue placeholder="Document type" /></SelectTrigger>
@@ -141,6 +155,7 @@ const KycQueuePage = () => {
             <TableHeader className="sticky top-0 bg-card z-10">
               <TableRow>
                 <TableHead>User</TableHead>
+                <TableHead>Provider</TableHead>
                 <TableHead>Country</TableHead>
                 <TableHead>Document</TableHead>
                 <TableHead>Submitted</TableHead>
@@ -156,11 +171,11 @@ const KycQueuePage = () => {
               {isLoading ? (
                 Array.from({ length: 6 }).map((_, i) => (
                   <TableRow key={i}>
-                    <TableCell colSpan={9}><Skeleton className="h-8 w-full" /></TableCell>
+                    <TableCell colSpan={10}><Skeleton className="h-8 w-full" /></TableCell>
                   </TableRow>
                 ))
               ) : data?.rows.length === 0 ? (
-                <TableRow><TableCell colSpan={9} className="text-center text-sm text-muted-foreground py-12">No submissions match your filters.</TableCell></TableRow>
+                <TableRow><TableCell colSpan={10} className="text-center text-sm text-muted-foreground py-12">No submissions match your filters.</TableCell></TableRow>
               ) : (
                 data?.rows.map((row) => {
                   const tags = extractRiskTags(row.persona_verification_data);
@@ -175,6 +190,9 @@ const KycQueuePage = () => {
                       <TableCell>
                         <div className="font-medium">{row.profile?.full_name || "—"}</div>
                         <div className="text-xs text-muted-foreground">{row.profile?.email || "—"}</div>
+                      </TableCell>
+                      <TableCell className="text-sm">
+                        {kycProviderLabel(row.verification_provider, row)}
                       </TableCell>
                       <TableCell>{row.id_document_country || "—"}</TableCell>
                       <TableCell className="capitalize text-sm">{row.id_document_type?.replace("_", " ") || "—"}</TableCell>

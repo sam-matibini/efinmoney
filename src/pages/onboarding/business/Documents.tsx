@@ -207,7 +207,7 @@ const Documents = () => {
     <KybShell
       step={3}
       title="Upload your documents"
-      subtitle="PDF or image, up to 15 MB each. Everything is encrypted and only visible to our compliance team."
+      subtitle="PDF or image, up to 15 MB each. These files go to our compliance team for a manual KYB review — they are not sent to Persona or Interac."
     >
       <div className="space-y-4">
         <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">

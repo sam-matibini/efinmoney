@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
-import { ArrowRight, Check, ChevronsUpDown } from "lucide-react";
+import { ArrowRight, Check, ChevronsUpDown, FileText } from "lucide-react";
 import KybShell from "@/components/kyb/KybShell";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -186,8 +186,21 @@ const Details = () => {
     <KybShell
       step={1}
       title="Tell us about your business"
-      subtitle="This must match your registration documents exactly."
+      subtitle="This must match your registration documents exactly. Companies are verified by our compliance team — not Persona or Interac."
     >
+      <Card className="p-5 flex items-start gap-3">
+        <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
+          <FileText className="w-5 h-5 text-primary" />
+        </div>
+        <div>
+          <p className="text-sm font-medium text-foreground">Manual KYB review</p>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Persona and Interac are for personal identity only. For a company you'll provide details, ownership, and
+            documents. A compliance officer reviews everything, typically within 1–2 business days.
+          </p>
+        </div>
+      </Card>
+
       <Card className="p-6 space-y-4">
         <h3 className="font-semibold text-foreground">Contact person</h3>
         <p className="text-sm text-muted-foreground">

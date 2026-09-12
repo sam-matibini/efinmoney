@@ -48,7 +48,10 @@ export function getKycPromptConfig(
     return {
       variant: "pending",
       title: "Verification under review",
-      message: "We're reviewing your documents — this usually takes less than 24 hours.",
+      message:
+        kyc.verification_provider === "manual"
+          ? "A compliance officer is reviewing your documents. Typical turnaround is 1–2 business days."
+          : "We're reviewing your documents — this usually takes less than 24 hours.",
       cta: "View status",
       href: "/kyc",
       dismissible: true,
@@ -62,7 +65,7 @@ export function getKycPromptConfig(
       title: "Verification needs attention",
       message: "We couldn't approve your last submission. Review the details and try again.",
       cta: "Try again",
-      href: upgradeRoute(current) + (current === "tier_1" ? "?autostart=persona" : ""),
+      href: upgradeRoute(current),
       dismissible: false,
       perks,
     };
@@ -72,9 +75,9 @@ export function getKycPromptConfig(
     return {
       variant: "continue",
       title: "Continue verification",
-      message: "You're almost there — finish your ID check in about 2 minutes.",
+      message: "You're almost there — finish with Persona, Interac, or a document upload.",
       cta: "Continue",
-      href: upgradeRoute(current) + (current === "tier_1" ? "?autostart=persona" : ""),
+      href: upgradeRoute(current),
       dismissible: true,
       perks,
     };
@@ -86,10 +89,10 @@ export function getKycPromptConfig(
       title: current === "tier_1" ? "Verify your identity" : `Unlock ${tierLabel(upgradeTo)}`,
       message:
         current === "tier_1"
-          ? "Complete a quick ID check to unlock sending, top-ups, and higher limits."
+          ? "Complete a quick ID check — Persona, Interac, or a document upload — to unlock sending, top-ups, and higher limits."
           : `Upgrade to ${tierLabel(upgradeTo)} for virtual cards and international transfers.`,
       cta: current === "tier_1" ? "Verify now" : "Upgrade tier",
-      href: upgradeRoute(current) + (current === "tier_1" ? "?autostart=persona" : ""),
+      href: upgradeRoute(current),
       dismissible: true,
       perks,
     };

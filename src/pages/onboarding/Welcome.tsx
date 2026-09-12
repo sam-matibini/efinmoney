@@ -41,14 +41,14 @@ const Welcome = () => {
         </div>
         <div>
           <p className="text-sm font-medium text-foreground">Takes about 5 minutes</p>
-          <p className="text-xs text-muted-foreground">Have your ID and a recent utility bill handy.</p>
+          <p className="text-xs text-muted-foreground">Have a government ID ready. A recent utility bill helps if you upload documents.</p>
         </div>
       </Card>
 
       <Card className="p-6">
         <h3 className="font-semibold text-foreground mb-4">What you'll do</h3>
         <ol className="space-y-3 text-sm">
-          {["Verify your identity", "Confirm your address", "Review and submit"].map((label, i) => (
+          {["Choose Persona, Interac, or document upload", "Confirm your details", "Get verified"].map((label, i) => (
             <li key={label} className="flex items-start gap-3">
               <span className="w-6 h-6 rounded-full bg-secondary text-xs font-semibold flex items-center justify-center text-foreground flex-shrink-0">
                 {i + 1}

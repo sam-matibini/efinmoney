@@ -104,15 +104,16 @@ const Review = () => {
         />
         <Label htmlFor="attest" className="text-sm font-normal leading-relaxed">
           I confirm that I am authorised to act on behalf of this business, and that the information
-          and documents provided are true, complete and accurate. I understand that eFin Money is
-          required to verify this information and that providing false information is an offence.
+          and documents provided are true, complete and accurate. I understand that eFinMoney will
+          verify this application through a manual compliance review (not Persona or Interac), and that
+          providing false information is an offence.
         </Label>
       </Card>
 
       <Card className="p-4 flex items-center gap-3 bg-secondary/40">
         <ShieldCheck className="w-4 h-4 text-primary flex-shrink-0" />
         <p className="text-xs text-muted-foreground">
-          Reviews are usually completed within 1–2 business days. We'll email you as soon as there's
+          Reviews are usually completed within 1–2 business days by our compliance team. We'll email you as soon as there's
           a decision.
         </p>
       </Card>

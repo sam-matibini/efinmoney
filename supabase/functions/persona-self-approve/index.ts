@@ -101,6 +101,7 @@ Deno.serve(async (req) => {
       id_verification_status: "approved",
       liveness_check_status: "approved",
       persona_decision: "approved",
+      verification_provider: "persona",
       reviewed_at: now,
     };
     if (!kyc.submitted_at) update.submitted_at = now;

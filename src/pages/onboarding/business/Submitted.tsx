@@ -24,9 +24,9 @@ const Submitted = () => {
           <Clock className="w-5 h-5 text-primary" />
         </div>
         <div>
-          <p className="text-sm font-medium text-foreground">Usually 1–2 business days</p>
+          <p className="text-sm font-medium text-foreground">Manual KYB — usually 1–2 business days</p>
           <p className="text-xs text-muted-foreground">
-            We may contact you if we need anything else.
+            A compliance officer reviews your documents (not Persona or Interac). We may contact you if we need anything else.
           </p>
         </div>
       </Card>

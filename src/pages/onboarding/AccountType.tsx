@@ -22,15 +22,15 @@ const OPTIONS: {
     icon: User,
     title: "Personal account",
     subtitle: "For an individual sending, receiving and spending money.",
-    perks: ["Ready to use right away", "Verify to raise your limits", "Takes about 5 minutes"],
+    perks: ["Ready to use right away", "Persona, Interac, or document upload", "Takes a few minutes"],
     href: "/onboarding/identity",
   },
   {
     value: "business",
     icon: Building2,
     title: "Business account",
-    subtitle: "For a registered company, sole proprietorship or non-profit.",
-    perks: ["Higher limits & business payouts", "Owner / director verification (KYB)", "Approval in 1–2 business days"],
+    subtitle: "For a registered company, sole proprietorship or non-profit. Verified by staff document review — not Persona or Interac.",
+    perks: ["Manual KYB document review", "Owner / director verification", "Approval in 1–2 business days"],
     href: "/onboarding/business/details",
   },
 ];
@@ -47,7 +47,7 @@ const AccountType = () => {
   return (
     <OnboardingShell
       title="How will you use eFinMoney?"
-      subtitle="Choose the account type that fits you. A business account is verified differently from a personal one."
+      subtitle="Choose the account type that fits you. Personal identity can use Persona, Interac, or a manual document review. Business accounts go through a staff KYB review."
       hideSaveExit
     >
       <div className="grid gap-4">
