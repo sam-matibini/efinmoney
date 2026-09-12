@@ -822,12 +822,12 @@ const TopUpPage = () => {
       const flwMethods = FLW_METHODS_BY_CCY[currency] || ["card"];
       const hosted = flwMethods.filter((m) => ["card", "banktransfer", "ussd"].includes(m));
       const fromPolicy = policyFailoverPartners
-        .map((p) => collectPayMethodIds(collectMethodForPartner(p) || p)[0])
-        .find((id) => id && id !== "fincra");
+        .map((p) => collectPayMethodIds(collectMethodForPartner(p) || p, currency)[0])
+        .find((id) => id && id !== "fincra" && !(currency.toUpperCase() === "CAD" && id === "flw_momo"));
       const backup =
         fromPolicy
         || (productFeatures.flutterwave && hosted.length > 0 && "flw_hosted")
-        || (productFeatures.flutterwave && (flwMethods.includes("mobilemoney") || currency === "TZS") && "flw_momo")
+        || (productFeatures.flutterwave && currency.toUpperCase() !== "CAD" && (flwMethods.includes("mobilemoney") || currency === "TZS") && "flw_momo")
         || (productFeatures.nombaNigeria && isNombaTopupLive(currency) && intlMethods.includes("nomba") && "nomba")
         || (productFeatures.paytota && (intlMethods.includes("paytota") || africaMomoMethods.includes("paytota")) && "paytota")
         || (productFeatures.swychr && africaMomoMethods.includes("swychr") && "swychr")
@@ -875,8 +875,9 @@ const TopUpPage = () => {
       || (policyAfricaOverride && africaMomoMethods.includes(policyAfricaOverride) && policyAfricaOverride)
       || (defaultRail && (forceNombaCard || activeRails.has(defaultRail)) ? defaultRail : null)
       || null;
-    const primaryIds = collectPrimary ? collectPayMethodIds(collectPrimary) : [];
+    const primaryIds = collectPrimary ? collectPayMethodIds(collectPrimary, ccyUpper) : [];
     const showRail = (id: string) => {
+      if (id === "flw_momo" && ccyUpper === "CAD") return false;
       if (id === "bank_va" && (ccyUpper === "NGN" || ccyUpper === "GHS") && productFeatures.flutterwave) return true;
       if (id === "bank_checkout" && (supportsFincraBankCheckout(ccyUpper) || ccyUpper === "GHS")) return true;
       // Always offer Wise as its own top-level rail when the feature is on.
@@ -1011,8 +1012,8 @@ const TopUpPage = () => {
                   setWesternCardRail("paypal");
                 } else if (next) {
                   toast.message("Card checkout is busy — try the option below.");
-                  setAfricaBackupId(collectPayMethodIds(next)[0] || next);
-                  setSelectedMethodId(collectPayMethodIds(next)[0] || next);
+                  setAfricaBackupId(collectPayMethodIds(next, currency)[0] || next);
+                  setSelectedMethodId(collectPayMethodIds(next, currency)[0] || next);
                 } else {
                   toast.error("Card checkout is unavailable right now.");
                 }
@@ -1045,7 +1046,7 @@ const TopUpPage = () => {
           ),
         });
       }
-      if (showRail("flw_momo") && (availableFlwMethods.includes("mobilemoney") || currency === "TZS")) {
+      if (showRail("flw_momo") && ccyUpper !== "CAD" && (availableFlwMethods.includes("mobilemoney") || currency === "TZS")) {
         payMethods.push({
           id: "flw_momo",
           tone: "mobile",
@@ -1351,7 +1352,9 @@ const TopUpPage = () => {
 
   /** The auto-routed gateway is only the default selection now. */
   const GATEWAY_DEFAULT_METHOD: Partial<Record<Gateway, string>> = {
-    flutterwave: availableFlwMethods.includes("mobilemoney") ? "flw_momo" : "flw_hosted",
+    flutterwave: currency.toUpperCase() === "CAD"
+      ? "flw_hosted"
+      : availableFlwMethods.includes("mobilemoney") ? "flw_momo" : "flw_hosted",
     swychr_pay: "swychr",
     paytota_pay: "paytota",
     dodo_pay: "dodo",
@@ -1378,6 +1381,7 @@ const TopUpPage = () => {
     || policyAfricaOverride
     || (defaultRail && (forceNombaForWallet || activeRails.has(defaultRail)) ? defaultRail : "")
     || "",
+    currency,
   );
   const defaultMethodId =
     (forceNombaForWallet && payMethods.some((m) => m.id === "nomba") && "nomba")

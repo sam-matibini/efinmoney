@@ -8,10 +8,12 @@ import {
 } from "../_shared/nomba-api.ts";
 import {
   classifyNombaPayout,
+  isCanadaCadPayout,
   momoNetworkHints,
   nombaBankPaymentMethod,
   normalizeNombaCountry,
   pickNombaInstitution,
+  resolvePayoutNetwork,
 } from "../_shared/nomba-payout-corridors.ts";
 import { resolveCadInteracDestination } from "../_shared/cadInteracPayout.ts";
 
@@ -65,40 +67,8 @@ const DIAL_BY_COUNTRY: Record<string, string> = {
   CD: "243",
 };
 
-const CURRENCY_DEFAULT_NETWORK: Record<string, string> = {
-  KES: "mpesa",
-  GHS: "mtn",
-  UGX: "mtn",
-  TZS: "airtel",
-  RWF: "mtn",
-  XOF: "orange",
-  XAF: "mtn",
-  ETB: "mpesa",
-  CDF: "mpesa",
-  USD: "mpesa",
-};
-
-const PAYOUT_METHOD_TO_NETWORK: Record<string, string> = {
-  mtn_mobile: "mtn",
-  airtel_money: "airtel",
-  airteltigo_money: "airtel",
-  zamtel_money: "zamtel",
-  vodafone_cash: "vodafone",
-  vodafone_money: "vodafone",
-  tigo_pesa: "tigo",
-  mpesa: "mpesa",
-  orange_money: "orange",
-};
-
 function resolveNetwork(payoutMethod: string | null | undefined, currency: string): string {
-  if (payoutMethod && PAYOUT_METHOD_TO_NETWORK[payoutMethod]) {
-    return PAYOUT_METHOD_TO_NETWORK[payoutMethod];
-  }
-  const lower = (payoutMethod ?? "").toLowerCase().trim();
-  if (["mtn", "airtel", "zamtel", "mpesa", "vodafone", "tigo", "orange", "wave", "moov"].includes(lower)) {
-    return lower;
-  }
-  return CURRENCY_DEFAULT_NETWORK[currency] || "mpesa";
+  return resolvePayoutNetwork(payoutMethod, currency);
 }
 
 function normalizePhone(phone: string, country: string): string {
@@ -210,15 +180,24 @@ Deno.serve(async (req) => {
 
     const targetCurrency = String(transfer.target_currency || "NGN").toUpperCase();
     const sourceCurrencyWallet = String(transfer.source_currency || targetCurrency).toUpperCase();
-    const payoutMethod = String(transfer.payout_method || body.network || "").trim();
     const country = normalizeNombaCountry(
       String(transfer.recipient_country || body.recipient_country || ""),
       targetCurrency,
     );
+    const canadaCad = isCanadaCadPayout({
+      currency: targetCurrency,
+      country,
+      method: String(transfer.payout_method || ""),
+      transferType: String(transfer.transfer_type || ""),
+      sourceCurrency: sourceCurrencyWallet,
+    });
+    const payoutMethod = canadaCad
+      ? String(transfer.payout_method || "interac").trim()
+      : String(transfer.payout_method || body.network || "").trim();
     const kind = classifyNombaPayout({
       currency: targetCurrency,
       country,
-      method: payoutMethod || (targetCurrency === "NGN" ? "bank" : "mobile_money"),
+      method: payoutMethod || (targetCurrency === "NGN" ? "bank" : canadaCad ? "interac" : "mobile_money"),
     });
 
     if (kind === "unsupported") {

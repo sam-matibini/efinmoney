@@ -813,7 +813,7 @@ const SendPage = () => {
     recipient_bank_code?: string;
     recipient_bank_name?: string | null;
     recipient_country?: string;
-    transfer_type?: "bank" | "mobile_money";
+    transfer_type?: "bank" | "mobile_money" | "domestic_canada";
     payout_method?: string;
   }) => {
     const ngnAcct = isNGNBank ? ngnAccountNumber.replace(/\D/g, "") : "";
@@ -864,7 +864,7 @@ const SendPage = () => {
       recipient_bank_code: overrides?.recipient_bank_code ?? (isBankPayout ? bankCode : isCanadaIntlPayout && cadPayoutMode === "eft" ? caInstitutionNumber.replace(/\D/g, "") : undefined),
       recipient_bank_name: overrides?.recipient_bank_name ?? (isBankPayout ? (bankName || undefined) : isCanadaIntlPayout && cadPayoutMode === "eft" ? (caBankName.trim() || undefined) : undefined),
       recipient_country: destCountryIso,
-      transfer_type: overrides?.transfer_type ?? (isBankPayout || isCanadaIntlPayout ? "bank" : "mobile_money"),
+      transfer_type: overrides?.transfer_type ?? (isCanadaIntlPayout ? "domestic_canada" : isBankPayout ? "bank" : "mobile_money"),
       payout_method: overrides?.payout_method ?? (isBankPayout ? "bank" : isCanadaIntlPayout ? canadaPayoutMethod : effectivePayoutMethod),
       source_currency: overrides?.source_currency ?? sourceCurrency,
       target_currency: destCurrency,
@@ -884,7 +884,7 @@ const SendPage = () => {
     setLastTransferId(transfer.id);
     if (user) {
       try {
-        const tType = overrides?.transfer_type ?? (isBankPayout || isCanadaIntlPayout ? "bank" : "mobile_money");
+        const tType = overrides?.transfer_type ?? (isCanadaIntlPayout ? "domestic_canada" : isBankPayout ? "bank" : "mobile_money");
         const { isNew } = await recordTransferRecipient({
           user_id: user.id,
           name: overrides?.recipient_name ?? recipientName,
@@ -1187,8 +1187,12 @@ const SendPage = () => {
 
         const ngnAcct = isNGNBank ? ngnAccountNumber.replace(/\D/g, "") : "";
         const ngnBank = isNGNBank ? (ngnBanks.find((b) => b.code === ngnBankCode)?.name || null) : null;
-        const transferType: "bank" | "mobile_money" = isNGNBank ? "bank" : "mobile_money";
-        const payoutMethod = isNGNBank ? "bank" : (effectivePayoutMethod || "mobile_money");
+        const transferType: "bank" | "mobile_money" = isNGNBank || isCanadaIntlPayout ? "bank" : "mobile_money";
+        const payoutMethod = isNGNBank
+          ? "bank"
+          : isCanadaIntlPayout
+            ? (cadPayoutMode === "interac" ? "interac" : "eft")
+            : (effectivePayoutMethod || "mobile_money");
         const intentBase = {
           walletId: selectedWallet.wallet_id,
           sourceCurrency,
@@ -2040,8 +2044,11 @@ const SendPage = () => {
             NGN: "NG", GHS: "GH", KES: "KE", UGX: "UG", TZS: "TZ", RWF: "RW",
             ZMW: "ZM", ZAR: "ZA", CAD: "CA", USD: "US", GBP: "GB", EUR: "DE",
           } as Record<string, string>)[intent.targetCurrency] || intent.recipientCountryHint || intent.targetCurrency,
-          transfer_type: intent.transferType,
-          payout_method: intent.payoutMethod,
+          transfer_type: intent.targetCurrency === "CAD" ? "domestic_canada" : intent.transferType,
+          payout_method: intent.targetCurrency === "CAD"
+            && (!intent.payoutMethod || intent.payoutMethod === "mobile_money" || intent.payoutMethod === "mpesa")
+            ? "interac"
+            : intent.payoutMethod,
         });
 
         markCardSendIntentConsumed();

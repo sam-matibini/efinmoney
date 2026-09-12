@@ -218,12 +218,17 @@ export function defaultPayoutPartner(currency: string): string | null {
 }
 
 /** Map a collect partner / method onto TopUpPage method ids. */
-export function collectPayMethodIds(partnerOrMethod: string): string[] {
+export function collectPayMethodIds(partnerOrMethod: string, currency?: string): string[] {
   const raw = partnerOrMethod.trim().toLowerCase();
   const method = collectMethodForPartner(raw) || raw;
+  const ccy = (currency || "").toUpperCase();
   if (method === "square" || method === "paypal") return ["square"];
   if (method === "interac") return ["interac", "plaid"];
-  if (method === "flutterwave") return ["flw_hosted", "flw_momo"];
+  if (method === "flutterwave") {
+    // CAD/USD/EUR/GBP collect is card/bank — never Kenya M-Pesa.
+    if (["CAD", "USD", "EUR", "GBP"].includes(ccy)) return ["flw_hosted"];
+    return ["flw_hosted", "flw_momo"];
+  }
   if (method === "wise") return ["wise", "wise_link"];
   if (method === "ghana") return ["ghana"];
   if (method === "elicate") return ["elicate"];
@@ -360,7 +365,20 @@ export async function resolveCollectMethodPreference(
     // CAD/NGN: Nomba Checkout is the live card collect — ignore stale Worldline/Fincra policies.
     if ((ccy === "CAD" || ccy === "NGN") && keepActive("nomba")) {
       const rest = rails.filter((r) => r !== "nomba" && r !== "bambora" && r !== "worldline");
-      return { method: "nomba", rails: ["nomba", ...rest], source: "policy" };
+      // CAD collection is Interac / Nomba / Fincra Autodeposit — never Kenya M-Pesa.
+      const cadSafe = ccy === "CAD"
+        ? rest.filter((r) => !["flutterwave", "flw", "paytota", "swychr", "ghana_pay", "elicate"].includes(r))
+        : rest;
+      return { method: "nomba", rails: ["nomba", ...cadSafe], source: "policy" };
+    }
+    if (ccy === "CAD") {
+      const cadCollect = rails.filter((r) =>
+        ["nomba", "interac", "flovide", "fincra", "wise", "dodo", "paypal", "square"].includes(r)
+      );
+      if (cadCollect.length) {
+        const method = collectMethodForPartner(cadCollect[0] || "") || cadCollect[0];
+        return { method, rails: cadCollect, source: "policy" };
+      }
     }
     if (rails.length) {
       const method = collectMethodForPartner(rails[0] || "");

@@ -61,9 +61,9 @@ type PartnerMeta = {
 
 const PARTNERS: PartnerMeta[] = [
   { id: "flovide", name: "Flovide", blurb: "Interac top-up in Canada; bank send to NG/KE/GH/UG/CA", collect: ["CAD"], payout: ["NGN", "KES", "GHS", "UGX", "CAD"] },
-  { id: "fincra", name: "Fincra", blurb: "Africa collect + payout; CAD Interac collect", collect: ["CAD", "USD", "EUR", "GBP", "NGN", "GHS", "KES", "UGX", "TZS", "ZMW", "ZAR", "XOF", "XAF", "MWK"], payout: ["NGN", "GHS", "KES", "UGX", "TZS", "ZMW", "ZAR", "XOF", "XAF"] },
-  { id: "nomba", name: "Nomba", blurb: "NGN bank + Global Payout (KE/GH/UG/TZ/RW/XOF/XAF/CAD/GBP/EUR/USD/ZAR…)", collect: ["NGN", "CAD"], payout: ["NGN", "GHS", "KES", "UGX", "TZS", "RWF", "XOF", "XAF", "ZAR", "CAD", "GBP", "EUR", "USD"] },
-  { id: "flutterwave", name: "Flutterwave", blurb: "Africa + some western card rails", collect: ["CAD", "USD", "NGN", "GHS", "KES", "UGX", "RWF", "TZS", "ZMW"], payout: ["NGN", "GHS", "KES", "UGX", "RWF", "TZS", "ZMW"] },
+  { id: "fincra", name: "Fincra", blurb: "Africa collect + payout; CAD Interac Autodeposit collect (not M-Pesa)", collect: ["CAD", "USD", "EUR", "GBP", "NGN", "GHS", "KES", "UGX", "TZS", "ZMW", "ZAR", "XOF", "XAF", "MWK"], payout: ["NGN", "GHS", "KES", "UGX", "TZS", "ZMW", "ZAR", "XOF", "XAF"] },
+  { id: "nomba", name: "Nomba", blurb: "NGN bank + Global Payout (KE/GH/UG/TZ/RW/XOF/XAF/CAD Interac/GBP/EUR/USD/ZAR…)", collect: ["NGN", "CAD"], payout: ["NGN", "GHS", "KES", "UGX", "TZS", "RWF", "XOF", "XAF", "ZAR", "CAD", "GBP", "EUR", "USD"] },
+  { id: "flutterwave", name: "Flutterwave", blurb: "Africa MoMo payout + western card collect. CAD collect is card/bank — never Kenya M-Pesa.", collect: ["CAD", "USD", "NGN", "GHS", "KES", "UGX", "RWF", "TZS", "ZMW"], payout: ["NGN", "GHS", "KES", "UGX", "RWF", "TZS", "ZMW"] },
   { id: "lenhub_flutter", name: "Lenhub", blurb: "Card collect + FX bank/MoMo payouts", collect: ["CAD", "USD", "EUR", "GBP", "NGN", "GHS", "KES", "UGX", "RWF", "TZS"], payout: ["NGN", "GHS", "KES", "UGX", "TZS", "RWF", "ZMW"] },
   { id: "paytota", name: "Paytota", blurb: "Western invoices + East Africa MoMo", collect: ["CAD", "USD", "EUR", "GBP", "UGX", "KES", "RWF"], payout: ["UGX", "KES", "RWF"] },
   { id: "swychr", name: "Swychr", blurb: "Select Africa MoMo corridors", collect: ["XAF", "KES", "XOF", "UGX"], payout: ["XAF", "KES", "XOF", "UGX"] },

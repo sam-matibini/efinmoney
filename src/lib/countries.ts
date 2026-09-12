@@ -81,7 +81,7 @@ export const COUNTRIES: CountryInfo[] = [
   { id: "Algeria", country: "Algeria", code: "DZD", flag: "🇩🇿", method: "Bank Transfer", payout: "bank", region: "Africa" },
 
   // NORTH AMERICA
-  { id: "Canada", country: "Canada", code: "CAD", flag: "🇨🇦", method: "Interac/Bank", payout: "bank", region: "North America", symbol: "C$" },
+  { id: "Canada", country: "Canada", code: "CAD", flag: "🇨🇦", method: "Interac/Bank", payout: "interac", region: "North America", symbol: "C$" },
   { id: "United States", country: "United States", code: "USD", flag: "🇺🇸", method: "ACH/Bank", payout: "bank", region: "North America", symbol: "$" },
   { id: "Mexico", country: "Mexico", code: "MXN", flag: "🇲🇽", method: "Bank/SPEI", payout: "bank", region: "North America" },
   { id: "Jamaica", country: "Jamaica", code: "JMD", flag: "🇯🇲", method: "Bank Transfer", payout: "bank", region: "North America" },

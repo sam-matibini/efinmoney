@@ -5,6 +5,8 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { flwV3Fetch } from "../_shared/flw-v3.ts";
 import { checkFlutterwaveLiquidity } from "../_shared/treasury-worker.ts";
 
+import { isCanadaCadPayout, resolvePayoutNetwork } from "../_shared/nomba-payout-corridors.ts";
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
@@ -17,15 +19,27 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
 
 function resolveNetwork(payoutMethod: string | null | undefined, currency: string): string {
-  const map: Record<string, string> = {
-    mtn_mobile: "mtn", airtel_money: "airtel", mpesa: "mpesa", bank: "bank",
-  };
-  if (payoutMethod && map[payoutMethod]) return map[payoutMethod];
-  const defaults: Record<string, string> = { KES: "mpesa", GHS: "mtn", UGX: "mtn", TZS: "airtel", ZMW: "mtn", NGN: "bank" };
-  return defaults[currency] || "mpesa";
+  return resolvePayoutNetwork(payoutMethod, currency);
 }
 
 async function retryPendingPayout(supabase: ReturnType<typeof createClient>, transfer: Record<string, unknown>) {
+  if (isCanadaCadPayout({
+    currency: String(transfer.target_currency || ""),
+    country: transfer.recipient_country as string,
+    method: transfer.payout_method as string,
+    transferType: transfer.transfer_type as string,
+    sourceCurrency: transfer.source_currency as string,
+  })) {
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/nomba-payout`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-internal-secret": SERVICE_KEY,
+      },
+      body: JSON.stringify({ transfer_id: transfer.id }),
+    });
+    return res.json();
+  }
   const body = {
     transfer_id: transfer.id,
     phone_number: transfer.recipient_phone,

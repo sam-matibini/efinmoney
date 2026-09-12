@@ -17,18 +17,13 @@ import {
   autoStripePayoutEnabled,
 } from "../_shared/treasury-worker.ts";
 
+import { isCanadaCadPayout, resolvePayoutNetwork } from "../_shared/nomba-payout-corridors.ts";
+
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
 
 function resolveNetwork(payoutMethod: string | null | undefined, currency: string): string {
-  const map: Record<string, string> = {
-    mtn_mobile: "mtn", airtel_money: "airtel", mpesa: "mpesa", bank: "bank",
-  };
-  if (payoutMethod && map[payoutMethod]) return map[payoutMethod];
-  const defaults: Record<string, string> = {
-    KES: "mpesa", GHS: "mtn", UGX: "mtn", TZS: "airtel", ZMW: "mtn", NGN: "bank",
-  };
-  return defaults[currency] || "mpesa";
+  return resolvePayoutNetwork(payoutMethod, currency);
 }
 
 async function invokeNombaPayout(transferId: string) {
@@ -116,6 +111,31 @@ Deno.serve(async (req) => {
     for (const t of queued ?? []) {
       const amt = Number(t.target_amount ?? 0);
       const cur = String(t.target_currency ?? "NGN").toUpperCase();
+      if (isCanadaCadPayout({
+        currency: cur,
+        country: t.recipient_country,
+        method: t.payout_method,
+        transferType: t.transfer_type,
+        sourceCurrency: t.source_currency,
+      })) {
+        const payout = await invokeNombaPayout(t.id);
+        let action: string;
+        if (payout?.pending_liquidity || payout?.queued) {
+          action = "still_queued";
+        } else if (payout?.success) {
+          action = "payout_sent";
+        } else {
+          action = "payout_failed";
+        }
+        (results.processed as unknown[]).push({
+          transfer_id: t.id,
+          action,
+          rail: "nomba",
+          error: payout?.error ?? payout?.provider_message ?? null,
+          payout,
+        });
+        continue;
+      }
       const check = await checkFlutterwaveLiquidity(db, amt, cur, { requireBuffer: false });
       if (!check.sufficient) {
         (results.processed as unknown[]).push({

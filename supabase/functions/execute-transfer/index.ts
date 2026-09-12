@@ -9,6 +9,7 @@ import { explainPayoutError, notifyOpsBrief, notifyOpsFailoverPing } from "../_s
 import { validatePayoutMin } from "../_shared/payoutMins.ts";
 import { nombaApiConfigured } from "../_shared/nomba-api.ts";
 import { requireCadInteracDestination } from "../_shared/cadInteracPayout.ts";
+import { isCanadaCadPayout, resolvePayoutNetwork } from "../_shared/nomba-payout-corridors.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -26,38 +27,8 @@ const PAYABLE_BY_CURRENCY: Record<string, string> = {
   GHS: "2126",
 };
 
-// Map our internal payout_method codes -> Flutterwave network token used by V3_MM_BANK
-const PAYOUT_METHOD_TO_NETWORK: Record<string, string> = {
-  mtn_mobile: "mtn",
-  airtel_money: "airtel",
-  airteltigo_money: "airtel",
-  zamtel_money: "zamtel",
-  vodafone_cash: "vodafone",
-  vodafone_money: "vodafone",
-  tigo_pesa: "tigo",
-  mpesa: "mpesa",
-  bank: "bank",
-};
-
-// Fallback default network per destination currency when payout_method is generic ("mobile_money") or unknown
-const CURRENCY_DEFAULT_NETWORK: Record<string, string> = {
-  KES: "mpesa",
-  ZMW: "mtn",
-  GHS: "mtn",
-  UGX: "mtn",
-  TZS: "airtel",
-  RWF: "mtn",
-};
-
 function resolveNetwork(payoutMethod: string | null | undefined, currency: string): string {
-  if (payoutMethod && PAYOUT_METHOD_TO_NETWORK[payoutMethod]) {
-    return PAYOUT_METHOD_TO_NETWORK[payoutMethod];
-  }
-  const lower = (payoutMethod ?? "").toLowerCase().trim();
-  if (["mtn", "airtel", "zamtel", "mpesa", "vodafone", "tigo"].includes(lower)) {
-    return lower;
-  }
-  return CURRENCY_DEFAULT_NETWORK[currency] || "mpesa";
+  return resolvePayoutNetwork(payoutMethod, currency);
 }
 
 const PAWAPAY_SUPPORTED_COUNTRY_HINTS = new Set([
@@ -537,7 +508,13 @@ Deno.serve(async (req) => {
       (payload.use_stellar === true || transfer.use_stellar === true) &&
       STELLAR_COUNTRIES.has(recipientCountry);
 
-    const isCanada = transfer.transfer_type === "domestic_canada" || transfer.recipient_country === "CA";
+    const isCanada = isCanadaCadPayout({
+      currency: targetCurrency,
+      country: recipientCountry || transfer.recipient_country,
+      method: transfer.payout_method,
+      transferType: transfer.transfer_type,
+      sourceCurrency: transfer.source_currency,
+    });
     const isGhana =
       targetCurrency === "GHS" ||
       recipientCountry === "GH" ||
@@ -603,8 +580,12 @@ Deno.serve(async (req) => {
       transfer.payout_method,
     );
     // Kenya: Nomba only, whatever the saved policy/failover list says.
+    // Canada CAD: never follow an admin policy that lists Flutterwave/Fincra MoMo
+    // (that produces "Unsupported network mpesa for CAD"). Dedicated Interac/EFT chain below.
     const policyRails = kenyaNombaExclusive
       ? (nombaApiConfigured() ? ["nomba"] : [])
+      : isCanada
+      ? []
       : resolvedPolicyRails;
     let policyRouted = false;
 
@@ -626,10 +607,11 @@ Deno.serve(async (req) => {
     let engineRouted = false;
     // Zambia MoMo and ops force_rail skip the routing engine — Fincra-only for ZMW.
     // Kenya skips it too — Nomba-exclusive corridor.
+    // Canada CAD skips it — Interac/EFT only, never Kenya M-Pesa scoring.
     // Admin / code-default payout rails also skip the scoring engine (explicit ops choice).
     if (
       !forceFincraOnly && !fincraExclusiveCorridor && !zambiaMomo
-      && !kenyaNombaExclusive && policyRails.length === 0
+      && !kenyaNombaExclusive && !isCanada && policyRails.length === 0
     ) {
 
 

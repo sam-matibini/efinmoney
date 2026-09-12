@@ -137,6 +137,125 @@ function isBankMethod(method?: string | null): boolean {
   return m === "bank" || m.includes("bank") || m.includes("eft") || m.includes("sepa") || m.includes("ach") || m.includes("wire") || m.includes("faster");
 }
 
+function isEftMethod(method?: string | null): boolean {
+  const m = String(method || "").toLowerCase();
+  return m === "eft" || m.includes("eft");
+}
+
+/** African MoMo payout partners — never valid for CAD / Canada. */
+export const AFRICA_MOMO_PAYOUT_RAILS = new Set([
+  "flutterwave",
+  "flw",
+  "fincra",
+  "paytota",
+  "pawapay",
+  "mtn_momo",
+  "swychr",
+  "elicate",
+  "ghana_pay",
+  "ghana",
+  "lenhub_flutter",
+  "lenhub",
+]);
+
+/** Canada CAD payout chain: Interac / EFT, never Kenya M-Pesa. */
+export const CANADA_CAD_PAYOUT_RAILS = ["nomba", "flovide", "paysafe"];
+
+const AFRICA_MOMO_NETWORKS = new Set([
+  "mtn", "airtel", "zamtel", "mpesa", "vodafone", "tigo", "orange", "wave", "moov",
+]);
+
+const PAYOUT_METHOD_TO_NETWORK: Record<string, string> = {
+  mtn_mobile: "mtn",
+  airtel_money: "airtel",
+  airteltigo_money: "airtel",
+  zamtel_money: "zamtel",
+  vodafone_cash: "vodafone",
+  vodafone_money: "vodafone",
+  tigo_pesa: "tigo",
+  mpesa: "mpesa",
+  orange_money: "orange",
+  bank: "bank",
+  eft: "eft",
+  interac: "interac",
+};
+
+const CURRENCY_DEFAULT_NETWORK: Record<string, string> = {
+  KES: "mpesa",
+  ZMW: "mtn",
+  GHS: "mtn",
+  UGX: "mtn",
+  TZS: "airtel",
+  RWF: "mtn",
+  XOF: "orange",
+  XAF: "mtn",
+  ETB: "mpesa",
+  CDF: "mpesa",
+  NGN: "bank",
+  CAD: "interac",
+};
+
+/** True when this payout is CAD in Canada — Interac/EFT, not African MoMo. */
+export function isCanadaCadPayout(params: {
+  currency?: string | null;
+  country?: string | null;
+  method?: string | null;
+  transferType?: string | null;
+  sourceCurrency?: string | null;
+}): boolean {
+  const method = String(params.method || "").toLowerCase();
+  if (method === "card_push") return false;
+  const type = String(params.transferType || "").toLowerCase();
+  if (type === "domestic_canada") return true;
+  const dest = String(params.currency || "").toUpperCase();
+  const src = String(params.sourceCurrency || "").toUpperCase();
+  const country = String(params.country || "").trim().toUpperCase();
+  if (dest === "CAD") return true;
+  if (src === "CAD" && dest === "CAD") return true;
+  if (["CA", "CAN", "CAD", "CANADA"].includes(country) && (!dest || dest === "CAD" || dest === "CA")) {
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Network token for Flutterwave/Fincra/Nomba MoMo.
+ * CAD never falls through to Kenya M-Pesa.
+ */
+export function resolvePayoutNetwork(
+  payoutMethod: string | null | undefined,
+  currency: string,
+): string {
+  const ccy = String(currency || "").toUpperCase();
+  if (ccy === "CAD") {
+    const m = String(payoutMethod || "").toLowerCase().trim();
+    if (isEftMethod(m) || m === "bank") return "eft";
+    return "interac";
+  }
+  if (payoutMethod && PAYOUT_METHOD_TO_NETWORK[payoutMethod]) {
+    return PAYOUT_METHOD_TO_NETWORK[payoutMethod];
+  }
+  const lower = (payoutMethod ?? "").toLowerCase().trim();
+  if (AFRICA_MOMO_NETWORKS.has(lower)) return lower;
+  return CURRENCY_DEFAULT_NETWORK[ccy] || "";
+}
+
+/** Drop Kenya/Africa MoMo partners from a CAD payout rail list. */
+export function sanitizeCanadaPayoutRails(rails: string[]): string[] {
+  const kept = rails
+    .map((r) => r.trim().toLowerCase())
+    .filter((r) => r && !AFRICA_MOMO_PAYOUT_RAILS.has(r));
+  if (!kept.length) return [...CANADA_CAD_PAYOUT_RAILS];
+  const out: string[] = [];
+  for (const r of kept) {
+    if (!out.includes(r)) out.push(r);
+  }
+  for (const r of CANADA_CAD_PAYOUT_RAILS) {
+    if (!out.includes(r)) out.push(r);
+  }
+  return out;
+}
+
 /** Classify how we should pay out on Nomba for this transfer. */
 export function classifyNombaPayout(params: {
   currency: string;
@@ -151,6 +270,15 @@ export function classifyNombaPayout(params: {
 
   if (ccy === "NGN" && (isBankMethod(method) || !method || method === "bank")) {
     return "domestic_ngn";
+  }
+
+  // CAD in Canada is Interac or EFT — never Kenya M-Pesa / African MoMo,
+  // even if payout_method was left blank or wrongly stored as mpesa.
+  if (ccy === "CAD" || country === "CA") {
+    if (isEftMethod(method) || (isBankMethod(method) && !isInteracMethod(method) && method && !isMomoMethod(method))) {
+      return "global_bank";
+    }
+    return "global_interac";
   }
 
   if (isInteracMethod(method) && (ccy === "CAD" || country === "CA")) {
@@ -211,9 +339,9 @@ export function defaultPayoutRails(params: {
       }
       return ["nomba", ...fincraAfrica];
     case "global_interac":
-      return ["nomba", "flovide"];
+      return [...CANADA_CAD_PAYOUT_RAILS];
     case "global_bank":
-      if (ccy === "CAD") return ["nomba", "flovide"];
+      if (ccy === "CAD") return [...CANADA_CAD_PAYOUT_RAILS];
       if (ccy === "ZAR" || ccy === "AED") return ["nomba", "fincra", "flutterwave"];
       if (ccy === "USD" || ccy === "GBP" || ccy === "EUR") return ["nomba", "flutterwave"];
       return ["nomba", "fincra", "flutterwave"];
@@ -235,7 +363,7 @@ export function momoNetworkHints(network: string, country: string): string[] {
   if (n.includes("wave")) hints.push("wave");
   if (n.includes("moov")) hints.push("moov");
   if (n.includes("zamtel")) hints.push("zamtel");
-  if (!hints.length) {
+  if (!hints.length && country.toUpperCase() !== "CA") {
     const fb = NOMBA_MOMO_FALLBACK[`${country.toUpperCase()}:${network.toLowerCase()}`]
       || NOMBA_MOMO_FALLBACK[`${country.toUpperCase()}:mpesa`]
       || NOMBA_MOMO_FALLBACK[`${country.toUpperCase()}:mtn`];
@@ -258,8 +386,10 @@ export function pickNombaInstitution(
   if (institutions.length === 1) return institutions[0];
   const fbKey = `${country.toUpperCase()}:${network.toLowerCase()}`;
   const fb = NOMBA_MOMO_FALLBACK[fbKey]
-    || NOMBA_MOMO_FALLBACK[`${country.toUpperCase()}:mpesa`]
-    || NOMBA_MOMO_FALLBACK[`${country.toUpperCase()}:mtn`];
+    || (country.toUpperCase() !== "CA"
+      ? (NOMBA_MOMO_FALLBACK[`${country.toUpperCase()}:mpesa`]
+        || NOMBA_MOMO_FALLBACK[`${country.toUpperCase()}:mtn`])
+      : undefined);
   if (fb) return fb;
   if (institutions[0]) return institutions[0];
   return null;

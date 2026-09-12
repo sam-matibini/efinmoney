@@ -134,6 +134,18 @@ Deno.serve(async (req) => {
     const senderId = transfer.sender_id as string;
     currentUserId = senderId;
 
+    const destCcy = String(currency || transfer.target_currency || "").toUpperCase();
+    if (destCcy === "CAD") {
+      const reason = "CAD payouts use Interac e-Transfer or EFT in Canada, not mobile money";
+      return new Response(JSON.stringify({
+        success: false,
+        error: reason,
+        retryable: true,
+        error_class: "misroute",
+        rail: "flutterwave",
+      }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
     const hasBankRail = !!(account_number && bank_code);
     if (currency === "NGN" && !hasBankRail) {
       const reason = "Nigerian payout requires bank_code and 10-digit NUBAN account_number";

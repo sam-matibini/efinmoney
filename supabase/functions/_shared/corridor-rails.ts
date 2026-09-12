@@ -3,7 +3,7 @@
  */
 import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { filterLiveRails, isRetiredRail } from "./retiredPartners.ts";
-import { defaultPayoutRails, nombaPayoutSupported } from "./nomba-payout-corridors.ts";
+import { defaultPayoutRails, isCanadaCadPayout, nombaPayoutSupported, sanitizeCanadaPayoutRails } from "./nomba-payout-corridors.ts";
 import { nombaApiConfigured } from "./nomba-api.ts";
 
 export type RailDirection = "collect" | "payout";
@@ -148,6 +148,11 @@ export async function resolveCorridorRails(
         rails = ["nomba", ...rest];
       }
     }
+  }
+
+  if (direction === "payout" && isCanadaCadPayout({ currency: ccy, country: cc || country, method })) {
+    rails = sanitizeCanadaPayoutRails(rails);
+    if (rails.length) source = source === "none" ? "default" : source;
   }
 
   if (rails.length) return { policy, rails, source };

@@ -504,6 +504,18 @@ Deno.serve(async (req) => {
     const senderId = transfer.sender_id as string;
     currentUserId = senderId;
 
+    const destCcy = String(currency || transfer.target_currency || "").toUpperCase();
+    if (destCcy === "CAD") {
+      const reason = "CAD payouts use Interac e-Transfer or EFT in Canada, not Fincra mobile money";
+      return new Response(JSON.stringify({
+        success: false,
+        error: reason,
+        retryable: true,
+        error_class: "misroute",
+        rail: "fincra",
+      }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
     const cfg = getFincraConfig();
     if (!cfg.secretKey || !cfg.businessId) {
       const reason = "Fincra is not configured";

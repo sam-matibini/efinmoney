@@ -74,6 +74,7 @@ function normalizePhone(phone: string, currency: string): string {
 }
 
 function isMobileMethod(method: string, currency: string): boolean {
+  if (currency === "CAD") return false;
   if (["mpesa", "mobile_money", "mobile", "momo"].some((m) => method.includes(m))) return true;
   return ["KES", "GHS", "UGX"].includes(currency) && !method.includes("bank");
 }
@@ -151,7 +152,10 @@ Deno.serve(async (req) => {
       String(transfer.recipient_country || COUNTRY_BY_CURRENCY[currency] || ""),
       currency,
     ) || String(transfer.recipient_country || COUNTRY_BY_CURRENCY[currency] || "").toUpperCase();
-    const method = String(body.network || transfer.payout_method || "bank").toLowerCase();
+    const transferMethod = String(transfer.payout_method || "").toLowerCase();
+    const method = currency === "CAD"
+      ? (transferMethod || "interac")
+      : String(body.network || transfer.payout_method || "bank").toLowerCase();
 
     if (!Number.isFinite(amount) || amount <= 0) {
       return json({ success: false, error: "Invalid payout amount", rail: "flovide" }, 200);
@@ -179,7 +183,9 @@ Deno.serve(async (req) => {
     }
 
     let beneficiaryBody: Record<string, unknown>;
-    if (currency === "CAD" && (method.includes("interac") || String(transfer.recipient_email || "").includes("@"))) {
+    // CAD is Interac unless the transfer is explicitly Canadian EFT.
+    // Never treat body.network=mpesa as Kenya MoMo for a CAD payout.
+    if (currency === "CAD" && !method.includes("eft")) {
       const dest = resolveCadInteracDestination({
         recipient_account: transfer.recipient_account,
         recipient_phone: transfer.recipient_phone,
