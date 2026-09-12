@@ -10,6 +10,8 @@ export interface LinkedFundingSource {
   institution: string | null;
   last_four: string;
   currency_code: string;
+  country_code: string | null;
+  details: Record<string, string> | null;
   is_active: boolean;
   created_at: string;
 }

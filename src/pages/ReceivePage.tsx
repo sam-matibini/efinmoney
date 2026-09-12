@@ -15,6 +15,7 @@ import PageHeroBanner from "@/components/common/PageHeroBanner";
 import AppPage from "@/components/layout/AppPage";
 import ZambiaMoMoReceiveLinks from "@/components/payments/ZambiaMoMoReceiveLinks";
 import BankVirtualAccountCard from "@/components/payments/BankVirtualAccountCard";
+import LinkedBanksCard from "@/components/payments/LinkedBanksCard";
 import { productFeatures } from "@/lib/productFeatures";
 import { isBankVaCurrency } from "@/lib/bankVirtualAccounts";
 
@@ -52,7 +53,7 @@ const ReceivePage = () => {
           <div>
             <h1 className="text-2xl font-display font-bold">Bank account</h1>
             <p className="text-muted-foreground">
-              Share your NGN or GHS bank details to receive transfers into your wallet — then send or spend from that wallet.
+              Generate a receive account, or link a bank you already have and move money in-country through our payout rails.
             </p>
           </div>
 
@@ -67,6 +68,8 @@ const ReceivePage = () => {
             variant="emerald"
           />
 
+
+          <LinkedBanksCard />
 
           <BankVirtualAccountCard defaultCurrency={defaultCurrency} />
 
@@ -158,7 +161,7 @@ const ReceivePage = () => {
           ) : null}
 
           <p className="text-sm text-muted-foreground">
-            Virtual bank accounts are deposit addresses only — they have no separate balance. Transfers credit your NGN or GHS wallet; use Top up, Send, or the wallet statement from there.
+            Virtual accounts are deposit addresses only — incoming transfers credit your wallet. Linked banks are accounts you already own; withdrawals and in-country sends debit that same wallet.
           </p>
         </motion.div>
     </AppPage>
