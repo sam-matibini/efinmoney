@@ -161,6 +161,17 @@ Deno.serve(async (req) => {
       return json({ success: false, error: "Invalid payout amount", rail: "flovide" }, 200);
     }
 
+    if (currency === "CAD") {
+      return json({
+        success: false,
+        error: "CAD payouts use Nomba Interac/EFT, not Flovide",
+        rail: "flovide",
+        error_class: "misroute",
+        retryable: false,
+        code: "cad_not_flovide",
+      }, 200);
+    }
+
     // Prefer exact currency balance; for FX payouts Flovide may debit CAD/USD wallet.
     const balances = await flovideListBalances();
     const list = Array.isArray(balances.json?.data)

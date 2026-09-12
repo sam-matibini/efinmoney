@@ -59,18 +59,22 @@ assert(
 
 const cadRails = defaultPayoutRails({ currency: "CAD", country: "CA", method: "interac" });
 assert("CAD default rails start with nomba", cadRails[0] === "nomba");
+assert("CAD default rails are Nomba only", cadRails.length === 1 && cadRails[0] === "nomba");
 assert("CAD default rails exclude flutterwave", !cadRails.includes("flutterwave"));
-assert("CAD default rails exclude fincra", !cadRails.includes("fincra"));
+assert("CAD default rails exclude fincra payout", !cadRails.includes("fincra"));
+assert("CAD default rails exclude flovide", !cadRails.includes("flovide"));
+assert("CAD default rails exclude paysafe", !cadRails.includes("paysafe"));
 assert(
   "CAD default rails are Canada chain",
   CANADA_CAD_PAYOUT_RAILS.every((r) => cadRails.includes(r)),
 );
 
-const cleaned = sanitizeCanadaPayoutRails(["flutterwave", "fincra", "nomba"]);
+const cleaned = sanitizeCanadaPayoutRails(["flutterwave", "fincra", "nomba", "flovide", "paysafe"]);
 assert("sanitize drops flutterwave", !cleaned.includes("flutterwave"));
-assert("sanitize drops fincra", !cleaned.includes("fincra"));
+assert("sanitize drops fincra payout", !cleaned.includes("fincra"));
 assert("sanitize keeps nomba", cleaned.includes("nomba"));
-assert("sanitize adds paysafe", cleaned.includes("paysafe"));
+assert("sanitize drops flovide", !cleaned.includes("flovide"));
+assert("sanitize drops paysafe", !cleaned.includes("paysafe"));
 
 assert("CAD currency maps to Canada", findCountryByCode("CAD")?.id === "Canada");
 assert("CA ISO2 maps to Canada", findCountryByCode("CA")?.id === "Canada");

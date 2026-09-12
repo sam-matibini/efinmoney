@@ -367,13 +367,13 @@ export async function resolveCollectMethodPreference(
       const rest = rails.filter((r) => r !== "nomba" && r !== "bambora" && r !== "worldline");
       // CAD collection is Interac / Nomba / Fincra Autodeposit — never Kenya M-Pesa.
       const cadSafe = ccy === "CAD"
-        ? rest.filter((r) => !["flutterwave", "flw", "paytota", "swychr", "ghana_pay", "elicate"].includes(r))
+        ? rest.filter((r) => !["flutterwave", "flw", "paytota", "swychr", "ghana_pay", "elicate", "flovide"].includes(r))
         : rest;
       return { method: "nomba", rails: ["nomba", ...cadSafe], source: "policy" };
     }
     if (ccy === "CAD") {
       const cadCollect = rails.filter((r) =>
-        ["nomba", "interac", "flovide", "fincra", "wise", "dodo", "paypal", "square"].includes(r)
+        ["nomba", "interac", "fincra", "wise", "dodo", "paypal", "square"].includes(r)
       );
       if (cadCollect.length) {
         const method = collectMethodForPartner(cadCollect[0] || "") || cadCollect[0];

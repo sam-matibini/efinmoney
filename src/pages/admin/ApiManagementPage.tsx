@@ -42,7 +42,7 @@ const INTEGRATIONS: Array<{
   { key: "nomba", name: "Nomba", description: "NGN bank + Global Payout (Africa MoMo, CAD/GBP/EUR/USD) & collection", category: "Payments — Africa", envHints: ["NOMBA_CLIENT_ID", "NOMBA_CLIENT_SECRET", "NOMBA_ACCOUNT_ID", "NOMBA_PAYOUT_SOURCE_CURRENCY"] },
   { key: "ghana", name: "Ghana Pay", description: "Ghana GHS collection & mobile-money payouts", category: "Payments — Africa", envHints: ["GHANA_PAY_API_URL", "GHANA_PAY_USER"] },
   { key: "fincra", name: "Fincra", description: "Africa collect + NGN/GHS/KES payouts & CAD Interac", category: "Payments — Africa", envHints: ["FINCRA_SECRET_KEY", "FINCRA_BUSINESS_ID"] },
-  { key: "flovide", name: "Flovide", description: "CAD Interac Auto Deposit + NGN/KES/GHS payouts (OhentPay)", category: "Payments — Global & Cards", envHints: ["FLOVIDE_PUBLIC_KEY", "FLOVIDE_SECRET_KEY"] },
+  { key: "flovide", name: "Flovide", description: "Africa NGN/KES/GHS/UGX payouts (OhentPay) — not CAD Interac", category: "Payments — Global & Cards", envHints: ["FLOVIDE_PUBLIC_KEY", "FLOVIDE_SECRET_KEY"] },
   { key: "flutterwave", name: "Flutterwave", description: "African payouts, top-ups & bills (TZS primary)", category: "Payments — Africa", envHints: ["FLW_SECRET_KEY", "FLW_PUBLIC_KEY"] },
   { key: "swychr", name: "Swychr", description: "International pay-in/out, virtual cards & airtime", category: "Payments — Africa", envHints: ["SWYCHR_EMAIL", "SWYCHR_PASSWORD"] },
   { key: "elicate", name: "Elicate Pay", description: "Zambia MoMo (ZMW) top-up, send & payment links", category: "Payments — Africa", envHints: ["ELICATE_SECRET_KEY", "ELICATE_PUBLIC_KEY"] },
@@ -58,7 +58,7 @@ const INTEGRATIONS: Array<{
   { key: "dodo", name: "Dodo Payments", description: "MoR global card checkout for USD/CAD/EUR/GBP wallet top-up", category: "Payments — Global & Cards", envHints: ["DODO_PAYMENTS_API_KEY", "DODO_PAYMENTS_WEBHOOK_KEY"] },
   { key: "paypal", name: "PayPal", description: "Orders API wallet top-up for USD/CAD/EUR/GBP", category: "Payments — Global & Cards", envHints: ["PAYPAL_CLIENT_ID", "PAYPAL_CLIENT_SECRET"] },
   { key: "square", name: "Square", description: "Card checkout for USD/EUR/GBP wallet top-up", category: "Payments — Global & Cards", envHints: ["SQUARE_ACCESS_TOKEN", "SQUARE_APPLICATION_ID", "SQUARE_LOCATION_ID"] },
-  { key: "paysafe", name: "Paysafe", description: "Canadian Interac & EFT payouts", category: "Payments — Global & Cards", envHints: ["PAYSAFE_API_KEY"] },
+  { key: "paysafe", name: "Paysafe", description: "Retired for CAD Interac/EFT — Nomba is the CAD payout rail", category: "Payments — Global & Cards", envHints: ["PAYSAFE_API_KEY"] },
   { key: "bambora", name: "Bambora (Worldline)", description: "CAD/USD card collect, saved profiles, Canadian EFT debit", category: "Payments — Global & Cards", envHints: ["BAMBORA_MERCHANT_ID", "BAMBORA_API_PASSCODE", "BAMBORA_PAYMENTS_PASSCODE", "BAMBORA_BATCH_PASSCODE"] },
   { key: "verto", name: "Verto", description: "Corporate FX, V-Pay and partner bank payouts", category: "Payments — Global & Cards", envHints: ["VERTO_CLIENT_ID", "VERTO_API_KEY"] },
   // Banking
@@ -105,7 +105,7 @@ const EDGE_FUNCTIONS: Array<{ name: string; description: string; jwt: boolean; c
   { name: "flw-verify-payment",        description: "Verify FLW payment status",                 jwt: true,  category: "Flutterwave" },
   { name: "flw-verify-transfer",       description: "Verify FLW transfer status",                jwt: true,  category: "Flutterwave" },
   // Paysafe
-  { name: "paysafe-payout",            description: "Initiates Paysafe EFT/Interac payouts",    jwt: false, category: "Paysafe" },
+  { name: "paysafe-payout",            description: "Retired CAD Interac/EFT (returns misroute; Nomba is the CAD rail)",    jwt: false, category: "Paysafe" },
   { name: "paysafe-verify-transfer",   description: "Verify Paysafe transfer status",            jwt: false, category: "Paysafe" },
   { name: "paysafe-webhook",           description: "Receives Paysafe events",                   jwt: false, category: "Paysafe" },
   // Bambora / Worldline NAM
@@ -202,8 +202,8 @@ const EDGE_FUNCTIONS: Array<{ name: string; description: string; jwt: boolean; c
   { name: "fincra-cad-interac",         description: "Fincra CAD Interac Autodeposit + RFI settle", jwt: true,  category: "Fincra" },
   { name: "fincra-cad-va-probe",        description: "List/request Fincra CAD Interac virtual account", jwt: true,  category: "Fincra" },
   { name: "emfi-probe",                 description: "Fiserv EmFi (Payfare BaaS) auth + host smoke test", jwt: true,  category: "Fiserv EmFi" },
-  { name: "flovide-cad-interac",        description: "Flovide CAD Interac Auto Deposit collect", jwt: true,  category: "Flovide" },
-  { name: "flovide-payout",             description: "Flovide NGN/KES/GHS/UGX/CAD payouts",     jwt: false, category: "Flovide" },
+  { name: "flovide-cad-interac",        description: "Retired CAD Interac collect — use fincra-cad-interac", jwt: true,  category: "Flovide" },
+  { name: "flovide-payout",             description: "Flovide NGN/KES/GHS/UGX payouts (CAD rejected)",     jwt: false, category: "Flovide" },
   { name: "flovide-webhook",            description: "Receives Flovide payment events",         jwt: false, category: "Flovide" },
   { name: "flovide-api-smoke",          description: "Probe Flovide balances/corridors",        jwt: false, category: "Flovide" },
   { name: "flovide-get-banks",          description: "Fetch bank / MoMo list via Flovide",      jwt: true,  category: "Flovide" },

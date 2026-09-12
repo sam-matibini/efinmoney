@@ -158,8 +158,16 @@ export const AFRICA_MOMO_PAYOUT_RAILS = new Set([
   "lenhub",
 ]);
 
-/** Canada CAD payout chain: Interac / EFT, never Kenya M-Pesa. */
-export const CANADA_CAD_PAYOUT_RAILS = ["nomba", "flovide", "paysafe"];
+/** Canada CAD payout: Nomba Interac/EFT only. No Flovide or Paysafe. */
+export const CANADA_CAD_PAYOUT_RAILS = ["nomba"];
+
+/** Partners that must never pay CAD (Africa MoMo, retired CA rails). */
+const CANADA_BLOCKED_PAYOUT_RAILS = new Set([
+  ...AFRICA_MOMO_PAYOUT_RAILS,
+  "flovide",
+  "paysafe",
+  "paysafe_payout",
+]);
 
 const AFRICA_MOMO_NETWORKS = new Set([
   "mtn", "airtel", "zamtel", "mpesa", "vodafone", "tigo", "orange", "wave", "moov",
@@ -240,11 +248,11 @@ export function resolvePayoutNetwork(
   return CURRENCY_DEFAULT_NETWORK[ccy] || "";
 }
 
-/** Drop Kenya/Africa MoMo partners from a CAD payout rail list. */
+/** Drop Kenya/Africa MoMo and retired CA partners from a CAD payout rail list. */
 export function sanitizeCanadaPayoutRails(rails: string[]): string[] {
   const kept = rails
     .map((r) => r.trim().toLowerCase())
-    .filter((r) => r && !AFRICA_MOMO_PAYOUT_RAILS.has(r));
+    .filter((r) => r && !CANADA_BLOCKED_PAYOUT_RAILS.has(r));
   if (!kept.length) return [...CANADA_CAD_PAYOUT_RAILS];
   const out: string[] = [];
   for (const r of kept) {

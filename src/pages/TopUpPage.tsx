@@ -1202,15 +1202,11 @@ const TopUpPage = () => {
       showRail("interac") &&
       isCadWallet &&
       !productFeatures.plaid &&
-      (rails.has("interac") ||
-        productFeatures.fincraInterac ||
-        productFeatures.flovideInterac ||
-        productFeatures.flovide)
+      (rails.has("interac") || productFeatures.fincraInterac)
     ) {
       // CAD Interac via Fincra Autodeposit (`fincra-cad-interac`)
       const interacAmount = Number(amount);
-      const useFincraCad =
-        productFeatures.fincraInterac || productFeatures.flovide || productFeatures.flovideInterac;
+      const useFincraCad = productFeatures.fincraInterac;
       payMethods.push({
         id: "interac",
         tone: "bank",

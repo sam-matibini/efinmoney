@@ -132,7 +132,7 @@ Deno.serve(async (req) => {
         transferType: t.transfer_type,
         sourceCurrency: t.source_currency,
       })) {
-        // Full Canada chain (Nomba → Flovide → Paysafe), not Nomba-only.
+        // Full Canada chain (Nomba Interac/EFT). Flovide and Paysafe are not CAD rails.
         const payout = await invokeExecuteTransfer(t.id);
         let action: string;
         if (payout?.pending_ops) {

@@ -16,16 +16,13 @@ interface Props {
 }
 
 /**
- * CAD collection via Interac Autodeposit (Fincra preferred, then Flovide).
+ * CAD collection via Interac Autodeposit (Fincra).
  * Skips the method picker when Interac is the only option.
  */
 export default function CadCollectionPanel({ walletId, walletCurrency, initialAmount, onComplete, onExit }: Props) {
   const isCad = walletCurrency.toUpperCase() === "CAD";
   const seedAmount = Number(initialAmount) > 0 ? Number(initialAmount) : 0;
-  const interacOn =
-    productFeatures.fincraInterac
-    || productFeatures.flovide
-    || productFeatures.flovideInterac;
+  const interacOn = productFeatures.fincraInterac;
   const plaidOn = productFeatures.plaid;
 
   const [lang, setLang] = useState<Lang>("en");

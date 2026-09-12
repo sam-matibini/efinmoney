@@ -45,7 +45,6 @@ import RecipientStripeKycFields, { buildRecipientKycPayload, isRecipientKycValid
 import {
   CAD_BANK_EFT_ENABLED,
   INTERAC_ETRANSFER_ENABLED,
-  PAYSAFE_PAYOUTS_ENABLED,
   STRIPE_CANADA_RAILS_NOTE,
 } from "@/lib/canadaPayoutRails";
 import PaymentMethodRow, { type PaymentMethodOption } from "@/components/money/PaymentMethodRow";
@@ -1459,7 +1458,7 @@ const CanadaSendFlow = () => {
                   <div className="p-4 rounded-xl bg-primary/5 border border-primary/25 text-sm flex items-start gap-3">
                     <Link2 className="w-5 h-5 text-primary shrink-0 mt-0.5" />
                     <div className="space-y-1 text-muted-foreground">
-                      <p>We hold C${parsedAmount.toFixed(2)} in escrow and give you a shareable link. The recipient picks debit card (Stripe){PAYSAFE_PAYOUTS_ENABLED ? ", Interac, or EFT" : ""} when they claim.</p>
+                      <p>We hold C${parsedAmount.toFixed(2)} in escrow and give you a shareable link. The recipient picks debit card (Stripe), Interac, or EFT when they claim.</p>
                       <p className="text-xs">Expires in 7 days · revocable anytime before claim</p>
                     </div>
                   </div>

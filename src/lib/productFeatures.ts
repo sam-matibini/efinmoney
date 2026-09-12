@@ -39,10 +39,10 @@ export const productFeatures = {
   fincra: envFlag("VITE_FEATURE_FINCRA", true),
   /** Fincra CAD Interac Autodeposit — send checkout + CAD collections. */
   fincraInterac: envFlag("VITE_FEATURE_FINCRA_INTERAC", true),
-  /** Flovide (OhentPay) — banks, resolve, FX, NGN/KES/GHS/UGX/CAD payouts. */
+  /** Flovide (OhentPay) — Africa bank/MoMo. Not used for CAD Interac or CAD payout. */
   flovide: envFlag("VITE_FEATURE_FLOVIDE", true),
-  /** Flovide CAD Interac Autodeposit — off; CAD top-up is Nomba card. */
-  flovideInterac: envFlag("VITE_FEATURE_FLOVIDE_INTERAC", false),
+  /** Flovide CAD Interac — retired. CAD Interac collect is Fincra Autodeposit. */
+  flovideInterac: false,
   /** Wise bank-deposit top-up (shared receive account + unique payment reference). */
   wise: envFlag("VITE_FEATURE_WISE", true),
   /** Square Checkout — card top-up for USD/EUR/GBP (CAD uses Nomba). */

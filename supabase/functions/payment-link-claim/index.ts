@@ -259,9 +259,9 @@ Deno.serve(async (req) => {
     }
   }
 
-  // === Interac / EFT: execute Paysafe payout BEFORE posting release ledger ===
-  let paysafeResult: Record<string, unknown> | null = null;
-  let paysafeTransferId: string | null = null;
+  // === Interac / EFT: Nomba payout via execute-transfer BEFORE posting release ledger ===
+  let cadPayoutResult: Record<string, unknown> | null = null;
+  let cadTransferId: string | null = null;
 
   if (method === "interac" || method === "eft") {
     const recipientAccount = method === "eft"
@@ -295,20 +295,21 @@ Deno.serve(async (req) => {
       await rollback(admin, claimed.id);
       return json({ error: "Could not create transfer record" }, 500);
     }
-    paysafeTransferId = payTransfer.id;
+    cadTransferId = payTransfer.id;
 
     try {
-      const psRes = await fetch(`${SUPABASE_URL}/functions/v1/paysafe-payout`, {
+      const execRes = await fetch(`${SUPABASE_URL}/functions/v1/execute-transfer`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          Authorization: `Bearer ${SERVICE_ROLE}`,
           "x-internal-secret": SERVICE_ROLE,
         },
-        body: JSON.stringify({ transfer_id: payTransfer.id, skip_wallet_refund: true }),
+        body: JSON.stringify({ transfer_id: payTransfer.id }),
       });
-      paysafeResult = await psRes.json();
+      cadPayoutResult = await execRes.json();
     } catch (err) {
-      console.error("paysafe-payout invoke failed for payment link", code, err);
+      console.error("execute-transfer invoke failed for payment link", code, err);
       await admin.from("transfers").update({
         status: "failed",
         failure_reason: "Payout provider unreachable",
@@ -317,21 +318,12 @@ Deno.serve(async (req) => {
       return json({ error: "We couldn't reach our Canadian payments partner. Please try again shortly." }, 502);
     }
 
-    if (!paysafeResult?.success) {
+    if (cadPayoutResult?.success === false) {
       await rollback(admin, claimed.id);
-      const details = paysafeResult?.details as { error?: { code?: string; message?: string } } | null;
-      const paysafeCode = details?.error?.code;
-      let msg: string;
-      if (paysafeCode === "PAYMENTHUB-1") {
-        msg = method === "interac"
-          ? "Interac e-Transfer isn't enabled on our Canadian payments account yet. Please try Bank (EFT) or debit card, or contact support."
-          : "This bank transfer option isn't enabled on our Canadian payments account yet. Please try a different delivery method.";
-      } else {
-        msg = String(paysafeResult?.error || "Canadian payout failed")
-          .replace(/Your money has been returned to your wallet\s*[—-]?\s*/gi, "")
-          .replace(/returned to your wallet\.?\s*/gi, "")
-          .trim();
-      }
+      const msg = String(cadPayoutResult?.error || "Canadian payout failed")
+        .replace(/Your money has been returned to your wallet\s*[—-]?\s*/gi, "")
+        .replace(/returned to your wallet\.?\s*/gi, "")
+        .trim();
       return json({ error: msg }, 502);
     }
   }
@@ -485,7 +477,7 @@ Deno.serve(async (req) => {
     const { data: existingTransfer } = await admin
       .from("transfers")
       .select("id")
-      .eq("id", paysafeTransferId!)
+      .eq("id", cadTransferId!)
       .single();
     transfer = existingTransfer;
   } else {
@@ -530,8 +522,8 @@ Deno.serve(async (req) => {
         ...(method === "card_push" ? { stripe_payout_id: stripePayoutId } : {}),
         ...(method === "interac" || method === "eft"
           ? {
-              paysafe_id: paysafeResult?.paysafe_id ?? null,
-              paysafe_status: paysafeResult?.status ?? null,
+              rail: cadPayoutResult?.payout?.rail ?? cadPayoutResult?.rail ?? "nomba",
+              pending_ops: cadPayoutResult?.pending_ops ?? false,
             }
           : {}),
       },
@@ -545,8 +537,8 @@ Deno.serve(async (req) => {
     method,
     transfer_id: transfer?.id ?? null,
     stripe_payout_id: stripePayoutId,
-    paysafe_id: paysafeResult?.paysafe_id ?? null,
-    security: paysafeResult?.security ?? null,
+    rail: cadPayoutResult?.payout?.rail ?? cadPayoutResult?.rail ?? null,
+    security: cadPayoutResult?.payout?.security ?? cadPayoutResult?.security ?? null,
   });
 });
 

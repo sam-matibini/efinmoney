@@ -65,19 +65,14 @@ export default function WiseInteracInvoiceCheckout({
 
   const showLoopBilling = !productFeatures.fincraInterac && loopBillingLinkConfigured();
   const fincraOn = productFeatures.fincraInterac;
-  const flovideOn = !fincraOn && (productFeatures.flovide || productFeatures.flovideInterac);
   const [method, setMethod] = useState<CheckoutMethod | null>(
     fincraOn || !loopBillingLinkConfigured() ? "interac" : null,
   );
-  const interacTitle = fincraOn || flovideOn ? "Interac e-Transfer" : undefined;
+  const interacTitle = fincraOn ? "Interac e-Transfer" : undefined;
   const interacDescription = fincraOn
     ? lang === "fr"
       ? `Virement Autodeposit vers ${FINCRA_CAD_INTERAC_ALIAS}`
       : `Send Interac Autodeposit to ${FINCRA_CAD_INTERAC_ALIAS}`
-    : flovideOn
-    ? lang === "fr"
-      ? "Demande Interac à votre courriel — approuvez dans votre app bancaire"
-      : "Interac request to your email — approve in your banking app"
     : undefined;
 
   const amountLabel = useMemo(() => {

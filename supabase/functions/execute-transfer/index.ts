@@ -447,7 +447,7 @@ Deno.serve(async (req) => {
           debit_amount: 0,
           credit_amount: Number(transfer.source_amount),
           description: isCanadaPayout
-            ? `Paysafe payout to ${transfer.recipient_name} (${transfer.payout_method || "interac"})`
+            ? `CAD payout to ${transfer.recipient_name} (${transfer.payout_method || "interac"})`
             : `Payable to ${transfer.recipient_name}`,
           reference_type: "transfer",
           reference_id: transfer_id,
@@ -486,7 +486,7 @@ Deno.serve(async (req) => {
     // Mark funded
     await supabase.from("transfers").update({ status: "funded" }).eq("id", transfer_id);
 
-    // Smart Route: Paysafe (Interac/EFT) for Canada; Stellar SEP-31 anchor for opt-in
+    // Smart Route: Nomba Interac/EFT for Canada; Stellar SEP-31 anchor for opt-in
     // African corridors (NG/KE/ZM); Flutterwave for the rest.
     const STELLAR_COUNTRIES = new Set(["NG", "KE", "ZM"]);
     const MTN_COUNTRIES = new Set(["GH", "UG", "ZM"]);
@@ -894,7 +894,7 @@ Deno.serve(async (req) => {
           }
         };
 
-        // 0) Nomba — Interac + Canadian bank EFT (global payout)
+        // Nomba Interac / EFT only. Flovide and Paysafe are not CAD payout rails.
         if (nombaApiConfigured()) {
           await tryCanadaRail("nomba", async () => {
             const nombaRes = await fetch(
@@ -909,55 +909,30 @@ Deno.serve(async (req) => {
           });
         }
 
-        // 1) Flovide — Interac fallback
-        const flovideReady = !!(
-          Deno.env.get("FLOVIDE_PUBLIC_KEY")?.trim()
-          && Deno.env.get("FLOVIDE_SECRET_KEY")?.trim()
-        );
-        const wantInterac = String(transfer.payout_method || "").toLowerCase().includes("interac");
-        if (flovideReady && wantInterac) {
-          await tryCanadaRail("flovide", async () => {
-            const fvRes = await fetch(
-              `${Deno.env.get("SUPABASE_URL")}/functions/v1/flovide-payout`,
-              { method: "POST", headers: internalHeaders, body: JSON.stringify({ transfer_id }) },
-            );
-            return fvRes.json().catch(() => ({
-              success: false,
-              error: `flovide-payout HTTP ${fvRes.status}`,
-              rail: "flovide",
-            }));
-          });
-        }
-
-        // 2) Stripe Connect / Paysafe legacy fallback
-        if (!payoutOk(payoutResult) && !canadaHardDecline) {
-          const fnName = transfer.payout_method === "stripe_connect"
-            ? "stripe-connect-instant-payout"
-            : "paysafe-payout";
-          const legacyRail = fnName === "stripe-connect-instant-payout" ? "stripe_connect" : "paysafe";
-          railsAttempted.push(legacyRail);
-          canadaAttempts.push(legacyRail);
+        if (!payoutOk(payoutResult) && !canadaHardDecline && transfer.payout_method === "stripe_connect") {
+          railsAttempted.push("stripe_connect");
+          canadaAttempts.push("stripe_connect");
           const res = await fetch(
-            `${Deno.env.get("SUPABASE_URL")}/functions/v1/${fnName}`,
+            `${Deno.env.get("SUPABASE_URL")}/functions/v1/stripe-connect-instant-payout`,
             {
               method: "POST",
               headers: {
                 "Content-Type": "application/json",
                 "x-internal-secret": Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "",
               },
-              body: JSON.stringify({ transfer_id, skip_wallet_refund: true }),
+              body: JSON.stringify({ transfer_id }),
             },
           );
           const legacyResult = await res.json();
           if (payoutOk(legacyResult)) {
-            payoutResult = { ...legacyResult, rail: legacyRail, priority_chain: canadaAttempts };
+            payoutResult = { ...legacyResult, rail: "stripe_connect", priority_chain: canadaAttempts };
           } else {
-            const err = String(legacyResult?.error || legacyResult?.message || `${legacyRail} payout failed`);
-            railErrors.push(`${legacyRail}: ${err}`);
+            const err = String(legacyResult?.error || legacyResult?.message || "stripe_connect payout failed");
+            railErrors.push(`stripe_connect: ${err}`);
             payoutResult = {
               ...(legacyResult || {}),
               success: false,
-              rail: legacyRail,
+              rail: "stripe_connect",
               error: err,
               priority_chain: canadaAttempts,
             };

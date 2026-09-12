@@ -189,6 +189,17 @@ Deno.serve(async (req) => {
       });
     }
 
+    return new Response(JSON.stringify({
+      success: false,
+      error: "Paysafe is retired for Canadian Interac and EFT. CAD payouts use Nomba.",
+      rail: "paysafe",
+      error_class: "misroute",
+      retryable: false,
+      code: "paysafe_retired_cad",
+    }), {
+      status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+
     const merchantRefNum = `EFM-${transfer.id}`;
     const amountCents = Math.round(Number(transfer.target_amount) * 100);
     const { firstName, lastName } = splitName(transfer.recipient_name);

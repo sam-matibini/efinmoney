@@ -155,6 +155,14 @@ export async function resolveCorridorRails(
     if (rails.length) source = source === "none" ? "default" : source;
   }
 
+  if (direction === "collect" && (ccy === "CAD" || cc === "CA")) {
+    rails = rails.filter((r) => r !== "flovide" && r !== "paysafe" && r !== "flovide_interac");
+    if (!rails.length) {
+      rails = ["nomba", "fincra"];
+      source = source === "none" ? "default" : source;
+    }
+  }
+
   if (rails.length) return { policy, rails, source };
   return { policy: null, rails: [], source: "none" };
 }

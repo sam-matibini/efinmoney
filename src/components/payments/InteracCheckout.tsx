@@ -12,8 +12,7 @@ import { productFeatures } from "@/lib/productFeatures";
 import { FINCRA_CAD_INTERAC_ALIAS } from "@/lib/fincraCad";
 import { cadAmountsMatch, INTERAC_CONFIRM_QTY } from "@/lib/interacConfirm";
 
-const FLOVIDE_FN = "flovide-cad-interac";
-/** Loop Bank CAD Interac Autodeposit. */
+/** Loop Bank CAD Interac Autodeposit (only if Fincra Interac is off). */
 const WISE_FN = "wise-cad-interac";
 /** Fincra CAD Interac (@fincra.ca Autodeposit). */
 const FINCRA_FN = "fincra-cad-interac";
@@ -129,13 +128,7 @@ export default function InteracCheckout({
   const [alias, setAlias] = useState<string | null>(null);
   const [eft, setEft] = useState<{ bankNumber: string; transitNumber: string; accountNumber: string } | null>(null);
   const [configured, setConfigured] = useState(true);
-  const [railFn, setRailFn] = useState(
-    productFeatures.fincraInterac
-      ? FINCRA_FN
-      : (productFeatures.flovide || productFeatures.flovideInterac)
-      ? FLOVIDE_FN
-      : WISE_FN,
-  );
+  const [railFn, setRailFn] = useState(FINCRA_FN);
   const [intent, setIntent] = useState<InteracIntent | null>(null);
   const [bootstrapped, setBootstrapped] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -192,7 +185,7 @@ export default function InteracCheckout({
         };
 
         let json: Record<string, unknown> | null = null;
-        let fn = productFeatures.fincraInterac ? FINCRA_FN : WISE_FN;
+        let fn = FINCRA_FN;
 
         // CAD collections go through Fincra Autodeposit (support.cad.live-015@fincra.ca).
         json = await tryFn(FINCRA_FN);
@@ -208,33 +201,16 @@ export default function InteracCheckout({
             pending: Array.isArray(json?.pending) ? json.pending : [],
           };
         }
-        if (!json && (productFeatures.flovide || productFeatures.flovideInterac) && !productFeatures.fincraInterac) {
-          json = await tryFn(FLOVIDE_FN);
-          if (json && json.configured !== false && (json.alias || json.mode === "autodeposit")) {
-            fn = FLOVIDE_FN;
-          } else if (json && json.configured !== false) {
-            fn = FLOVIDE_FN;
-          } else {
-            json = null;
-          }
-        }
         if (!json && !productFeatures.fincraInterac) {
           json = await tryFn(WISE_FN);
           if (json && json.configured !== false) fn = WISE_FN;
-          else if (productFeatures.flovide || productFeatures.flovideInterac) {
-            const flovide = await tryFn(FLOVIDE_FN);
-            if (flovide) {
-              json = flovide;
-              fn = FLOVIDE_FN;
-            }
-          }
         }
         if (cancelled) return;
         if (!json) return;
         setRailFn(fn);
         setAlias((json.alias as string | null) ?? (fn === FINCRA_FN ? FINCRA_CAD_INTERAC_ALIAS : null));
         // Compact Autodeposit UI hides phone — drop any non-CA profile phone so it can't fail validation.
-        if (fn === FLOVIDE_FN || fn === FINCRA_FN) {
+        if (fn === FINCRA_FN) {
           setForm((prev) => (prev.phone ? { ...prev, phone: "" } : prev));
           setError(null);
         }
@@ -297,7 +273,7 @@ export default function InteracCheckout({
   }, [intent, railFn, amountLocked, fixedAmount, lang, onIntentCleared]);
 
   const pay = useCallback(async () => {
-    const compactRail = railFn === FLOVIDE_FN || railFn === FINCRA_FN;
+    const compactRail = railFn === FINCRA_FN;
     // Autodeposit rails only need name + email — phone is hidden and not required.
     // Profile phones (often non-CA) must not block checkout when the field isn't shown.
     const schema = compactRail ? payerSchema : payerSchemaFull;
@@ -342,7 +318,7 @@ export default function InteracCheckout({
 
       const fallbackOrder = productFeatures.fincraInterac
         ? []
-        : [FINCRA_FN, FLOVIDE_FN, WISE_FN].filter(
+        : [FINCRA_FN, WISE_FN].filter(
             (fn, i, arr) => fn !== railFn && arr.indexOf(fn) === i,
           );
 
@@ -397,8 +373,7 @@ export default function InteracCheckout({
       const aliasLine =
         (data.alias as string | null)
         || alias
-        || (usedFn === FINCRA_FN ? FINCRA_CAD_INTERAC_ALIAS : null)
-        || (usedFn === FLOVIDE_FN ? "efin@flovide.com" : null);
+        || (usedFn === FINCRA_FN ? FINCRA_CAD_INTERAC_ALIAS : null);
       await navigator.clipboard
         .writeText(
           [
@@ -410,7 +385,7 @@ export default function InteracCheckout({
             .join("\n"),
         )
         .catch(() => undefined);
-      toast.success(usedFn === FLOVIDE_FN ? t.flovideDetailsCopied : t.detailsCopied);
+      toast.success(t.detailsCopied);
     } catch (e) {
       const message = e instanceof Error ? e.message : "Could not start the payment";
       setError(message);
@@ -451,7 +426,7 @@ export default function InteracCheckout({
     };
 
     const fetchIntent = async (): Promise<InteracIntent | null> => {
-      if (railFn === FLOVIDE_FN || railFn === FINCRA_FN) {
+      if (railFn === FINCRA_FN) {
         const { data } = await supabase.functions.invoke(
           `${railFn}?intent_id=${encodeURIComponent(intent.id)}`,
           { method: "GET" },
@@ -622,17 +597,16 @@ export default function InteracCheckout({
   }
 
   if (intent) {
-    const isFlovide = railFn === FLOVIDE_FN;
     const isFincra = railFn === FINCRA_FN;
     return (
       <InteracStatusView
         intent={intent}
-        alias={alias || (isFincra ? FINCRA_CAD_INTERAC_ALIAS : isFlovide ? "efin@flovide.com" : null)}
-        eft={isFlovide || isFincra ? null : eft}
+        alias={alias || (isFincra ? FINCRA_CAD_INTERAC_ALIAS : null)}
+        eft={isFincra ? null : eft}
         lang={lang}
         purpose={purpose}
         done={DONE.includes(intent.status)}
-        variant={isFlovide ? "flovide" : isFincra ? "fincra" : "loop"}
+        variant={isFincra ? "fincra" : "loop"}
         onChangeAmount={DONE.includes(intent.status) ? undefined : () => void cancelAndChangeAmount()}
         changingAmount={cancelling}
         onCompletePayment={
@@ -676,12 +650,10 @@ export default function InteracCheckout({
       submitting={loading}
       error={error}
       onSubmit={() => void pay()}
-      compact={railFn === FLOVIDE_FN || railFn === FINCRA_FN}
+      compact={railFn === FINCRA_FN}
       depositEmail={
         railFn === FINCRA_FN
           ? (alias || FINCRA_CAD_INTERAC_ALIAS)
-          : railFn === FLOVIDE_FN
-          ? (alias || "efin@flovide.com")
           : alias
       }
     />

@@ -2320,9 +2320,8 @@ const SendPage = () => {
   const cardFundingAvailable = productFeatures.nombaNigeria || productFeatures.lenhubFlutter
     || productFeatures.paytota || productFeatures.swychr || productFeatures.flutterwave;
 
-  const interacFundingAvailable = true;
+  const interacFundingAvailable = productFeatures.fincraInterac;
   const interacUsesFincra = productFeatures.fincraInterac;
-  const interacUsesFlovide = !interacUsesFincra && (productFeatures.flovide || productFeatures.flovideInterac);
   const wisePayWallet = wallets?.find((w) => isWisePayCurrency(w.currency_code));
 
   useEffect(() => {
@@ -2342,8 +2341,6 @@ const SendPage = () => {
           label: "Interac",
           sublabel: interacUsesFincra
             ? `e-Transfer · ${FINCRA_CAD_INTERAC_ALIAS}`
-            : interacUsesFlovide
-            ? "Autodeposit · efin@flovide.com"
             : "e-Transfer · CAD",
           icon: Banknote,
           tone: "bank" as const,
