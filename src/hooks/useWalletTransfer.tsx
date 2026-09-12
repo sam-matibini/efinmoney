@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { invalidateFinancialBooks } from "@/lib/finance/invalidateFinancialBooks";
+import { executeWalletFxSwap, invokeTransferError } from "@/lib/walletTransfer";
 import { useAuth } from './useAuth';
 
 export type WalletTransferInput = {
