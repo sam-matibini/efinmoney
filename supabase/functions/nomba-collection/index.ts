@@ -13,6 +13,7 @@ import {
   resolveFxRate,
   type FxRateRow,
 } from "../_shared/nomba-topup-quote.ts";
+import { resolveNombaCustomerEmail } from "../_shared/nomba-customer-email.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -102,10 +103,15 @@ Deno.serve(async (req) => {
     if (!wallet || wallet.user_id !== userId) return json({ error: "Invalid wallet" }, 403);
 
     const walletCurrency = String(wallet.currency_code).toUpperCase();
-    const customerEmail = String(email || userEmail || "").trim();
-    if (!customerEmail || !customerEmail.includes("@")) {
-      return json({ error: "A valid email is required for checkout" }, 400);
-    }
+    const extraBlocked = [
+      Deno.env.get("NOMBA_MERCHANT_EMAIL") || "",
+      ...(Deno.env.get("NOMBA_BLOCKED_CUSTOMER_EMAILS") || "").split(","),
+    ];
+    const customerEmail = resolveNombaCustomerEmail(
+      String(email || userEmail || ""),
+      userId,
+      extraBlocked,
+    ).email;
 
     if (walletCurrency === "CAD" && requestedCredit < 2) {
       return json({ error: "Minimum CAD top-up is C$2.00" }, 400);
@@ -230,6 +236,7 @@ Deno.serve(async (req) => {
         currency: checkoutCurrency,
         callbackUrl,
         customerEmail,
+        userId,
         orderReference: internalRef.slice(0, 50),
         meta: {
           efin_txn_id: String(txn.id),
@@ -245,13 +252,17 @@ Deno.serve(async (req) => {
           failure_reason: created.error,
           raw_response: { error: created.error, rail: "nomba_api" },
         }).eq("id", txn.id);
+        const blockedEmail = /email is blocked/i.test(created.error);
         const accountHint = created.error.toLowerCase().includes("account number")
           ? " Nomba needs Online Checkout enabled on your live parent account with a settlement account. Email docs@nomba.com — also verify NOMBA_SUBACCOUNT_ID is unset or is a real outlet ID (not the parent accountId)."
           : "";
         return json({
-          error: `${created.error}${accountHint}`,
-          code: "nomba_checkout_failed",
+          error: blockedEmail
+            ? "Card checkout could not start. Pay with Interac, Wise, or wallet — or try card again in a moment."
+            : `${created.error}${accountHint}`,
+          code: blockedEmail ? "nomba_email_blocked" : "nomba_checkout_failed",
           hint: accountHint ? "checkout_account_setup" : undefined,
+          detail: created.error,
         }, 200);
       }
 

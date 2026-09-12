@@ -917,13 +917,9 @@ const CanadaSendFlow = () => {
     }
 
     if (funding === "card" && productFeatures.nombaNigeria && !productFeatures.stripe) {
-      const wallet = selectedWallet || fallbackWallet;
-      if (!wallet) {
+      const wallet = selectedWallet || cadWallets[0];
+      if (!wallet || wallet.currency_code !== "CAD") {
         toast.error("Open a CAD wallet first so we can credit the card payment.");
-        return;
-      }
-      if (!user?.email) {
-        toast.error("Your account email is required for card checkout.");
         return;
       }
       setCardSubmitting(true);
@@ -1628,7 +1624,7 @@ const CanadaSendFlow = () => {
                         <p className="text-sm text-muted-foreground">
                           Pay C${totalCharged.toFixed(2)} CAD with Visa, Mastercard, Amex or Verve on Nomba’s secure page. We credit your CAD wallet, then pay out Interac or EFT.
                         </p>
-                        <p className="text-[11px] text-muted-foreground">Minimum card send is 1 CAD.</p>
+                        <p className="text-[11px] text-muted-foreground">Minimum card send is C$2.00 (Nomba checkout).</p>
                       </div>
                     )}
                     {funding === "card" && productFeatures.stripe && (
@@ -1700,7 +1696,7 @@ const CanadaSendFlow = () => {
                   : method === "paylink"
                     ? `Create link · C$${parsedAmount.toFixed(2)}`
                     : funding === "card"
-                      ? `Pay C$${parsedAmount.toFixed(2)} with card`
+                      ? `Pay C$${totalCharged.toFixed(2)} with card`
                       : funding === "interac"
                         ? "Continue to Interac"
                         : funding === "bank"

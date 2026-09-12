@@ -6,6 +6,12 @@
  * optional NOMBA_API_BASE (default https://api.nomba.com), NOMBA_ENV=live|sandbox
  */
 
+import {
+  isNombaEmailBlockedError,
+  nombaPayerEmail,
+  resolveNombaCustomerEmail,
+} from "./nomba-customer-email.ts";
+
 export type NombaApiConfig = {
   clientId: string;
   clientSecret: string;
@@ -156,11 +162,16 @@ export async function createNombaCheckoutOrder(params: {
   currency: string;
   callbackUrl: string;
   customerEmail?: string;
+  /** Used to mint a unique payer email if Nomba blocks the merchant mailbox. */
+  userId?: string;
   orderReference?: string;
   /** Optional outlet/sub-account ID to credit (NOT the parent accountId header). */
   subAccountId?: string;
   meta?: Record<string, string>;
-}): Promise<{ ok: true; checkoutLink: string; orderReference: string } | { ok: false; error: string }> {
+}): Promise<
+  | { ok: true; checkoutLink: string; orderReference: string }
+  | { ok: false; error: string; status?: number; raw?: unknown }
+> {
   const amountStr = params.amount.toFixed(2);
   // Parent accountId belongs in the header only (via nombaApiFetch).
   // Body accountId is ONLY for outlet/sub-accounts — putting the parent UUID here
@@ -171,40 +182,57 @@ export async function createNombaCheckoutOrder(params: {
   // Never put the parent account UUID in the order body — Nomba returns
   // "No Account Number found". Body accountId is for outlet/sub-accounts only.
   const subAccountId = subRaw && subRaw !== cfg.accountId ? subRaw : "";
-  const order: Record<string, unknown> = {
-    amount: amountStr,
-    currency: params.currency.toUpperCase(),
-    callbackUrl: params.callbackUrl,
-    customerEmail: params.customerEmail,
-    orderReference: params.orderReference,
-    orderMetaData: params.meta,
-  };
-  if (subAccountId) order.accountId = subAccountId;
 
-  const { ok, status, json } = await nombaCheckoutApiFetch("/v1/checkout/order", {
-    method: "POST",
-    body: JSON.stringify({ order }),
-  });
-  if (!ok) {
-    return {
-      ok: false,
-      error: String(json?.description || json?.message || `Nomba checkout HTTP ${status}`),
-      status,
-      raw: json,
-    };
+  const extraBlocked = [
+    Deno.env.get("NOMBA_MERCHANT_EMAIL") || "",
+    ...(Deno.env.get("NOMBA_BLOCKED_CUSTOMER_EMAILS") || "").split(","),
+  ];
+  const userId = params.userId || "guest";
+  const first = resolveNombaCustomerEmail(params.customerEmail, userId, extraBlocked);
+  const emails = [first.email];
+  if (first.email !== nombaPayerEmail(userId)) {
+    emails.push(nombaPayerEmail(userId));
   }
-  const checkoutLink = String(json?.data?.checkoutLink || "");
-  const orderReference = String(json?.data?.orderReference || "");
-  if (!checkoutLink) {
-    const dataMsg = String(json?.data?.message || json?.data?.description || "").trim();
-    return {
-      ok: false,
-      error: dataMsg || "Nomba returned no checkout link",
-      status,
-      raw: json,
+
+  let lastError = "Nomba checkout failed";
+  let lastStatus: number | undefined;
+  let lastRaw: unknown;
+  for (let i = 0; i < emails.length; i++) {
+    const customerEmail = emails[i];
+    const order: Record<string, unknown> = {
+      amount: amountStr,
+      currency: params.currency.toUpperCase(),
+      callbackUrl: params.callbackUrl,
+      customerEmail,
+      orderReference: params.orderReference,
+      orderMetaData: params.meta,
     };
+    if (subAccountId) order.accountId = subAccountId;
+
+    const { ok, status, json } = await nombaCheckoutApiFetch("/v1/checkout/order", {
+      method: "POST",
+      body: JSON.stringify({ order }),
+    });
+    if (ok) {
+      const checkoutLink = String(json?.data?.checkoutLink || "");
+      const orderReference = String(json?.data?.orderReference || "");
+      if (checkoutLink) {
+        return { ok: true, checkoutLink, orderReference };
+      }
+      const dataMsg = String(json?.data?.message || json?.data?.description || "").trim();
+      lastError = dataMsg || "Nomba returned no checkout link";
+      lastStatus = status;
+      lastRaw = json;
+    } else {
+      lastError = String(json?.description || json?.message || `Nomba checkout HTTP ${status}`);
+      lastStatus = status;
+      lastRaw = json;
+    }
+    if (!isNombaEmailBlockedError(lastError) || i === emails.length - 1) {
+      break;
+    }
   }
-  return { ok: true, checkoutLink, orderReference };
+  return { ok: false, error: lastError, status: lastStatus, raw: lastRaw };
 }
 
 /** Fetch checkout transaction by merchant orderReference or Nomba orderId. */
