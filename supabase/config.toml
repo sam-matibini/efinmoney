@@ -366,6 +366,9 @@ verify_jwt = false
 [functions.plaid-exchange-token]
 verify_jwt = false
 
+[functions.plaid-refresh-balances]
+verify_jwt = false
+
 [functions.intra-ca-transfer-create]
 verify_jwt = false
 

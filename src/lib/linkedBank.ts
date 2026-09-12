@@ -46,6 +46,12 @@ export type LinkedBank = {
   displayName: string;
   accountName: string;
   details: LinkedBankDetails;
+  /** Plaid live extract — spendable balance when the bank reports it. */
+  liveAvailable?: number | null;
+  liveCurrent?: number | null;
+  liveCurrency?: string | null;
+  liveUpdatedAt?: string | null;
+  needsReconnect?: boolean;
 };
 
 export type BankPayoutSpec = {

@@ -35,6 +35,17 @@ Send checkout and CAD wallet collections take Interac Autodeposit through Fincra
 - Secrets: `FINCRA_SECRET_KEY`, `FINCRA_BUSINESS_ID`, `FINCRA_CAD_INTERAC_ALIAS`, optional `FINCRA_CAD_VIRTUAL_ACCOUNT_ID`
 - SQL: `supabase/migrations/20260911220000_fincra_interac_complete_status.sql`
 
+## Bank tab and Plaid live balances
+
+The Bank account page (`/wallet/receive`) lists company or personal linked banks.
+
+- **Link bank** — manual corridor details (NG/GH/KE) or country-specific fields.
+- **Connect with Plaid** — Instant Auth for Canada and the US. After linking, eFinMoney calls Plaid `/accounts/balance/get` and caches **available** and **current** balances on `plaid_accounts`.
+- The card shows **Bank available** (live extract) next to **eFinMoney wallet** (what in-country payouts actually debit). Refresh pulls a new extract; Plaid items are not re-fetched more than once per minute unless you force refresh.
+- Manual Nigerian / Ghanaian / Kenyan links cannot show a live bank ledger — Plaid does not cover those institutions. Those rows still show the matching eFinMoney wallet.
+
+Edge functions (deploy separately from GitHub): `plaid-create-link-token`, `plaid-exchange-token`, `plaid-refresh-balances`. Secrets: `PLAID_CLIENT_ID`, `PLAID_SECRET`, `PLAID_ENV`. SQL: `supabase/migrations/20260912030000_plaid_account_balances.sql`.
+
 ## KYC and KYB
 
 Personal identity can be verified with **Persona**, **Interac** (Canadian bank sign-in), or an optional **manual document review** (government ID + live selfie). Manual submissions land in Admin → KYC with provider `manual` and status `pending_review`.

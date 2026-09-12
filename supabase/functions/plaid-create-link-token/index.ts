@@ -47,6 +47,7 @@ Deno.serve(async (req) => {
     const body = await req.json().catch(() => ({})) as {
       redirect_uri?: string;
       language?: string;
+      country_codes?: string[];
     };
 
     const userPayload: Record<string, unknown> = { client_user_id: user.id };
@@ -66,14 +67,23 @@ Deno.serve(async (req) => {
       if (phone) userPayload.phone_number = phone;
     }
 
+    const requestedCodes = Array.isArray(body.country_codes) ? body.country_codes : [];
+    const country_codes = [...new Set(
+      requestedCodes
+        .map((c) => String(c || "").toUpperCase())
+        .filter((c) => c === "CA" || c === "US"),
+    )];
+    if (country_codes.length === 0) country_codes.push("CA", "US");
+
     // Prefer Instant Auth (bank login). Instant Match is a different flow
     // (manual account numbers) and can open a blank "Verify your identity" pane.
+    // Balance is not a Link product — live balances use /accounts/balance/get on Auth items.
     const linkBody: Record<string, unknown> = {
       client_id: clientId,
       secret,
       client_name: "eFinMoney",
       language: body.language === "fr" ? "fr" : "en",
-      country_codes: ["CA"],
+      country_codes,
       user: userPayload,
       products: ["auth"],
       auth: {

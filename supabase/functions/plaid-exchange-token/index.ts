@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { corsPreflightResponse, jsonResponse } from "../_shared/cors.ts";
+import { plaidBalanceFields } from "../_shared/plaidBalances.ts";
 
 const ALLOWED_ENVS = new Set(["sandbox", "development", "production"]);
 const RAW_ENV = (Deno.env.get("PLAID_ENV") || "production").trim().toLowerCase();
@@ -52,6 +53,13 @@ Deno.serve(async (req) => {
 
     const exch = await plaid("/item/public_token/exchange", { public_token });
     const accountsRes = await plaid("/accounts/get", { access_token: exch.access_token });
+    let liveAccounts = accountsRes.accounts || [];
+    try {
+      const live = await plaid("/accounts/balance/get", { access_token: exch.access_token });
+      if (Array.isArray(live.accounts) && live.accounts.length) liveAccounts = live.accounts;
+    } catch (e) {
+      console.warn("balance/get at link time failed; using accounts/get balances:", e);
+    }
     let auth_numbers: { eft?: unknown[] } = { eft: [] };
     try {
       const a = await plaid("/auth/get", { access_token: exch.access_token });
@@ -69,10 +77,11 @@ Deno.serve(async (req) => {
     }).select().single();
     if (itemErr) throw itemErr;
 
-    const accountsToInsert = (accountsRes.accounts || []).map((acc: Record<string, unknown>) => {
+    const accountsToInsert = (liveAccounts || []).map((acc: Record<string, unknown>) => {
       const eft = ((auth_numbers.eft || []) as Array<Record<string, unknown>>)
         .find((e) => e.account_id === acc.account_id);
       const balances = acc.balances as Record<string, unknown> | undefined;
+      const live = plaidBalanceFields(balances, String(balances?.iso_currency_code || "CAD"));
       return {
         user_id: user.id,
         item_id: itemRow.id,
@@ -85,7 +94,11 @@ Deno.serve(async (req) => {
         institution_number: eft?.institution ?? null,
         branch_number: eft?.branch ?? null,
         account_number: eft?.account ?? null,
-        currency_code: balances?.iso_currency_code || "CAD",
+        currency_code: live.currency_code,
+        available_balance: live.available_balance,
+        current_balance: live.current_balance,
+        balances_iso_currency: live.balances_iso_currency,
+        balances_updated_at: live.balances_updated_at,
       };
     });
     let insertedIds: string[] = [];

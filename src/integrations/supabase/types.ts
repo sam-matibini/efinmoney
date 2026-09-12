@@ -8989,9 +8989,13 @@ export type Database = {
       plaid_accounts: {
         Row: {
           account_number: string | null
+          available_balance: number | null
+          balances_iso_currency: string | null
+          balances_updated_at: string | null
           branch_number: string | null
           created_at: string
           currency_code: string | null
+          current_balance: number | null
           id: string
           institution_number: string | null
           item_id: string
@@ -9005,9 +9009,13 @@ export type Database = {
         }
         Insert: {
           account_number?: string | null
+          available_balance?: number | null
+          balances_iso_currency?: string | null
+          balances_updated_at?: string | null
           branch_number?: string | null
           created_at?: string
           currency_code?: string | null
+          current_balance?: number | null
           id?: string
           institution_number?: string | null
           item_id: string
@@ -9021,9 +9029,13 @@ export type Database = {
         }
         Update: {
           account_number?: string | null
+          available_balance?: number | null
+          balances_iso_currency?: string | null
+          balances_updated_at?: string | null
           branch_number?: string | null
           created_at?: string
           currency_code?: string | null
+          current_balance?: number | null
           id?: string
           institution_number?: string | null
           item_id?: string

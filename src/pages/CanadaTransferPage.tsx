@@ -25,6 +25,9 @@ interface PlaidAccountRow {
   branch_number: string | null;
   account_number: string | null;
   item_id: string;
+  available_balance?: number | null;
+  current_balance?: number | null;
+  balances_iso_currency?: string | null;
 }
 
 export default function CanadaTransferPage() {
@@ -55,7 +58,7 @@ export default function CanadaTransferPage() {
       if (!user) return [];
       const { data, error } = await supabase
         .from("plaid_accounts")
-        .select("id,name,mask,subtype,institution_number,branch_number,account_number,item_id, plaid_items(institution_name)")
+        .select("id,name,mask,subtype,institution_number,branch_number,account_number,item_id,available_balance,current_balance,balances_iso_currency,plaid_items(institution_name)")
         .eq("user_id", user.id)
         .order("created_at", { ascending: false });
       if (error) throw error;
@@ -67,7 +70,9 @@ export default function CanadaTransferPage() {
   const fetchLinkToken = useCallback(async () => {
     setLinking(true);
     try {
-      const { data, error } = await supabase.functions.invoke("plaid-create-link-token");
+      const { data, error } = await supabase.functions.invoke("plaid-create-link-token", {
+        body: { country_codes: ["CA"] },
+      });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
       setLinkToken(data.link_token);
@@ -214,11 +219,18 @@ export default function CanadaTransferPage() {
               <Select value={selectedAccount} onValueChange={setSelectedAccount}>
                 <SelectTrigger><SelectValue placeholder="Choose linked bank account" /></SelectTrigger>
                 <SelectContent>
-                  {accounts.map((a) => (
-                    <SelectItem key={a.id} value={a.id}>
-                      {a.plaid_items?.institution_name || "Bank"} — {a.name} ••{a.mask}
-                    </SelectItem>
-                  ))}
+                  {accounts.map((a) => {
+                    const live = a.available_balance ?? a.current_balance;
+                    const liveLabel =
+                      live != null && Number.isFinite(Number(live))
+                        ? ` · ${Number(live).toLocaleString("en-CA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${(a.balances_iso_currency || "CAD")}`
+                        : "";
+                    return (
+                      <SelectItem key={a.id} value={a.id}>
+                        {a.plaid_items?.institution_name || "Bank"} — {a.name} ••{a.mask}{liveLabel}
+                      </SelectItem>
+                    );
+                  })}
                 </SelectContent>
               </Select>
             </div>

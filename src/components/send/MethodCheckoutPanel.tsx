@@ -21,6 +21,9 @@ export interface PanelBankSource {
   display_name: string;
   institution?: string | null;
   last_four?: string | null;
+  liveAvailable?: number | null;
+  liveCurrent?: number | null;
+  liveCurrency?: string | null;
 }
 
 export interface PanelSavedCard {
@@ -322,11 +325,18 @@ const MethodCheckoutPanel = ({
               <Select value={selectedSourceId || bankSources[0]?.id} onValueChange={onSourceChange}>
                 <SelectTrigger><SelectValue placeholder="Select bank account" /></SelectTrigger>
                 <SelectContent>
-                  {bankSources.map((s) => (
-                    <SelectItem key={s.id} value={s.id}>
-                      🏦 {s.institution ? `${s.institution} ` : ""}{s.display_name} ••••{s.last_four}
-                    </SelectItem>
-                  ))}
+                  {bankSources.map((s) => {
+                    const liveN = s.liveAvailable ?? s.liveCurrent;
+                    const live =
+                      liveN != null && Number.isFinite(Number(liveN))
+                        ? ` · ${Number(liveN).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${(s.liveCurrency || "").toUpperCase()}`.trim()
+                        : "";
+                    return (
+                      <SelectItem key={s.id} value={s.id}>
+                        🏦 {s.institution ? `${s.institution} ` : ""}{s.display_name} ••••{s.last_four}{live}
+                      </SelectItem>
+                    );
+                  })}
                 </SelectContent>
               </Select>
             </div>

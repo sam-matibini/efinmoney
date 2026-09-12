@@ -72,7 +72,8 @@ export default function LinkBankPanel({ walletCurrency, countryCode }: Props) {
     <div className="space-y-4">
       <p className="text-sm text-muted-foreground">
         Link a bank with one tap, or add the account details manually. We ask only for what your
-        country's banking system requires.
+        country's banking system requires. Plaid (Canada & US) also pulls a live bank balance for
+        transfer decisions.
       </p>
 
       <BankDetailsForm

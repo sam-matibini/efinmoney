@@ -117,7 +117,7 @@ Tables with foreign keys to `auth.users` (`profiles`, `wallets`, `user_roles`, e
 | **Flutterwave** | `flutterwave-payout`, `flutterwave-webhook`, `flw-bill-payment`, `flw-create-virtual-account`, `flw-get-banks`, `flw-get-billers`, `flw-initialize-payment`, `flw-resolve-account`, `flw-verify-payment` |
 | **Elicate** | `elicate-payout`, `elicate-webhook`, `elicate-reconcile` |
 | **M-Pesa** | `mtn-momo-payout`, `mtn-momo-webhook` |
-| **Plaid** | `plaid-create-link-token`, `plaid-exchange-token` |
+| **Plaid** | `plaid-create-link-token`, `plaid-exchange-token`, `plaid-refresh-balances` |
 | **Persona KYC** | `create-persona-inquiry`, `get-persona-inquiry-status`, `persona-webhook`, `persona-self-approve` |
 | **Sumsub EDD** | `sumsub-create-applicant`, `sumsub-refresh-token`, `sumsub-get-applicant-status`, `sumsub-webhook` |
 | **Interac OIDC KYC** | `interac-start`, `interac-callback`, `interac-exchange`, `interac-jwks` |

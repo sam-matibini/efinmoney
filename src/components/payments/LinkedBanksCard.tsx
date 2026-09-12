@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { usePlaidLink } from "react-plaid-link";
@@ -9,6 +9,7 @@ import {
   Landmark,
   Loader2,
   Plus,
+  RefreshCw,
   Trash2,
   Wallet,
 } from "lucide-react";
@@ -42,7 +43,6 @@ import { useCreateTransfer } from "@/hooks/useTransfers";
 import { usePinGate } from "@/components/send/usePinGate";
 import { getCorridorBanks, resolveCorridorAccount } from "@/lib/flovide";
 import { PLAID_COUNTRIES, bankSchemaForCountry, validateBankFields } from "@/lib/bankFieldSchemas";
-import { productFeatures } from "@/lib/productFeatures";
 import { retailPayoutFeeNative } from "@/lib/retailPayoutFees";
 import {
   CORRIDOR_BANK_COUNTRIES,
@@ -53,6 +53,11 @@ import {
   lastFourOf,
   payoutSpecFor,
 } from "@/lib/linkedBank";
+import {
+  formatLiveBankLine,
+  isPlaidBalanceStale,
+  preferredLiveBalance,
+} from "@/lib/plaidLiveBalance";
 import type { NigeriaBank } from "@/lib/nombaNigeria";
 
 const fmt = (n: number, ccy: string) =>
@@ -86,6 +91,8 @@ export default function LinkedBanksCard() {
   const [manual, setManual] = useState<Record<string, string>>({});
   const [linkToken, setLinkToken] = useState<string | null>(null);
   const [linking, setLinking] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const autoRefreshed = useRef(false);
 
   const isBusiness = !!business;
   const kycOk =
@@ -100,7 +107,7 @@ export default function LinkedBanksCard() {
       const { data, error } = await supabase
         .from("plaid_accounts")
         .select(
-          "id,name,mask,subtype,account_number,institution_number,branch_number,currency_code,plaid_items(institution_name)",
+          "id,name,mask,subtype,account_number,institution_number,branch_number,currency_code,available_balance,current_balance,balances_iso_currency,balances_updated_at,plaid_items(institution_name,status)",
         )
         .eq("user_id", user.id)
         .order("created_at", { ascending: false });
@@ -115,8 +122,9 @@ export default function LinkedBanksCard() {
     const seen = new Set<string>();
     for (const a of plaidAccounts) {
       const inst =
-        (a.plaid_items as { institution_name?: string } | null)?.institution_name || "Bank";
-      const ccy = String(a.currency_code || "CAD").toUpperCase();
+        (a.plaid_items as { institution_name?: string; status?: string } | null)?.institution_name || "Bank";
+      const itemStatus = (a.plaid_items as { status?: string } | null)?.status;
+      const ccy = String(a.balances_iso_currency || a.currency_code || "CAD").toUpperCase();
       const key = `plaid:${a.id}`;
       seen.add(`${inst}|${a.mask}`);
       rows.push({
@@ -135,6 +143,11 @@ export default function LinkedBanksCard() {
           transit_number: a.branch_number || "",
           branch_number: a.branch_number || "",
         },
+        liveAvailable: a.available_balance,
+        liveCurrent: a.current_balance,
+        liveCurrency: a.balances_iso_currency || a.currency_code,
+        liveUpdatedAt: a.balances_updated_at,
+        needsReconnect: itemStatus === "login_required",
       });
     }
     for (const b of savedBanks) {
@@ -163,7 +176,8 @@ export default function LinkedBanksCard() {
   const currency = COUNTRY_TO_CURRENCY[country] || "NGN";
   const schema = bankSchemaForCountry(country);
   const corridor = CORRIDOR_BANK_COUNTRIES.has(country);
-  const plaidOk = productFeatures.plaid && PLAID_COUNTRIES.has(country);
+  const plaidOk = PLAID_COUNTRIES.has(country);
+  const hasPlaid = linked.some((b) => b.source === "plaid");
 
   useEffect(() => {
     if (mode !== "add" || !corridor) {
@@ -197,10 +211,12 @@ export default function LinkedBanksCard() {
     return () => window.clearTimeout(t);
   }, [corridor, accountNumber, bankCode, currency]);
 
-  const startPlaid = useCallback(async () => {
+  const startPlaid = useCallback(async (codes?: string[]) => {
     setLinking(true);
     try {
-      const { data, error } = await supabase.functions.invoke("plaid-create-link-token");
+      const { data, error } = await supabase.functions.invoke("plaid-create-link-token", {
+        body: { country_codes: codes?.length ? codes : ["CA", "US"] },
+      });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
       setLinkToken(data.link_token);
@@ -211,6 +227,31 @@ export default function LinkedBanksCard() {
     }
   }, []);
 
+  const refreshBalances = useCallback(async (force = false) => {
+    if (!user) return;
+    setRefreshing(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("plaid-refresh-balances", {
+        body: { force },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      const reconnect = (data?.errors || []).filter((e: { needs_reconnect?: boolean }) => e.needs_reconnect);
+      if (reconnect.length) {
+        toast.error(
+          `Reconnect ${reconnect.map((e: { institution?: string | null }) => e.institution || "your bank").join(", ")} with Plaid to keep live balances.`,
+        );
+      } else if (force && data?.refreshed > 0) {
+        toast.success("Bank balances updated");
+      }
+      void qc.invalidateQueries({ queryKey: ["plaid_accounts", user.id] });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not refresh bank balances");
+    } finally {
+      setRefreshing(false);
+    }
+  }, [qc, user]);
+
   const onPlaidSuccess = useCallback(
     async (public_token: string, metadata: { institution?: { name?: string } }) => {
       try {
@@ -219,8 +260,9 @@ export default function LinkedBanksCard() {
         });
         if (error) throw error;
         if (data?.error) throw new Error(data.error);
-        toast.success("Bank linked");
+        toast.success("Bank linked — fetching live balance");
         void qc.invalidateQueries({ queryKey: ["plaid_accounts", user?.id] });
+        autoRefreshed.current = false;
         setMode("closed");
       } catch (e) {
         toast.error(e instanceof Error ? e.message : "Could not link bank");
@@ -235,6 +277,16 @@ export default function LinkedBanksCard() {
   useEffect(() => {
     if (linkToken && ready) open();
   }, [linkToken, ready, open]);
+
+  useEffect(() => {
+    if (!user || !hasPlaid || autoRefreshed.current) return;
+    const stale = linked.some(
+      (b) => b.source === "plaid" && isPlaidBalanceStale(b.liveUpdatedAt),
+    );
+    if (!stale) return;
+    autoRefreshed.current = true;
+    void refreshBalances(false);
+  }, [user, hasPlaid, linked, refreshBalances]);
 
   const resetAdd = () => {
     setBankCode("");
@@ -418,13 +470,37 @@ export default function LinkedBanksCard() {
             </CardTitle>
             <p className="mt-1 text-sm text-muted-foreground">
               Link a bank you already have. Withdraw from your eFinMoney wallet, or send to another
-              bank in the same country when that rail is live.
+              bank in the same country when that rail is live. Plaid-connected Canada and US accounts
+              show a live bank balance so you can decide transfers quickly.
             </p>
           </div>
-          <Button onClick={() => { resetAdd(); setMode("add"); }} className="shrink-0">
-            <Plus className="mr-2 h-4 w-4" />
-            Link bank
-          </Button>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center shrink-0">
+            {hasPlaid && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                disabled={refreshing}
+                onClick={() => void refreshBalances(true)}
+              >
+                <RefreshCw className={`mr-2 h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
+                Refresh balances
+              </Button>
+            )}
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => void startPlaid()}
+              disabled={linking}
+            >
+              {linking ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Building2 className="mr-2 h-4 w-4" />}
+              Connect with Plaid
+            </Button>
+            <Button onClick={() => { resetAdd(); setMode("add"); }} className="shrink-0">
+              <Plus className="mr-2 h-4 w-4" />
+              Link bank
+            </Button>
+          </div>
         </CardHeader>
         <CardContent className="space-y-3">
           {!canMoveMoney && (
@@ -450,7 +526,7 @@ export default function LinkedBanksCard() {
               <p className="mt-2 text-sm font-medium">No banks linked yet</p>
               <p className="mt-1 text-sm text-muted-foreground">
                 Add the company’s operating account or your personal bank — Nigeria, Ghana, Kenya,
-                Canada, and the US are supported.
+                Canada, and the US are supported. Use Connect with Plaid for live Canada / US balances.
               </p>
             </div>
           ) : (
@@ -469,6 +545,7 @@ export default function LinkedBanksCard() {
                           <p className="font-semibold truncate">{bank.institution}</p>
                           <Badge variant="outline">{bank.currency}</Badge>
                           {bank.source === "plaid" && <Badge variant="secondary">Plaid</Badge>}
+                          {bank.needsReconnect && <Badge variant="destructive">Reconnect</Badge>}
                           {spec.canPayout ? (
                             <Badge>{spec.railLabel.split(" (")[0]}</Badge>
                           ) : (
@@ -479,9 +556,25 @@ export default function LinkedBanksCard() {
                           {bank.accountName}
                           {bank.lastFour ? ` ····${bank.lastFour}` : ""}
                         </p>
+                        {bank.source === "plaid" && (
+                          <p className="mt-1 text-sm font-medium text-foreground">
+                            {formatLiveBankLine(
+                              bank.liveAvailable,
+                              bank.liveCurrent,
+                              bank.liveCurrency || bank.currency,
+                              bank.liveUpdatedAt,
+                              fmt,
+                            ) ||
+                              (refreshing
+                                ? "Bank balance · fetching…"
+                                : bank.needsReconnect
+                                  ? "Bank balance · reconnect with Plaid"
+                                  : "Bank balance · unavailable")}
+                          </p>
+                        )}
                         {wallet && (
                           <p className="mt-1 text-xs text-muted-foreground">
-                            {bank.currency} wallet · {fmt(Number(wallet.balance), bank.currency)}
+                            eFinMoney wallet · {fmt(Number(wallet.balance), bank.currency)}
                           </p>
                         )}
                       </div>
@@ -519,10 +612,22 @@ export default function LinkedBanksCard() {
                     {!spec.canPayout && spec.reason && (
                       <p className="text-xs text-muted-foreground">{spec.reason}</p>
                     )}
+                    {bank.needsReconnect && (
+                      <p className="text-xs text-muted-foreground">
+                        This bank login expired. Connect with Plaid again to restore live balances.
+                      </p>
+                    )}
                   </div>
                 );
               })}
             </div>
+          )}
+          {linked.some((b) => b.source === "saved") && (
+            <p className="text-xs text-muted-foreground">
+              Wallet amounts are your eFinMoney balance used to pay out. Live checking and savings
+              balances appear on banks connected with Plaid (Canada & US). Nigerian, Ghanaian, and
+              Kenyan corridor links are not covered by Plaid.
+            </p>
           )}
         </CardContent>
       </Card>
@@ -561,9 +666,9 @@ export default function LinkedBanksCard() {
             </div>
 
             {plaidOk && (
-              <Button type="button" variant="outline" className="w-full" onClick={() => void startPlaid()} disabled={linking}>
+              <Button type="button" variant="outline" className="w-full" onClick={() => void startPlaid([country])} disabled={linking}>
                 {linking ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Building2 className="mr-2 h-4 w-4" />}
-                Link with Plaid
+                Link with Plaid — live {country === "US" ? "USD" : "CAD"} balance
               </Button>
             )}
 
@@ -669,13 +774,32 @@ export default function LinkedBanksCard() {
                 </div>
               )}
               <p className="text-sm">
-                From wallet:{" "}
+                From eFinMoney wallet:{" "}
                 <span className="font-medium">
                   {walletFor(active.currency)
                     ? fmt(Number(walletFor(active.currency)!.balance), active.currency)
                     : `No ${active.currency} wallet`}
                 </span>
               </p>
+              {active.source === "plaid" && (
+                <div className="rounded-lg border bg-muted/40 p-3 space-y-1">
+                  <p className="text-sm">
+                    Bank available:{" "}
+                    <span className="font-medium">
+                      {preferredLiveBalance(active.liveAvailable, active.liveCurrent) != null
+                        ? fmt(
+                            preferredLiveBalance(active.liveAvailable, active.liveCurrent)!,
+                            (active.liveCurrency || active.currency).toUpperCase(),
+                          )
+                        : "Not available yet"}
+                    </span>
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Use the live bank figure to decide how much to move. This payout still debits
+                    your eFinMoney wallet, not the bank ledger.
+                  </p>
+                </div>
+              )}
               <p className="text-sm">
                 To:{" "}
                 <span className="font-medium">

@@ -9,7 +9,7 @@ This document reflects the **UI simplification pass** (July 2026). Edge function
 | **Nomba** | NGN bank send; Global Payout default for KE/GH/UG/TZ/RW/XOF/XAF/CAD/GBP/EUR/USD/ZAR (not ZMW); NGN/CAD top-up | `SendPage`, `TopUpPage`, `NombaTopUpCard` | `nomba-collection`, `nomba-payout`, `nomba-payment-callback`, … |
 | **Ghana Pay** | GHS top-up, GHS MoMo send | `GhanaTopUpCard`, send flow for GHS | Ghana collection/payout functions (lenhub) |
 | **Swychr Connect** | Secondary payin, NGN payout fallback, vCards, airtime | `SwychrTopUpCard`, `SwychrCardsPanel`, `SwychrAirtimePanel` (flagged off) | `swychr-collection`, `swychr-payout`, `swychr-card-*`, `swychr-airtime-*` |
-| **Plaid** | Link external bank accounts | Send funding (`plaid` flag), settings | Plaid link-token functions |
+| **Plaid** | Link CA/US banks + live balances on Bank tab | Bank tab (`LinkedBanksCard`), Send funding | `plaid-create-link-token`, `plaid-exchange-token`, `plaid-refresh-balances` |
 | **Wallets & FX** | Multi-currency balances, fiat exchange | `WalletsPage`, `ExchangePage` (Currency tab) | Wallet ledger, `execute-transfer` (wallet-funded) |
 
 Feature flags: `src/lib/productFeatures.ts` (override with `VITE_FEATURE_*` in `.env`).
@@ -47,7 +47,7 @@ Admin: **API Management** at `/admin/api` (FLW/Stripe corridor probes marked leg
 1. **NGN top-up** — `/wallet/topup` → Nomba card for NGN wallet.
 2. **GHS top-up** — Ghana Pay card for GHS wallet.
 3. **NGN send** — `/send` → Nigeria bank beneficiary → expect Nomba routing (upstream JWT must be valid).
-4. **Plaid link** — Send flow → Bank funding → link token (requires Plaid secrets).
+4. **Plaid link + live balances** — Bank tab → Connect with Plaid (CA/US). Balances refresh via `plaid-refresh-balances` (requires Plaid secrets). Manual NG/GH/KE links still show the eFinMoney wallet, not the bank’s ledger.
 5. **Gated routes** — `/cards`, `/pay-bills`, `/send/cpn` show Coming Soon with default flags.
 6. **Swychr sandbox** — `deno run --allow-env --allow-net scripts/swychr-smoke-test.ts` (requires `SWYCHR_EMAIL` / `SWYCHR_PASSWORD`).
 

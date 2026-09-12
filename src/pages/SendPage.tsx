@@ -267,7 +267,7 @@ const SendPage = () => {
       if (!user) return [] as any[];
       const { data, error } = await supabase
         .from("plaid_accounts")
-        .select("id,name,mask,subtype,currency_code, plaid_items(institution_name)")
+        .select("id,name,mask,subtype,currency_code,available_balance,current_balance,balances_iso_currency,balances_updated_at,plaid_items(institution_name)")
         .eq("user_id", user.id)
         .order("created_at", { ascending: false });
       if (error) throw error;
@@ -288,6 +288,9 @@ const SendPage = () => {
       currency_code: a.currency_code || 'CAD',
       is_active: true,
       created_at: '',
+      liveAvailable: a.available_balance,
+      liveCurrent: a.current_balance,
+      liveCurrency: a.balances_iso_currency || a.currency_code,
     }));
     return [...fromPlaid, ...linkedBankSources];
   }, [plaidAccounts, linkedBankSources, user?.id]);
@@ -3067,7 +3070,15 @@ const SendPage = () => {
                                         selectedWalletId={selectedWalletId || selectedWallet?.wallet_id}
                                         onWalletChange={(id) => setSelectedWalletId(id)}
                                         linkedCardCount={linkedCardCount}
-                                        bankSources={bankSources}
+                                        bankSources={bankSources.map((s) => ({
+                                          id: s.id,
+                                          display_name: s.display_name,
+                                          institution: s.institution,
+                                          last_four: s.last_four,
+                                          liveAvailable: "liveAvailable" in s ? (s as { liveAvailable?: number | null }).liveAvailable : null,
+                                          liveCurrent: "liveCurrent" in s ? (s as { liveCurrent?: number | null }).liveCurrent : null,
+                                          liveCurrency: "liveCurrency" in s ? (s as { liveCurrency?: string | null }).liveCurrency : (s as { currency_code?: string }).currency_code,
+                                        }))}
                                         selectedSourceId={selectedSourceId || bankSources[0]?.id}
                                         onSourceChange={setSelectedSourceId}
                                         onLinkBank={startPlaidLink}

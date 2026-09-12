@@ -62,7 +62,7 @@ const INTEGRATIONS: Array<{
   { key: "bambora", name: "Bambora (Worldline)", description: "CAD/USD card collect, saved profiles, Canadian EFT debit", category: "Payments — Global & Cards", envHints: ["BAMBORA_MERCHANT_ID", "BAMBORA_API_PASSCODE", "BAMBORA_PAYMENTS_PASSCODE", "BAMBORA_BATCH_PASSCODE"] },
   { key: "verto", name: "Verto", description: "Corporate FX, V-Pay and partner bank payouts", category: "Payments — Global & Cards", envHints: ["VERTO_CLIENT_ID", "VERTO_API_KEY"] },
   // Banking
-  { key: "plaid", name: "Plaid", description: "Bank account linking & balances (Canada domestic)", category: "Banking", envHints: ["PLAID_CLIENT_ID", "PLAID_SECRET"] },
+  { key: "plaid", name: "Plaid", description: "Bank linking (CA/US) and live balances on the Bank tab", category: "Banking", envHints: ["PLAID_CLIENT_ID", "PLAID_SECRET", "PLAID_ENV"] },
   { key: "interac", name: "Interac", description: "Canada domestic e-Transfer / EFT rail", category: "Banking", envHints: ["INTERAC_CLIENT_ID", "INTERAC_PRIVATE_JWK"] },
   // Crypto & Stablecoin
   { key: "circle", name: "Circle", description: "USDC corridor & CPN stablecoin payouts", category: "Crypto & Stablecoin", envHints: ["CIRCLE_API_KEY"] },
@@ -150,6 +150,7 @@ const EDGE_FUNCTIONS: Array<{ name: string; description: string; jwt: boolean; c
   // Plaid
   { name: "plaid-create-link-token",   description: "Create Plaid Link token",                  jwt: false, category: "Plaid" },
   { name: "plaid-exchange-token",      description: "Exchange Plaid public token",               jwt: false, category: "Plaid" },
+  { name: "plaid-refresh-balances",    description: "Live Plaid bank balances for Bank tab",     jwt: false, category: "Plaid" },
   // Interac
   { name: "vopay-interac-request",    description: "VoPay Interac Request Money → Loop Autodeposit", jwt: true,  category: "Interac" },
   { name: "vopay-webhook",            description: "VoPay Interac / EFT webhooks",                 jwt: false, category: "Interac" },
