@@ -193,6 +193,9 @@ const EDGE_FUNCTIONS: Array<{ name: string; description: string; jwt: boolean; c
   // Fincra
   { name: "fincra-initialize-checkout",description: "Initialize Fincra checkout",              jwt: true,  category: "Fincra" },
   { name: "fincra-payout",             description: "Initiates Fincra payouts",                jwt: false, category: "Fincra" },
+  { name: "partner-balance-fincra",    description: "Fincra disbursement wallet balances",     jwt: false, category: "Fincra" },
+  { name: "partner-rail-balances",     description: "Live Fincra/Verto/Nomba balances for Bank tab", jwt: false, category: "Fincra" },
+  { name: "linked-bank-rail-payout",   description: "Pay linked banks from Fincra/Nomba float", jwt: false, category: "Fincra" },
   { name: "fincra-verify-payment",     description: "Verify Fincra payment status",            jwt: true,  category: "Fincra" },
   { name: "fincra-webhook",            description: "Receives Fincra events",                  jwt: false, category: "Fincra" },
   { name: "wise-cad-interac",           description: "CAD Interac e-Transfer pay-in (Loop)",    jwt: true,  category: "Wise" },
@@ -219,6 +222,7 @@ const EDGE_FUNCTIONS: Array<{ name: string; description: string; jwt: boolean; c
   { name: "nomba-get-banks",           description: "Fetch bank list via Nomba",               jwt: true,  category: "Nomba" },
   { name: "nomba-payment-callback",    description: "Receives Nomba payment callbacks",        jwt: false, category: "Nomba" },
   { name: "nomba-payout",              description: "Nomba NGN + Global Payout disbursements", jwt: false, category: "Nomba" },
+  { name: "partner-balance-nomba",     description: "Nomba disbursement account balance",      jwt: false, category: "Nomba" },
   { name: "nomba-resolve-account",     description: "Validate bank account via Nomba",         jwt: true,  category: "Nomba" },
   { name: "nomba-transfer-conversion", description: "Nomba transfer conversion",               jwt: true,  category: "Nomba" },
   { name: "nomba-verify-transfer",     description: "Verify Nomba transfer status",            jwt: true,  category: "Nomba" },

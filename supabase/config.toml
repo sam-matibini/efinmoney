@@ -372,6 +372,12 @@ verify_jwt = false
 [functions.intra-ca-transfer-create]
 verify_jwt = false
 
+[functions.partner-rail-balances]
+verify_jwt = false
+
+[functions.linked-bank-rail-payout]
+verify_jwt = false
+
 [functions.virtual-card-ops]
 verify_jwt = false
 

@@ -80,9 +80,9 @@ function str(details: LinkedBankDetails, ...keys: string[]): string {
 
 export function railLabelFor(country: string, currency: string): string {
   const c = country.toUpperCase();
-  if (c === "NG") return "Nigerian bank (Nomba / Flutterwave)";
-  if (c === "GH") return "Ghanaian bank (Nomba / Flutterwave)";
-  if (c === "KE") return "Kenyan bank";
+  if (c === "NG") return "Nigerian bank (Fincra / Nomba)";
+  if (c === "GH") return "Ghanaian bank (Fincra / Nomba)";
+  if (c === "KE") return "Kenyan bank (Fincra / Nomba)";
   if (c === "CA") return "Canadian EFT";
   if (c === "US") return "US ACH / bank payout";
   if (c === "ZM") return "Zambian bank";

@@ -65,6 +65,14 @@ import {
 } from "@/lib/plaidLiveBalance";
 import { LOOP_CAD_INTERAC_ALIAS, LOOP_CAD_EFT, formatLoopEftLines } from "@/lib/loopCad";
 import BankPayInInstructions, { type PayInInstructions } from "@/components/payments/BankPayInInstructions";
+import PartnerRailsPanel from "@/components/payments/PartnerRailsPanel";
+import {
+  bestPayoutRail,
+  formatRailLine,
+  isPartnerPayoutCorridor,
+  type PartnerPayoutRailChoice,
+  type PartnerRailBalance,
+} from "@/lib/partnerRails";
 import type { NigeriaBank } from "@/lib/nombaNigeria";
 
 const fmt = (n: number, ccy: string) =>
@@ -117,6 +125,7 @@ export default function LinkedBanksCard() {
   const [linking, setLinking] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [payIn, setPayIn] = useState<PayInInstructions | null>(null);
+  const [payoutRail, setPayoutRail] = useState<PartnerPayoutRailChoice>("auto");
   const autoRefreshed = useRef(false);
 
   const isBusiness = !!business;
@@ -141,6 +150,25 @@ export default function LinkedBanksCard() {
     },
     enabled: !!user,
   });
+
+  const partnerRailsQuery = useQuery({
+    queryKey: ["partner_rail_balances", user?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase.functions.invoke("partner-rail-balances");
+      if (error) throw error;
+      const payload = data as {
+        success?: boolean;
+        rails?: PartnerRailBalance[];
+        fetched_at?: string;
+        error?: string;
+      };
+      if (payload?.error && !payload.success) throw new Error(payload.error);
+      return { rails: payload?.rails ?? [], fetchedAt: payload?.fetched_at ?? null };
+    },
+    enabled: Boolean(user && isBusiness),
+    staleTime: 30_000,
+  });
+  const partnerRails = partnerRailsQuery.data?.rails ?? [];
 
   const linked = useMemo<LinkedBank[]>(() => {
     const rows: LinkedBank[] = [];
@@ -416,6 +444,32 @@ export default function LinkedBanksCard() {
     setMode("instructions");
   };
 
+  const runPartnerRailPayout = async (to: LinkedBank, parsed: number, spec: ReturnType<typeof payoutSpecFor>) => {
+    const { data, error } = await supabase.functions.invoke("linked-bank-rail-payout", {
+      body: {
+        amount: parsed,
+        currency: to.currency,
+        rail: payoutRail === "wallet" ? "auto" : payoutRail,
+        wallet_id: walletFor(to.currency)?.wallet_id,
+        recipient_name: spec.recipientName,
+        recipient_account: spec.recipientAccount,
+        recipient_bank_code: spec.recipientBankCode,
+        recipient_bank_name: spec.recipientBankName,
+        recipient_country: spec.recipientCountry,
+      },
+    });
+    if (error) throw error;
+    const payload = data as { success?: boolean; error?: string; transfer_id?: string; message?: string; rail?: string };
+    if (payload?.error || payload?.success === false) {
+      throw new Error(payload.error || "Partner rail payout failed");
+    }
+    toast.success(payload.message || `Paid via ${payload.rail || "partner"} bank rails`);
+    void partnerRailsQuery.refetch();
+    setMode("closed");
+    setAmount("");
+    if (payload.transfer_id) navigate(`/transfers/${payload.transfer_id}`);
+  };
+
   const runBankFundedCad = async (from: LinkedBank, to: LinkedBank, parsed: number, fee: number) => {
     const spec = payoutSpecFor(to);
     const walletId = await ensureWalletId(to.currency);
@@ -487,6 +541,27 @@ export default function LinkedBanksCard() {
         setAmount("");
       } catch (e) {
         toast.error(e instanceof Error ? e.message : "Could not start bank-to-bank transfer");
+      } finally {
+        setBusy(false);
+      }
+      return;
+    }
+
+    const partnerEligible =
+      isBusiness &&
+      payoutRail !== "wallet" &&
+      isPartnerPayoutCorridor(to.country) &&
+      Boolean(spec.recipientAccount && spec.recipientBankCode);
+    const partnerCover = bestPayoutRail(partnerRails, to.currency, parsed, payoutRail);
+    const usePartnerRail =
+      partnerEligible && (payoutRail === "fincra" || payoutRail === "nomba" || Boolean(partnerCover));
+
+    if (usePartnerRail) {
+      setBusy(true);
+      try {
+        await runPartnerRailPayout(to, parsed, spec);
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : "Could not pay from partner rails");
       } finally {
         setBusy(false);
       }
@@ -685,6 +760,7 @@ export default function LinkedBanksCard() {
     setActive(bank);
     setPayTo(next === "pay" ? null : bank);
     setAmount("");
+    setPayoutRail("auto");
     setMode(next);
   };
 
@@ -701,9 +777,10 @@ export default function LinkedBanksCard() {
               {isBusiness ? "Company banks" : "Your banks"}
             </CardTitle>
             <p className="mt-1 text-sm text-muted-foreground">
-              Link Canada and US banks with Plaid for live balances. Move money between this
-              company’s accounts from the source bank when Plaid can debit it — otherwise withdraw
-              from the eFinMoney wallet. Top up a wallet from any linked bank.
+              Link Canada and US banks with Plaid for live balances. Nigerian, Ghanaian, and Kenyan
+              withdrawals pay from Fincra or Nomba partner wallets when those balances cover the
+              amount — no pre-funded eFinMoney wallet required. Plaid can debit CA/US banks for
+              same-company moves. Top up a wallet from any linked bank.
             </p>
           </div>
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center shrink-0">
@@ -735,6 +812,22 @@ export default function LinkedBanksCard() {
           </div>
         </CardHeader>
         <CardContent className="space-y-3">
+          {isBusiness && (
+            <PartnerRailsPanel
+              rails={partnerRails}
+              fetchedAt={partnerRailsQuery.data?.fetchedAt}
+              loading={partnerRailsQuery.isFetching}
+              error={
+                partnerRailsQuery.error instanceof Error
+                  ? partnerRailsQuery.error.message
+                  : partnerRailsQuery.error
+                    ? "Could not load partner balances."
+                    : null
+              }
+              onRefresh={() => void partnerRailsQuery.refetch()}
+            />
+          )}
+
           {!canMoveMoney && (
             <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4">
               <p className="text-sm font-semibold">Verify to send</p>
@@ -811,6 +904,13 @@ export default function LinkedBanksCard() {
                             eFinMoney wallet · {fmt(Number(wallet.balance), bank.currency)}
                           </p>
                         )}
+                        {isBusiness &&
+                          isPartnerPayoutCorridor(bank.country) &&
+                          formatRailLine(partnerRails, bank.currency, fmt) && (
+                            <p className="mt-1 text-xs text-muted-foreground">
+                              Partner rails · {formatRailLine(partnerRails, bank.currency, fmt)}
+                            </p>
+                          )}
                       </div>
                       {bank.source === "saved" && (
                         <Button
@@ -870,7 +970,9 @@ export default function LinkedBanksCard() {
             <p className="text-xs text-muted-foreground">
               Plaid (Canada & US) can debit the source bank for same-company transfers and wallet
               top-ups. Manual Nigerian, Ghanaian, and Kenyan links top up by sending to your
-              eFinMoney receive account; withdrawals still use the matching wallet.
+              eFinMoney receive account. Withdrawals pay from Fincra or Nomba when the partner
+              wallet covers the amount; otherwise the matching eFinMoney wallet is used. Verto
+              balances are shown for treasury but NUBAN payouts use Fincra or Nomba.
             </p>
           )}
         </CardContent>
@@ -994,9 +1096,14 @@ export default function LinkedBanksCard() {
             <DialogDescription>
               {mode === "pay" && active && payTo && shouldFundFromSourceBank(active, payTo) && payTo.currency === "CAD"
                 ? `We’ll debit ${active.institution} via Plaid/Loop and pay ${payTo.institution} when the deposit matches. You don’t need a pre-funded wallet.`
-                : mode === "pay"
-                  ? "Same-currency move between this company’s linked banks. Plaid Canada/US sources pull from the bank; otherwise we use the eFinMoney wallet."
-                  : `Same-currency payout from your eFinMoney wallet via ${active ? payoutSpecFor(active).railLabel : "our rails"}.`}
+                : isBusiness &&
+                    (mode === "pay" ? payTo : active) &&
+                    isPartnerPayoutCorridor((mode === "pay" ? payTo : active)!.country) &&
+                    payoutRail !== "wallet"
+                  ? `We’ll pay ${(mode === "pay" ? payTo : active)!.institution} from Fincra or Nomba over bank-to-bank rails. You don’t need a pre-funded eFinMoney wallet.`
+                  : mode === "pay"
+                    ? "Same-currency move between this company’s linked banks. Plaid Canada/US sources pull from the bank; otherwise we use the eFinMoney wallet."
+                    : `Same-currency payout from your eFinMoney wallet via ${active ? payoutSpecFor(active).railLabel : "our rails"}.`}
             </DialogDescription>
           </DialogHeader>
           {active && (
@@ -1044,6 +1151,22 @@ export default function LinkedBanksCard() {
                     Settlement still lands in your CAD wallet for a moment so we can pay the destination bank. You do not top up first.
                   </p>
                 </div>
+              ) : isBusiness &&
+                (mode === "pay" ? payTo : active) &&
+                isPartnerPayoutCorridor((mode === "pay" ? payTo : active)!.country) &&
+                payoutRail !== "wallet" ? (
+                <div className="rounded-lg border bg-muted/40 p-3 space-y-1">
+                  <p className="text-sm font-medium">Funded from partner rails</p>
+                  <p className="text-sm">
+                    {formatRailLine(partnerRails, (mode === "pay" ? payTo : active)!.currency, fmt) ||
+                      `No live ${(mode === "pay" ? payTo : active)!.currency} Fincra/Nomba balance yet`}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Cash leaves the Fincra or Nomba disbursement wallet. The eFinMoney ledger is not
+                    debited. Auto falls back to the company wallet if partner float cannot cover the
+                    amount. Pick Company wallet to force that path.
+                  </p>
+                </div>
               ) : (
                 <>
                   <p className="text-sm">
@@ -1076,6 +1199,28 @@ export default function LinkedBanksCard() {
                   )}
                 </>
               )}
+              {isBusiness &&
+                (mode === "pay" ? payTo : active) &&
+                isPartnerPayoutCorridor((mode === "pay" ? payTo : active)!.country) &&
+                !(mode === "pay" && payTo && shouldFundFromSourceBank(active, payTo) && payTo.currency === "CAD") && (
+                  <div className="space-y-2">
+                    <Label>Payout rail</Label>
+                    <Select
+                      value={payoutRail}
+                      onValueChange={(v) => setPayoutRail(v as PartnerPayoutRailChoice)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="auto">Auto — Fincra, then Nomba</SelectItem>
+                        <SelectItem value="fincra">Fincra</SelectItem>
+                        <SelectItem value="nomba">Nomba</SelectItem>
+                        <SelectItem value="wallet">Company wallet</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
               <p className="text-sm">
                 To:{" "}
                 <span className="font-medium">
