@@ -406,14 +406,18 @@ export function pickNombaInstitution(
 /** Nomba Global paymentMethod for bank-like rails. */
 export function nombaBankPaymentMethod(currency: string, country: string, method?: string | null): string {
   const m = String(method || "").toLowerCase();
+  const ccy = String(currency || "").toUpperCase();
+  const cc = String(country || "").toUpperCase();
   if (m.includes("interac")) return "INTERAC";
-  if (currency === "GBP" || country === "GB" || m.includes("faster")) return "FASTER_PAYMENTS";
-  if (currency === "EUR" || m.includes("sepa")) return "SEPA";
-  if (currency === "USD" && country === "US") {
-    if (m.includes("wire")) return "WIRE";
-    return "ACH";
-  }
-  if (currency === "CAD" && m.includes("eft")) return "EFT";
+  if (m.includes("wire") || m.includes("swift") || m.includes("chaps") || m.includes("fedwire")) return "WIRE";
+  if (m.includes("sepa")) return "SEPA";
+  if (m.includes("ach")) return "ACH";
+  if (m.includes("eft")) return "EFT";
+  if (m.includes("faster")) return "FASTER_PAYMENTS";
+  if (ccy === "USD" || cc === "US") return "ACH";
+  if (ccy === "CAD" || cc === "CA") return "EFT";
+  if (ccy === "GBP" || cc === "GB") return "FASTER_PAYMENTS";
+  if (ccy === "EUR" || cc === "EU" || cc === "DE" || cc === "FR" || cc === "NL") return "SEPA";
   return "BANK";
 }
 

@@ -52,12 +52,17 @@ import {
   COUNTRY_TO_CURRENCY,
   CURRENCY_TO_COUNTRY,
   LINK_COUNTRIES,
+  type BankPayoutMethod,
   type LinkedBank,
+  bankTransferMethodsFor,
+  canPayoutBank,
+  defaultBankTransferMethod,
   lastFourOf,
   payoutSpecFor,
   canPlaidDebit,
   shouldFundFromSourceBank,
 } from "@/lib/linkedBank";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
   formatLiveBankLine,
   isPlaidBalanceStale,
@@ -127,6 +132,9 @@ export default function LinkedBanksCard() {
   const [refreshing, setRefreshing] = useState(false);
   const [payIn, setPayIn] = useState<PayInInstructions | null>(null);
   const [payoutRail, setPayoutRail] = useState<PartnerPayoutRailChoice>("auto");
+  const [payoutMethod, setPayoutMethod] = useState<BankPayoutMethod>("bank");
+  const [interacEmail, setInteracEmail] = useState("");
+  const [interacPhone, setInteracPhone] = useState("");
   const autoRefreshed = useRef(false);
 
   const isBusiness = !!business;
@@ -457,6 +465,7 @@ export default function LinkedBanksCard() {
         recipient_bank_code: spec.recipientBankCode,
         recipient_bank_name: spec.recipientBankName,
         recipient_country: spec.recipientCountry,
+        payout_method: spec.payoutMethod,
       },
     });
     if (error) throw error;
@@ -471,8 +480,19 @@ export default function LinkedBanksCard() {
     if (payload.transfer_id) navigate(`/transfers/${payload.transfer_id}`);
   };
 
+  const overlayDest = (bank: LinkedBank): LinkedBank => ({
+    ...bank,
+    details: {
+      ...bank.details,
+      ...(interacEmail.trim() ? { interac_email: interacEmail.trim() } : {}),
+      ...(interacPhone.trim() ? { interac_phone: interacPhone.trim() } : {}),
+    },
+  });
+
+  const specForDest = (bank: LinkedBank) => payoutSpecFor(overlayDest(bank), payoutMethod);
+
   const runBankFundedCad = async (from: LinkedBank, to: LinkedBank, parsed: number, fee: number) => {
-    const spec = payoutSpecFor(to);
+    const spec = specForDest(to);
     const walletId = await ensureWalletId(to.currency);
     const transfer = await createTransfer.mutateAsync({
       sender_wallet_id: walletId,
@@ -481,7 +501,8 @@ export default function LinkedBanksCard() {
       recipient_bank_code: spec.recipientBankCode || undefined,
       recipient_bank_name: spec.recipientBankName || undefined,
       recipient_country: spec.recipientCountry,
-      transfer_type: "bank",
+      recipient_phone: spec.recipientPhone,
+      transfer_type: spec.payoutMethod === "interac" ? "domestic_canada" : "bank",
       payout_method: spec.payoutMethod,
       source_currency: to.currency,
       target_currency: to.currency,
@@ -517,7 +538,7 @@ export default function LinkedBanksCard() {
   };
 
   const runPayout = async (from: LinkedBank, to: LinkedBank) => {
-    const spec = payoutSpecFor(to);
+    const spec = specForDest(to);
     if (!spec.canPayout) {
       toast.error(spec.reason || "This corridor isn't available yet.");
       return;
@@ -601,7 +622,8 @@ export default function LinkedBanksCard() {
         recipient_bank_code: spec.recipientBankCode || undefined,
         recipient_bank_name: spec.recipientBankName || undefined,
         recipient_country: spec.recipientCountry,
-        transfer_type: "bank",
+        recipient_phone: spec.recipientPhone,
+        transfer_type: spec.payoutMethod === "interac" ? "domestic_canada" : "bank",
         payout_method: spec.payoutMethod,
         source_currency: to.currency,
         target_currency: to.currency,
@@ -744,9 +766,8 @@ export default function LinkedBanksCard() {
 
   const openMove = (bank: LinkedBank, next: "withdraw" | "pay" | "topup") => {
     if (next !== "topup") {
-      const spec = payoutSpecFor(bank);
-      if (next === "withdraw" && !spec.canPayout) {
-        toast.error(spec.reason || "Payout isn't available for this bank yet.");
+      if (next === "withdraw" && !canPayoutBank(bank)) {
+        toast.error(payoutSpecFor(bank).reason || "Payout isn't available for this bank yet.");
         return;
       }
     }
@@ -762,6 +783,9 @@ export default function LinkedBanksCard() {
     setPayTo(next === "pay" ? null : bank);
     setAmount("");
     setPayoutRail("auto");
+    setPayoutMethod(defaultBankTransferMethod(bank));
+    setInteracEmail(bank.details.interac_email || bank.details.email || "");
+    setInteracPhone(bank.details.interac_phone || bank.details.phone || "");
     setMode(next);
   };
 
@@ -875,7 +899,7 @@ export default function LinkedBanksCard() {
                           {bank.source === "plaid" && <Badge variant="secondary">Plaid</Badge>}
                           {bank.needsReconnect && <Badge variant="destructive">Reconnect</Badge>}
                           {spec.canPayout ? (
-                            <Badge>{spec.railLabel.split(" (")[0]}</Badge>
+                            <Badge>{bankTransferMethodsFor(bank.country, bank.currency).map((m) => m.label).join(" · ")}</Badge>
                           ) : (
                             <Badge variant="secondary">Link only</Badge>
                           )}
@@ -946,7 +970,7 @@ export default function LinkedBanksCard() {
                         size="sm"
                         variant="outline"
                         disabled={
-                          sameCurrencyBanks(bank).filter((b) => payoutSpecFor(b).canPayout).length === 0
+                          sameCurrencyBanks(bank).filter((b) => canPayoutBank(b)).length === 0
                         }
                         onClick={() => openMove(bank, "pay")}
                       >
@@ -1091,7 +1115,7 @@ export default function LinkedBanksCard() {
       </Dialog>
 
       <Dialog open={mode === "withdraw" || mode === "pay"} onOpenChange={(o) => !o && setMode("closed")}>
-        <DialogContent>
+        <DialogContent className="max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{mode === "withdraw" ? "Withdraw to your bank" : "Send to another linked bank"}</DialogTitle>
             <DialogDescription>
@@ -1104,7 +1128,11 @@ export default function LinkedBanksCard() {
                   ? `We’ll pay ${(mode === "pay" ? payTo : active)!.institution} from Fincra or Nomba over bank-to-bank rails. You don’t need a pre-funded eFinMoney wallet.`
                   : mode === "pay"
                     ? "Same-currency move between this company’s linked banks. Plaid Canada/US sources pull from the bank; otherwise we use the eFinMoney wallet."
-                    : `Same-currency payout from your eFinMoney wallet via ${active ? payoutSpecFor(active).railLabel : "our rails"}.`}
+                    : `Same-currency payout from your eFinMoney wallet via ${
+                        active
+                          ? payoutSpecFor(overlayDest(active), payoutMethod).railLabel
+                          : "our rails"
+                      }.`}
             </DialogDescription>
           </DialogHeader>
           {active && (
@@ -1114,19 +1142,24 @@ export default function LinkedBanksCard() {
                   <Label>Destination bank</Label>
                   <Select
                     value={payTo?.id || ""}
-                    onValueChange={(id) =>
-                      setPayTo(
-                        sameCurrencyBanks(active).filter((b) => payoutSpecFor(b).canPayout).find((b) => b.id === id) ||
-                          null,
-                      )
-                    }
+                    onValueChange={(id) => {
+                      const next =
+                        sameCurrencyBanks(active).filter((b) => canPayoutBank(b)).find((b) => b.id === id) ||
+                        null;
+                      setPayTo(next);
+                      if (next) {
+                        setPayoutMethod(defaultBankTransferMethod(next));
+                        setInteracEmail(next.details.interac_email || next.details.email || "");
+                        setInteracPhone(next.details.interac_phone || next.details.phone || "");
+                      }
+                    }}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Choose a linked bank" />
                     </SelectTrigger>
                     <SelectContent>
                       {sameCurrencyBanks(active)
-                        .filter((b) => payoutSpecFor(b).canPayout)
+                        .filter((b) => canPayoutBank(b))
                         .map((b) => (
                           <SelectItem key={b.id} value={b.id}>
                             {b.institution} ····{b.lastFour}
@@ -1228,6 +1261,65 @@ export default function LinkedBanksCard() {
                   {(mode === "pay" ? payTo : active)?.institution} ····{(mode === "pay" ? payTo : active)?.lastFour}
                 </span>
               </p>
+              {(() => {
+                const destBank = mode === "pay" ? payTo : active;
+                if (!destBank) return null;
+                const methods = bankTransferMethodsFor(destBank.country, destBank.currency);
+                const spec = payoutSpecFor(overlayDest(destBank), payoutMethod);
+                return (
+                  <div className="space-y-2">
+                    <Label>Transfer method</Label>
+                    <RadioGroup
+                      value={payoutMethod}
+                      onValueChange={(v) => setPayoutMethod(v as BankPayoutMethod)}
+                      className="gap-2"
+                    >
+                      {methods.map((m) => (
+                        <label
+                          key={m.id}
+                          className="flex items-start gap-3 rounded-lg border p-3 cursor-pointer has-[:checked]:border-primary"
+                        >
+                          <RadioGroupItem value={m.id} className="mt-0.5" />
+                          <span className="min-w-0">
+                            <span className="block text-sm font-medium">{m.label}</span>
+                            <span className="block text-xs text-muted-foreground">{m.description}</span>
+                            <span className="block text-xs text-muted-foreground mt-0.5">{m.typical}</span>
+                          </span>
+                        </label>
+                      ))}
+                    </RadioGroup>
+                    {payoutMethod === "interac" && (
+                      <div className="space-y-2 rounded-lg border bg-muted/40 p-3">
+                        <p className="text-xs text-muted-foreground">
+                          Interac Autodeposit needs a personal email or Canadian mobile. Do not use an eFinMoney login.
+                        </p>
+                        <div className="space-y-1">
+                          <Label htmlFor="b2b-interac-email">Interac email</Label>
+                          <Input
+                            id="b2b-interac-email"
+                            type="email"
+                            value={interacEmail}
+                            onChange={(e) => setInteracEmail(e.target.value)}
+                            placeholder="ap@company.com"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label htmlFor="b2b-interac-phone">Canadian mobile</Label>
+                          <Input
+                            id="b2b-interac-phone"
+                            value={interacPhone}
+                            onChange={(e) => setInteracPhone(e.target.value)}
+                            placeholder="+1 416 555 0100"
+                          />
+                        </div>
+                      </div>
+                    )}
+                    {!spec.canPayout && spec.reason && (
+                      <p className="text-xs text-destructive">{spec.reason}</p>
+                    )}
+                  </div>
+                );
+              })()}
               {mode === "pay" && (
                 <Button
                   type="button"
@@ -1262,7 +1354,18 @@ export default function LinkedBanksCard() {
               Cancel
             </Button>
             <Button
-              disabled={busy || !active || (mode === "pay" && !payTo)}
+              disabled={
+                busy
+                || !active
+                || (mode === "pay" && !payTo)
+                || Boolean(
+                  (mode === "pay" ? payTo : active)
+                  && !payoutSpecFor(
+                    overlayDest((mode === "pay" ? payTo : active)!),
+                    payoutMethod,
+                  ).canPayout,
+                )
+              }
               onClick={() => {
                 const dest = mode === "pay" ? payTo : active;
                 if (!active || !dest) return;

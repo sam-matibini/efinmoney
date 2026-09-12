@@ -75,6 +75,7 @@ Deno.serve(async (req) => {
       dest_bank_name?: string;
       dest_country?: string;
       note?: string;
+      payout_method?: string;
     };
 
     const amount = Number(body.amount);
@@ -152,7 +153,7 @@ Deno.serve(async (req) => {
         recipient_bank_name: String(body.recipient_bank_name || body.dest_bank_name || "").slice(0, 120) || null,
         recipient_country: country,
         transfer_type: "bank",
-        payout_method: "bank",
+        payout_method: String(body.payout_method || "bank").toLowerCase().slice(0, 32) || "bank",
         source_currency: currency,
         target_currency: currency,
         source_amount: amount,

@@ -596,11 +596,12 @@ Deno.serve(async (req) => {
       (transfer as Record<string, unknown>).transit_number || body.transit_number || "",
     ).trim();
 
-    // Canadian EFT: institution-transit-account stored in recipient_account.
+    // Canadian EFT / wire: institution-transit-account stored in recipient_account.
     const payoutMethodLower = String(transfer.payout_method || "").toLowerCase();
     if (
       targetCurrency === "CAD"
-      && (payoutMethodLower.includes("eft") || accountNumber.includes("-"))
+      && !payoutMethodLower.includes("interac")
+      && (payoutMethodLower.includes("eft") || payoutMethodLower.includes("wire") || accountNumber.includes("-"))
     ) {
       const rawParts = accountNumber.split("-");
       if (rawParts.length >= 3) {

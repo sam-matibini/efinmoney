@@ -1,4 +1,9 @@
-import { isLivePayoutCurrency } from "@/lib/retailPayoutFees";
+import { isLivePayoutCurrency } from "./retailPayoutFees.ts";
+import { CAD_BANK_EFT_ENABLED, INTERAC_ETRANSFER_ENABLED } from "./canadaPayoutRails.ts";
+import {
+  CAD_INTERAC_MISSING_CONTACT,
+  resolveCadInteracDestination,
+} from "./cadInteracPayout.ts";
 
 export const COUNTRY_TO_CURRENCY: Record<string, string> = {
   CA: "CAD",
@@ -56,16 +61,27 @@ export type LinkedBank = {
   plaidAccountId?: string;
 };
 
+/** Tokens stored on `transfers.payout_method` for bank-to-bank moves. */
+export type BankPayoutMethod = "bank" | "eft" | "interac" | "ach" | "wire";
+
+export type BankTransferMethodOption = {
+  id: BankPayoutMethod;
+  label: string;
+  description: string;
+  typical: string;
+};
+
 export type BankPayoutSpec = {
   canPayout: boolean;
   railLabel: string;
-  payoutMethod: "bank" | "eft";
+  payoutMethod: BankPayoutMethod;
   transferType: "bank";
   recipientAccount: string;
   recipientBankCode: string;
   recipientBankName: string;
   recipientName: string;
   recipientCountry: string;
+  recipientPhone?: string;
   currency: string;
   reason?: string;
 };
@@ -78,19 +94,143 @@ function str(details: LinkedBankDetails, ...keys: string[]): string {
   return "";
 }
 
-export function railLabelFor(country: string, currency: string): string {
+export function railLabelFor(country: string, currency: string, method?: BankPayoutMethod | string | null): string {
   const c = country.toUpperCase();
+  const m = String(method || "").toLowerCase();
+  if (m.includes("interac")) return "Interac e-Transfer";
+  if (m === "eft") return "Canadian EFT";
+  if (m === "ach") return "US ACH";
+  if (m === "wire") {
+    if (c === "CA") return "CAD wire";
+    if (c === "US") return "US wire";
+    if (c === "GB") return "Sterling wire";
+    if (c === "EU") return "SWIFT wire";
+    return `${currency} wire`;
+  }
   if (c === "NG") return "Nigerian bank (Fincra / Nomba)";
   if (c === "GH") return "Ghanaian bank (Fincra / Nomba)";
   if (c === "KE") return "Kenyan bank (Fincra / Nomba)";
   if (c === "CA") return "Canadian EFT";
-  if (c === "US") return "US ACH / bank payout";
+  if (c === "US") return "US ACH";
   if (c === "ZM") return "Zambian bank";
-  if (c === "GB") return "UK Faster Payments / bank";
+  if (c === "GB") return "UK Faster Payments";
+  if (c === "EU") return "SEPA";
   return `${currency} bank payout`;
 }
 
-export function payoutSpecFor(bank: LinkedBank): BankPayoutSpec {
+/** Bank-to-bank methods this destination country can actually send on. */
+export function bankTransferMethodsFor(country: string, _currency?: string): BankTransferMethodOption[] {
+  const c = (country || "").toUpperCase();
+  if (c === "CA") {
+    const opts: BankTransferMethodOption[] = [];
+    if (CAD_BANK_EFT_ENABLED) {
+      opts.push({
+        id: "eft",
+        label: "EFT",
+        description: "Canadian Electronic Funds Transfer to the linked institution, transit, and account numbers.",
+        typical: "1–2 business days",
+      });
+    }
+    if (INTERAC_ETRANSFER_ENABLED) {
+      opts.push({
+        id: "interac",
+        label: "Interac e-Transfer",
+        description: "Autodeposit to a personal email or Canadian mobile — not an eFinMoney login.",
+        typical: "Minutes",
+      });
+    }
+    opts.push({
+      id: "wire",
+      label: "Wire",
+      description: "Same-day CAD wire using the linked bank’s routing details.",
+      typical: "Same day",
+    });
+    return opts;
+  }
+  if (c === "US") {
+    return [
+      {
+        id: "ach",
+        label: "ACH",
+        description: "US Automated Clearing House to the linked ABA routing and account numbers.",
+        typical: "1–3 business days",
+      },
+      {
+        id: "wire",
+        label: "Wire",
+        description: "Domestic USD Fedwire using the same ABA routing and account.",
+        typical: "Same day",
+      },
+    ];
+  }
+  if (c === "GB") {
+    return [
+      {
+        id: "bank",
+        label: "Faster Payments",
+        description: "UK Faster Payments using sort code and account number.",
+        typical: "Near instant",
+      },
+      {
+        id: "wire",
+        label: "Wire / CHAPS",
+        description: "High-value sterling wire using the same sort code and account.",
+        typical: "Same day",
+      },
+    ];
+  }
+  if (c === "EU") {
+    return [
+      {
+        id: "bank",
+        label: "SEPA",
+        description: "Euro SEPA credit transfer to the IBAN.",
+        typical: "1 business day",
+      },
+      {
+        id: "wire",
+        label: "SWIFT wire",
+        description: "International wire using IBAN and BIC.",
+        typical: "1–3 business days",
+      },
+    ];
+  }
+  if (c === "NG") {
+    return [{
+      id: "bank",
+      label: "NUBAN transfer",
+      description: "Nigerian bank credit over Fincra or Nomba.",
+      typical: "Minutes",
+    }];
+  }
+  if (c === "GH" || c === "KE") {
+    return [{
+      id: "bank",
+      label: "Local bank transfer",
+      description: "In-country bank credit over Fincra or Nomba.",
+      typical: "Minutes to same day",
+    }];
+  }
+  return [{
+    id: "bank",
+    label: "Bank transfer",
+    description: `In-country ${c || "bank"} credit.`,
+    typical: "Same day",
+  }];
+}
+
+export function defaultBankTransferMethod(bank: Pick<LinkedBank, "country" | "currency">): BankPayoutMethod {
+  return bankTransferMethodsFor(bank.country, bank.currency)[0]?.id || "bank";
+}
+
+function fail(
+  base: Omit<BankPayoutSpec, "canPayout" | "reason">,
+  reason: string,
+): BankPayoutSpec {
+  return { ...base, canPayout: false, reason };
+}
+
+export function payoutSpecFor(bank: LinkedBank, method?: BankPayoutMethod | string | null): BankPayoutSpec {
   const country = (bank.country || CURRENCY_TO_COUNTRY[bank.currency] || "").toUpperCase();
   const currency = (bank.currency || COUNTRY_TO_CURRENCY[country] || "").toUpperCase();
   const d = bank.details;
@@ -99,6 +239,11 @@ export function payoutSpecFor(bank: LinkedBank): BankPayoutSpec {
   const account = str(d, "account_number", "iban");
   const bankCode = str(d, "bank_code", "routing_number", "sort_code", "institution_number");
   const live = isLivePayoutCurrency(currency);
+  const chosen = (String(method || "").toLowerCase() || defaultBankTransferMethod({ country, currency })) as BankPayoutMethod;
+  const payoutMethod: BankPayoutMethod =
+    chosen === "eft" || chosen === "interac" || chosen === "ach" || chosen === "wire" || chosen === "bank"
+      ? chosen
+      : defaultBankTransferMethod({ country, currency });
 
   const base = {
     transferType: "bank" as const,
@@ -106,72 +251,92 @@ export function payoutSpecFor(bank: LinkedBank): BankPayoutSpec {
     recipientBankName: bankName,
     recipientCountry: country || currency.slice(0, 2),
     currency,
-    railLabel: railLabelFor(country, currency),
+    payoutMethod,
+    railLabel: railLabelFor(country, currency, payoutMethod),
+    recipientAccount: account,
+    recipientBankCode: bankCode,
   };
 
   if (!live) {
-    return {
-      ...base,
-      canPayout: false,
-      payoutMethod: "bank",
-      recipientAccount: account,
-      recipientBankCode: bankCode,
-      reason: `In-country payouts aren't live for ${currency} yet.`,
-    };
+    return fail(base, `In-country payouts aren't live for ${currency} yet.`);
   }
 
   if (country === "CA") {
+    if (payoutMethod === "interac") {
+      const resolved = resolveCadInteracDestination({
+        interac_email: str(d, "interac_email"),
+        recipient_email: str(d, "interac_email", "email"),
+        recipient_phone: str(d, "interac_phone", "phone"),
+        recipient_account: str(d, "interac_email", "interac_phone"),
+      });
+      if (resolved.ok === false) {
+        return fail({ ...base, recipientAccount: "" }, resolved.error || CAD_INTERAC_MISSING_CONTACT);
+      }
+      return {
+        ...base,
+        canPayout: true,
+        recipientAccount: resolved.dest.consumerId,
+        recipientPhone: resolved.dest.phone || undefined,
+        recipientBankCode: "",
+      };
+    }
+
     const inst = str(d, "institution_number");
     const transit = str(d, "transit_number", "branch_number");
     const acct = str(d, "account_number");
     if (!inst || !transit || !acct) {
-      return {
-        ...base,
-        canPayout: false,
-        payoutMethod: "eft",
-        recipientAccount: acct,
-        recipientBankCode: inst,
-        reason: "Canadian EFT needs institution, transit, and account numbers.",
-      };
+      return fail(
+        { ...base, payoutMethod: payoutMethod === "wire" ? "wire" : "eft", recipientAccount: acct, recipientBankCode: inst },
+        payoutMethod === "wire"
+          ? "A CAD wire needs institution, transit, and account numbers."
+          : "Canadian EFT needs institution, transit, and account numbers.",
+      );
     }
     return {
       ...base,
       canPayout: true,
-      payoutMethod: "eft",
+      payoutMethod: payoutMethod === "wire" ? "wire" : "eft",
+      railLabel: railLabelFor(country, currency, payoutMethod === "wire" ? "wire" : "eft"),
       recipientAccount: `${inst}-${transit}-${acct}`,
       recipientBankCode: inst,
     };
   }
 
   if (!account) {
-    return {
-      ...base,
-      canPayout: false,
-      payoutMethod: "bank",
-      recipientAccount: "",
-      recipientBankCode: bankCode,
-      reason: "This bank is missing an account number.",
-    };
+    return fail(base, "This bank is missing an account number.");
   }
 
   if ((country === "NG" || country === "GH" || country === "KE") && !bankCode) {
+    return fail(base, "Pick the bank from the list so we can verify the account.");
+  }
+
+  if (country === "US") {
+    const routing = str(d, "routing_number", "institution_number");
+    if (!routing) {
+      return fail(base, "US ACH and wires need a 9-digit ABA routing number.");
+    }
+    const usMethod: BankPayoutMethod = payoutMethod === "wire" ? "wire" : "ach";
     return {
       ...base,
-      canPayout: false,
-      payoutMethod: "bank",
+      canPayout: true,
+      payoutMethod: usMethod,
+      railLabel: railLabelFor(country, currency, usMethod),
       recipientAccount: account,
-      recipientBankCode: "",
-      reason: "Pick the bank from the list so we can verify the account.",
+      recipientBankCode: routing,
     };
   }
 
   return {
     ...base,
     canPayout: true,
-    payoutMethod: "bank",
+    payoutMethod: payoutMethod === "wire" ? "wire" : payoutMethod === "bank" ? "bank" : defaultBankTransferMethod({ country, currency }),
     recipientAccount: account,
-    recipientBankCode: bankCode,
+    recipientBankCode: bankCode || str(d, "swift", "bic"),
   };
+}
+
+export function canPayoutBank(bank: LinkedBank): boolean {
+  return bankTransferMethodsFor(bank.country, bank.currency).some((m) => payoutSpecFor(bank, m.id).canPayout);
 }
 
 export function lastFourOf(account: string): string {
@@ -194,5 +359,5 @@ export function shouldFundFromSourceBank(from: LinkedBank, to: LinkedBank): bool
   if (from.id === to.id) return false;
   if (from.currency.toUpperCase() !== to.currency.toUpperCase()) return false;
   if (!canPlaidDebit(from)) return false;
-  return payoutSpecFor(to).canPayout;
+  return canPayoutBank(to);
 }

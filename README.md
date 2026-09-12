@@ -51,6 +51,7 @@ SQL: `supabase/migrations/20260912180000_activate_nomba_fincra_corridors.sql`. R
 The Bank account page (`/wallet/receive`) lists company or personal linked banks.
 
 - **Connect with Plaid** — Instant Auth for **Canada and the US**. After linking, eFinMoney stores EFT (CA) or ACH routing (US) numbers, caches live **available** / **current** balances, and can fund CAD wallet top-ups plus same-company bank-to-bank moves without a pre-funded wallet.
+- **Bank-to-bank methods** — Withdraw and same-company sends pick the payment method the destination country supports: **EFT**, **Interac e-Transfer**, or **wire** (Canada CAD via Nomba); **ACH** or **wire** (US); **Faster Payments** or **wire** (UK); **SEPA** or **SWIFT wire** (euro); local NUBAN / bank credit (NG/GH/KE via Fincra then Nomba). Interac still needs a personal Autodeposit email or Canadian mobile — not an eFinMoney login. CAD payouts stay Nomba (never Fincra payout, never M-Pesa).
 - **Partner rails (business)** — Live disbursement balances from **Fincra**, **Verto**, and **Nomba**. Withdraw and same-company sends to linked Nigerian, Ghanaian, or Kenyan banks pay from the Fincra or Nomba partner wallet (NUBAN / bank-to-bank). You do not need a pre-funded eFinMoney wallet when that float covers the amount. Verto is shown for treasury; NUBAN payouts use Fincra then Nomba.
 - **Bank transfer checkout** — Top up NGN/GHS from your bank app (`/wallet/topup?method=bank_checkout`), send to a recipient with **Pay with Bank** on Send (collect then payout), or move between company banks on this page. Fincra hosted `bank_transfer` for NGN; optional permanent receive account as a fallback.
 - **Top up wallet** — Send from the linked bank to the matching eFinMoney wallet (Loop Interac/EFT for CAD Plaid, Wise ACH details for USD, bank checkout / virtual account for NGN/GHS).
@@ -58,7 +59,7 @@ The Bank account page (`/wallet/receive`) lists company or personal linked banks
 - **Link bank** — manual corridor details (NG/GH/KE) or country-specific fields.
 - Manual Nigerian / Ghanaian / Kenyan links cannot be **debited** by Plaid. Those banks are **paid** from Fincra/Nomba float (or a funded wallet).
 
-Edge functions (deploy separately from GitHub): `plaid-create-link-token`, `plaid-exchange-token`, `plaid-refresh-balances`, `intra-ca-transfer-create`, `partner-rail-balances`, `linked-bank-rail-payout`. Secrets: `PLAID_CLIENT_ID`, `PLAID_SECRET`, `PLAID_ENV`, `FINCRA_SECRET_KEY`, `FINCRA_BUSINESS_ID`, `NOMBA_CLIENT_ID`, `NOMBA_CLIENT_SECRET`, `NOMBA_ACCOUNT_ID`, `VERTO_CLIENT_ID`, `VERTO_API_KEY`. SQL: `supabase/migrations/20260912030000_plaid_account_balances.sql`.
+Edge functions (deploy separately from GitHub): `plaid-create-link-token`, `plaid-exchange-token`, `plaid-refresh-balances`, `intra-ca-transfer-create`, `partner-rail-balances`, `linked-bank-rail-payout`, `execute-transfer`, `nomba-payout`. Secrets: `PLAID_CLIENT_ID`, `PLAID_SECRET`, `PLAID_ENV`, `FINCRA_SECRET_KEY`, `FINCRA_BUSINESS_ID`, `NOMBA_CLIENT_ID`, `NOMBA_CLIENT_SECRET`, `NOMBA_ACCOUNT_ID`, `VERTO_CLIENT_ID`, `VERTO_API_KEY`. SQL: `supabase/migrations/20260912030000_plaid_account_balances.sql`. Check: `npm run test:b2b-rails`.
 
 ## KYC and KYB
 

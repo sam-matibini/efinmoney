@@ -39,6 +39,20 @@ const SCHEMAS: Record<string, BankSchema> = {
       { key: "institution_number", label: "Institution number", helper: "3 digits", numeric: true, minLength: 3, maxLength: 3, required: true },
       { key: "transit_number", label: "Transit number", helper: "5 digits", numeric: true, minLength: 5, maxLength: 5, required: true },
       { key: "account_number", label: "Account number", numeric: true, minLength: 5, maxLength: 12, required: true },
+      {
+        key: "interac_email",
+        label: "Interac Autodeposit email",
+        helper: "Personal mailbox for e-Transfer payouts — not an eFinMoney login",
+        placeholder: "ap@company.com",
+        maxLength: 254,
+      },
+      {
+        key: "interac_phone",
+        label: "Interac mobile",
+        helper: "Canadian mobile if Autodeposit is registered to a phone",
+        placeholder: "+1 416 555 0100",
+        maxLength: 16,
+      },
     ],
   },
   US: {
@@ -46,7 +60,7 @@ const SCHEMAS: Record<string, BankSchema> = {
     label: "United States",
     fields: [
       BANK_NAME,
-      { key: "routing_number", label: "Routing number (ABA)", helper: "9 digits", numeric: true, minLength: 9, maxLength: 9, required: true },
+      { key: "routing_number", label: "Routing number (ABA)", helper: "9 digits — ACH and domestic wires", numeric: true, minLength: 9, maxLength: 9, required: true },
       { key: "account_number", label: "Account number", numeric: true, minLength: 4, maxLength: 17, required: true },
       { key: "account_type", label: "Account type", placeholder: "Checking or Savings", maxLength: 20 },
     ],
@@ -93,6 +107,7 @@ const SCHEMAS: Record<string, BankSchema> = {
       BANK_NAME,
       { key: "sort_code", label: "Sort code", helper: "6 digits", numeric: true, minLength: 6, maxLength: 6, required: true },
       { key: "account_number", label: "Account number", helper: "8 digits", numeric: true, minLength: 8, maxLength: 8, required: true },
+      { key: "swift", label: "SWIFT / BIC", helper: "Optional for sterling wires", uppercase: true, maxLength: 11 },
     ],
   },
   EU: {

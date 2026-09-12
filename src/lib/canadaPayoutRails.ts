@@ -5,13 +5,22 @@
 /** @deprecated Paysafe is retired for CAD. Always false. */
 export const PAYSAFE_PAYOUTS_ENABLED = false;
 
+function viteFlagOn(key: string, defaultOn = true): boolean {
+  try {
+    const env = (import.meta as { env?: Record<string, string | undefined> }).env;
+    const raw = env?.[key];
+    if (raw == null) return defaultOn;
+    return raw !== "false";
+  } catch {
+    return defaultOn;
+  }
+}
+
 /** Interac e-Transfer payout (CAD via Nomba). On unless explicitly disabled. */
-export const INTERAC_ETRANSFER_ENABLED =
-  import.meta.env.VITE_INTERAC_ETRANSFER_ENABLED !== "false";
+export const INTERAC_ETRANSFER_ENABLED = viteFlagOn("VITE_INTERAC_ETRANSFER_ENABLED");
 
 /** Canadian bank EFT payout (Nomba). On unless explicitly disabled. */
-export const CAD_BANK_EFT_ENABLED =
-  import.meta.env.VITE_CAD_EFT_PAYOUTS_ENABLED !== "false";
+export const CAD_BANK_EFT_ENABLED = viteFlagOn("VITE_CAD_EFT_PAYOUTS_ENABLED");
 
 /** Stripe-backed rails are not offered on Canada domestic send. */
 export const STRIPE_CANADA_RAILS_NOTE = "";
