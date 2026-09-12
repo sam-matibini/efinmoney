@@ -113,6 +113,8 @@ Deno.serve(async (req) => {
       sender_bank?: string;
       interac_reference?: string;
       provider_reference?: string;
+      amount_transferred?: number;
+      qty?: number;
       purpose?: string;
       transfer_id?: string;
       merchant_id?: string;
@@ -204,6 +206,21 @@ Deno.serve(async (req) => {
       }
       if (!FINCRA_INTERAC_OPEN_STATUSES.includes(String(current.status))) {
         return fail("intent_status", "This Interac request is no longer open.", 409, { status: current.status });
+      }
+
+      const expectedCents = Math.round(Number(current.amount) * 100);
+      const transferredCents = Math.round(Number(body.amount_transferred) * 100);
+      if (!Number.isFinite(transferredCents) || transferredCents !== expectedCents) {
+        return fail(
+          "amount_transferred",
+          `Amount transferred must match the checkout amount (CAD ${Number(current.amount).toFixed(2)}).`,
+          400,
+          { expected: current.amount, amount_transferred: body.amount_transferred },
+        );
+      }
+      const qty = Number(body.qty);
+      if (!Number.isFinite(qty) || qty !== 1) {
+        return fail("qty", "Quantity must be 1 (one order).", 400, { qty: body.qty });
       }
 
       try {

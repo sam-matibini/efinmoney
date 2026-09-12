@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { CheckCircle2, Copy, Loader2, ShieldCheck } from "lucide-react";
 import { CHECKOUT_STRINGS, type Lang } from "@/components/payments/checkoutStrings";
 import type { InteracIntent } from "@/components/payments/InteracCheckout";
+import { validateInteracConfirm } from "@/lib/interacConfirm";
 import { LOOP_CAD_EFT, type LoopCadEft } from "@/lib/loopCad";
 import { FINCRA_CAD_INTERAC_ALIAS } from "@/lib/fincraCad";
 import { cn } from "@/lib/utils";
@@ -23,8 +24,12 @@ interface Props {
   /** Cancel this request and return to the amount form. */
   onChangeAmount?: () => void;
   changingAmount?: boolean;
-  /** Submit the Interac confirmation reference (e.g. CAh9ECkx) and close checkout. */
-  onCompletePayment?: (interacReference: string) => void;
+  /** Submit Interac confirmation (reference + matching amount + qty 1) and close checkout. */
+  onCompletePayment?: (confirmation: {
+    interacReference: string;
+    amountTransferred: number;
+    qty: number;
+  }) => void;
   completing?: boolean;
   completeError?: string | null;
 }
@@ -48,6 +53,9 @@ export default function InteracStatusView({
 }: Props) {
   const t = CHECKOUT_STRINGS[lang];
   const [bankRef, setBankRef] = useState("");
+  const [amountTransferred, setAmountTransferred] = useState("");
+  const [qty, setQty] = useState("");
+  const [confirmError, setConfirmError] = useState<string | null>(null);
   const reference = intent.public_id || intent.reference;
   const amountLabel = `CAD ${Number(intent.amount).toFixed(2)}`;
   const eftDetails = eft ?? LOOP_CAD_EFT;
@@ -111,13 +119,13 @@ export default function InteracStatusView({
         `Ouvrez votre app bancaire et démarrez un Virement Interac.`,
         `Envoyez exactement ${amountLabel} à l'adresse Interac ci-dessous.`,
         `Collez le code de paiement dans le message. Autodeposit est activé — aucune question de sécurité.`,
-        `Entrez le numéro de référence Interac (ex. CAh9ECkx) et appuyez sur Terminer.`,
+        `Confirmez avec le numéro de référence Interac, le montant transféré (${amountLabel}) et la quantité 1, puis Terminer.`,
       ]
     : [
         `Open your banking app and start an Interac e-Transfer.`,
         `Send exactly ${amountLabel} to the Interac email below.`,
         `Paste the payment code in the message field. Autodeposit is on — no security question.`,
-        `Enter the Interac reference from your confirmation (for example CAh9ECkx) and tap Complete.`,
+        `Confirm with the Interac reference, the amount transferred (${amountLabel}), and qty 1, then tap Complete.`,
       ];
 
   return (
@@ -130,8 +138,8 @@ export default function InteracStatusView({
           </p>
           <p className="text-[12px] leading-relaxed text-emerald-800/90">
             {fr
-              ? "Après l'envoi, entrez le numéro de référence Interac de votre confirmation, puis appuyez sur Terminer."
-              : "After you send, enter the Interac reference from your confirmation, then tap Complete."}
+              ? "Après l'envoi, confirmez avec le numéro de référence, le montant transféré et la quantité 1, puis Terminer."
+              : "After you send, confirm with the Interac reference, amount transferred, and qty 1, then tap Complete."}
           </p>
         </div>
       </div>
@@ -147,52 +155,70 @@ export default function InteracStatusView({
         ))}
       </ol>
 
-      <div className="w-full min-w-0 space-y-1 overflow-hidden rounded-lg border">
-        <CopyRow
-          label={t.amountDue}
-          value={amountLabel}
-          onCopy={() =>
-            void copyText(
-              Number(intent.amount).toFixed(2),
-              fr ? "Montant copié" : "Amount copied",
-            )
-          }
-        />
-        {sendTo ? (
+      <div className="w-full min-w-0 overflow-hidden rounded-lg border">
+        <div className="space-y-1">
           <CopyRow
-            label={t.sendTo}
-            value={sendTo}
-            emphasize
+            label={t.amountDue}
+            value={amountLabel}
             onCopy={() =>
-              void copyText(sendTo, fr ? "Adresse copiée" : "Send-to address copied")
+              void copyText(
+                Number(intent.amount).toFixed(2),
+                fr ? "Montant copié" : "Amount copied",
+              )
             }
           />
-        ) : null}
-        <CopyRow
-          label={t.reference}
-          value={reference}
-          emphasize
-          onCopy={() =>
-            void copyText(reference, fr ? "Référence copiée" : "Reference copied")
-          }
-        />
+          {sendTo ? (
+            <CopyRow
+              label={t.sendTo}
+              value={sendTo}
+              emphasize
+              onCopy={() =>
+                void copyText(sendTo, fr ? "Adresse copiée" : "Send-to address copied")
+              }
+            />
+          ) : null}
+          <CopyRow
+            label={t.reference}
+            value={reference}
+            emphasize
+            onCopy={() =>
+              void copyText(reference, fr ? "Référence copiée" : "Reference copied")
+            }
+          />
+        </div>
+        <div className="border-t p-3">
+          <Button type="button" className="w-full" onClick={() => void copyDetails()}>
+            <Copy className="mr-2 h-4 w-4" />
+            {t.paymentDetails}
+          </Button>
+        </div>
       </div>
 
       {onCompletePayment && (
         <form
-          className="space-y-2 rounded-lg border border-pay-bank/30 bg-pay-bank/5 p-3.5"
+          className="space-y-3 rounded-lg border border-pay-bank/30 bg-pay-bank/5 p-3.5"
           onSubmit={(e) => {
             e.preventDefault();
-            const trimmed = bankRef.trim();
-            if (!/^[A-Za-z0-9][A-Za-z0-9-]{3,31}$/.test(trimmed)) {
-              toast.error(
-                fr
-                  ? "Entrez le numéro de référence Interac (ex. CAh9ECkx)."
-                  : "Enter the Interac reference from your confirmation (for example CAh9ECkx).",
-              );
+            const result = validateInteracConfirm(
+              {
+                interacReference: bankRef,
+                amountTransferredRaw: amountTransferred,
+                qtyRaw: qty,
+                checkoutAmount: Number(intent.amount),
+              },
+              lang,
+            );
+            if (!result.ok) {
+              setConfirmError(result.error);
+              toast.error(result.error);
               return;
             }
-            onCompletePayment(trimmed);
+            setConfirmError(null);
+            onCompletePayment({
+              interacReference: result.interacReference,
+              amountTransferred: result.amountTransferred,
+              qty: result.qty,
+            });
           }}
         >
           <div className="space-y-1.5">
@@ -200,7 +226,10 @@ export default function InteracStatusView({
             <Input
               id="interac-bank-ref"
               value={bankRef}
-              onChange={(e) => setBankRef(e.target.value)}
+              onChange={(e) => {
+                setBankRef(e.target.value);
+                setConfirmError(null);
+              }}
               placeholder={t.interacBankRefPlaceholder}
               autoComplete="off"
               spellCheck={false}
@@ -210,8 +239,52 @@ export default function InteracStatusView({
             />
             <p className="text-[11px] leading-relaxed text-muted-foreground">{t.interacBankRefHint}</p>
           </div>
-          {completeError ? <p className="text-sm text-destructive">{completeError}</p> : null}
-          <Button type="submit" className="w-full" disabled={completing || !bankRef.trim()}>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1fr)_5.5rem]">
+            <div className="space-y-1.5">
+              <Label htmlFor="interac-amount-transferred">{t.interacAmountTransferred}</Label>
+              <Input
+                id="interac-amount-transferred"
+                inputMode="decimal"
+                value={amountTransferred}
+                onChange={(e) => {
+                  setAmountTransferred(e.target.value);
+                  setConfirmError(null);
+                }}
+                placeholder={t.interacAmountTransferredPlaceholder}
+                autoComplete="off"
+                disabled={completing}
+                className="tabular-nums"
+              />
+              <p className="text-[11px] leading-relaxed text-muted-foreground">
+                {t.interacAmountTransferredHint(amountLabel)}
+              </p>
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="interac-qty">{t.interacQty}</Label>
+              <Input
+                id="interac-qty"
+                inputMode="numeric"
+                value={qty}
+                onChange={(e) => {
+                  setQty(e.target.value);
+                  setConfirmError(null);
+                }}
+                placeholder="1"
+                autoComplete="off"
+                disabled={completing}
+                className="tabular-nums"
+              />
+              <p className="text-[11px] leading-relaxed text-muted-foreground">{t.interacQtyHint}</p>
+            </div>
+          </div>
+          {(confirmError || completeError) ? (
+            <p className="text-sm text-destructive">{confirmError || completeError}</p>
+          ) : null}
+          <Button
+            type="submit"
+            className="w-full"
+            disabled={completing || !bankRef.trim() || !amountTransferred.trim() || !qty.trim()}
+          >
             {completing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
             {t.interacComplete}
           </Button>
@@ -226,11 +299,6 @@ export default function InteracStatusView({
           <Detail label={t.accountNumber} value={eftDetails.accountNumber} />
         </div>
       )}
-
-      <Button type="button" className="w-full" onClick={() => void copyDetails()}>
-        <Copy className="mr-2 h-4 w-4" />
-        {t.paymentDetails}
-      </Button>
 
       {onChangeAmount && (
         <div className="space-y-2">
@@ -257,8 +325,8 @@ export default function InteracStatusView({
       <p className="flex items-center justify-center gap-1.5 text-[11px] text-muted-foreground">
         <ShieldCheck className="h-3.5 w-3.5" />
         {fr
-          ? "Entrez le numéro de référence Interac, puis Terminer"
-          : "Enter the Interac reference, then Complete"}
+          ? "Confirmez la référence, le montant et la quantité 1, puis Terminer"
+          : "Confirm the reference, amount transferred, and qty 1, then Complete"}
       </p>
     </div>
   );

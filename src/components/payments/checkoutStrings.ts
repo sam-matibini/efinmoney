@@ -69,6 +69,12 @@ export const CHECKOUT_STRINGS = {
     interacBankRef: "e-Transfer reference number",
     interacBankRefHint: "From your bank confirmation after you send — for example CAh9ECkx.",
     interacBankRefPlaceholder: "CAh9ECkx",
+    interacAmountTransferred: "Amount transferred",
+    interacAmountTransferredHint: (amount: string) =>
+      `Enter the exact amount you sent. It must match ${amount} or Complete will not go through.`,
+    interacAmountTransferredPlaceholder: "0.00",
+    interacQty: "Qty",
+    interacQtyHint: "Enter 1 — this checkout is one order.",
     interacComplete: "Complete",
   },
   fr: {
@@ -135,6 +141,12 @@ export const CHECKOUT_STRINGS = {
     interacBankRef: "Numéro de référence Interac",
     interacBankRefHint: "Sur la confirmation de votre banque après l'envoi — par exemple CAh9ECkx.",
     interacBankRefPlaceholder: "CAh9ECkx",
+    interacAmountTransferred: "Montant transféré",
+    interacAmountTransferredHint: (amount: string) =>
+      `Entrez le montant exact envoyé. Il doit correspondre à ${amount}, sinon Terminer sera refusé.`,
+    interacAmountTransferredPlaceholder: "0,00",
+    interacQty: "Qté",
+    interacQtyHint: "Entrez 1 — cette commande est une seule ligne.",
     interacComplete: "Terminer",
   },
 } as const;

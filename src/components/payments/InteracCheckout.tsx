@@ -10,6 +10,7 @@ import InteracStatusView from "@/components/payments/InteracStatusView";
 import { CHECKOUT_STRINGS, type Lang } from "@/components/payments/checkoutStrings";
 import { productFeatures } from "@/lib/productFeatures";
 import { FINCRA_CAD_INTERAC_ALIAS } from "@/lib/fincraCad";
+import { cadAmountsMatch, INTERAC_CONFIRM_QTY } from "@/lib/interacConfirm";
 
 const FLOVIDE_FN = "flovide-cad-interac";
 /** Loop Bank CAD Interac Autodeposit. */
@@ -508,8 +509,33 @@ export default function InteracCheckout({
     };
   }, [intent?.id, intent?.status, onComplete, purpose, railFn]);
 
-  const completeWithReference = useCallback(async (interacReference: string) => {
+  const completeWithReference = useCallback(async (confirmation: {
+    interacReference: string;
+    amountTransferred: number;
+    qty: number;
+  }) => {
     if (!intent || completing || closedRef.current) return;
+
+    const expected = Number(intent.amount);
+    if (!cadAmountsMatch(confirmation.amountTransferred, expected)) {
+      const message =
+        lang === "fr"
+          ? `Le montant transféré doit correspondre au montant dû (CAD ${expected.toFixed(2)}).`
+          : `Amount transferred must match the checkout amount (CAD ${expected.toFixed(2)}).`;
+      setError(message);
+      toast.error(message);
+      return;
+    }
+    if (confirmation.qty !== INTERAC_CONFIRM_QTY) {
+      const message =
+        lang === "fr"
+          ? "La quantité doit être 1 (une commande)."
+          : "Quantity must be 1 (one order).";
+      setError(message);
+      toast.error(message);
+      return;
+    }
+
     setCompleting(true);
     setError(null);
 
@@ -530,7 +556,9 @@ export default function InteracCheckout({
     try {
       await supabase.rpc("complete_fincra_interac_etransfer", {
         p_intent_id: intent.id,
-        p_interac_reference: interacReference,
+        p_interac_reference: confirmation.interacReference,
+        p_amount_transferred: confirmation.amountTransferred,
+        p_qty: confirmation.qty,
       });
     } catch {
       /* RPC may not be applied yet */
@@ -541,8 +569,10 @@ export default function InteracCheckout({
         body: {
           action: "complete",
           intent_id: intent.id,
-          interac_reference: interacReference,
-          provider_reference: interacReference,
+          interac_reference: confirmation.interacReference,
+          provider_reference: confirmation.interacReference,
+          amount_transferred: confirmation.amountTransferred,
+          qty: confirmation.qty,
         },
       });
       const remoteError = fnError
@@ -580,7 +610,7 @@ export default function InteracCheckout({
     } finally {
       setCompleting(false);
     }
-  }, [intent, completing, railFn, purpose, onComplete, transferId]);
+  }, [intent, completing, railFn, purpose, onComplete, transferId, lang]);
 
   if (!bootstrapped) {
     return (
@@ -608,7 +638,7 @@ export default function InteracCheckout({
         onCompletePayment={
           DONE.includes(intent.status) || !isFincra
             ? undefined
-            : (ref) => void completeWithReference(ref)
+            : (confirmation) => void completeWithReference(confirmation)
         }
         completing={completing}
         completeError={error}
