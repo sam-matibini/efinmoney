@@ -65,25 +65,28 @@ const ManualKycForm = ({ onBack, onSubmitted }: Props) => {
 
     setSubmitting(true);
     const now = new Date().toISOString();
-    const payload: Record<string, unknown> = {
-      user_id: user.id,
-      verification_provider: "manual",
-      verification_status: "pending_review",
-      current_step: "identity",
-      id_document_type: idType,
-      id_document_country: country,
-      id_document_url: idUrl,
-      selfie_url: selfieUrl,
-      id_verification_status: "pending",
-      liveness_check_status: "pending",
-      submitted_at: now,
-    };
-    if (addressUrl) {
-      payload.address_document_url = addressUrl;
-      payload.address_verification_status = "pending";
-    }
-
-    const { error } = await supabase.from("kyc_verifications").upsert(payload, { onConflict: "user_id" });
+    const { error } = await supabase.from("kyc_verifications").upsert(
+      {
+        user_id: user.id,
+        verification_provider: "manual",
+        verification_status: "pending_review",
+        current_step: "identity",
+        id_document_type: idType,
+        id_document_country: country,
+        id_document_url: idUrl,
+        selfie_url: selfieUrl,
+        id_verification_status: "pending",
+        liveness_check_status: "pending",
+        submitted_at: now,
+        ...(addressUrl
+          ? {
+              address_document_url: addressUrl,
+              address_verification_status: "pending" as const,
+            }
+          : {}),
+      },
+      { onConflict: "user_id" },
+    );
     if (error) {
       setSubmitting(false);
       toast.error(error.message || "Could not submit. Please try again.");
