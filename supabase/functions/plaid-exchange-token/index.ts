@@ -60,10 +60,10 @@ Deno.serve(async (req) => {
     } catch (e) {
       console.warn("balance/get at link time failed; using accounts/get balances:", e);
     }
-    let auth_numbers: { eft?: unknown[] } = { eft: [] };
+    let auth_numbers: { eft?: unknown[]; ach?: unknown[] } = { eft: [], ach: [] };
     try {
       const a = await plaid("/auth/get", { access_token: exch.access_token });
-      auth_numbers = a.numbers || { eft: [] };
+      auth_numbers = a.numbers || { eft: [], ach: [] };
     } catch (e) {
       console.warn("auth/get failed (some sandbox institutions don't support auth):", e);
     }
@@ -80,6 +80,8 @@ Deno.serve(async (req) => {
     const accountsToInsert = (liveAccounts || []).map((acc: Record<string, unknown>) => {
       const eft = ((auth_numbers.eft || []) as Array<Record<string, unknown>>)
         .find((e) => e.account_id === acc.account_id);
+      const ach = ((auth_numbers.ach || []) as Array<Record<string, unknown>>)
+        .find((e) => e.account_id === acc.account_id);
       const balances = acc.balances as Record<string, unknown> | undefined;
       const live = plaidBalanceFields(balances, String(balances?.iso_currency_code || "CAD"));
       return {
@@ -91,9 +93,9 @@ Deno.serve(async (req) => {
         mask: acc.mask,
         subtype: acc.subtype,
         type: acc.type,
-        institution_number: eft?.institution ?? null,
+        institution_number: eft?.institution ?? ach?.routing ?? null,
         branch_number: eft?.branch ?? null,
-        account_number: eft?.account ?? null,
+        account_number: eft?.account ?? ach?.account ?? null,
         currency_code: live.currency_code,
         available_balance: live.available_balance,
         current_balance: live.current_balance,

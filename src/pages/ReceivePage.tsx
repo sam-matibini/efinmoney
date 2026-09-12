@@ -53,7 +53,7 @@ const ReceivePage = () => {
           <div>
             <h1 className="text-2xl font-display font-bold">Bank account</h1>
             <p className="text-muted-foreground">
-              Generate a receive account, or link a bank you already have and move money in-country through our payout rails. Plaid-connected Canada and US banks show live balances.
+              Generate a receive account, or link a bank you already have. Plaid connects Canada and US banks for live balances, wallet top-ups, and same-company transfers without pre-funding the wallet.
             </p>
           </div>
 

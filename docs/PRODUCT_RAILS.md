@@ -9,7 +9,7 @@ This document reflects the **UI simplification pass** (July 2026). Edge function
 | **Nomba** | NGN bank send; Global Payout default for KE/GH/UG/TZ/RW/XOF/XAF/CAD/GBP/EUR/USD/ZAR (not ZMW); NGN/CAD top-up | `SendPage`, `TopUpPage`, `NombaTopUpCard` | `nomba-collection`, `nomba-payout`, `nomba-payment-callback`, … |
 | **Ghana Pay** | GHS top-up, GHS MoMo send | `GhanaTopUpCard`, send flow for GHS | Ghana collection/payout functions (lenhub) |
 | **Swychr Connect** | Secondary payin, NGN payout fallback, vCards, airtime | `SwychrTopUpCard`, `SwychrCardsPanel`, `SwychrAirtimePanel` (flagged off) | `swychr-collection`, `swychr-payout`, `swychr-card-*`, `swychr-airtime-*` |
-| **Plaid** | Link CA/US banks + live balances on Bank tab | Bank tab (`LinkedBanksCard`), Send funding | `plaid-create-link-token`, `plaid-exchange-token`, `plaid-refresh-balances` |
+| **Plaid** | Link CA/US banks, live balances, CAD top-up, same-company bank moves | Bank tab (`LinkedBanksCard`), Send funding | `plaid-create-link-token`, `plaid-exchange-token`, `plaid-refresh-balances`, `intra-ca-transfer-create` |
 | **Wallets & FX** | Multi-currency balances, fiat exchange | `WalletsPage`, `ExchangePage` (Currency tab) | Wallet ledger, `execute-transfer` (wallet-funded) |
 
 Feature flags: `src/lib/productFeatures.ts` (override with `VITE_FEATURE_*` in `.env`).

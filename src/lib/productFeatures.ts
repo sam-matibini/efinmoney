@@ -14,7 +14,7 @@ function envFlag(name: string, defaultValue: boolean): boolean {
 export const productFeatures = {
   nombaNigeria: envFlag("VITE_FEATURE_NOMBA_NIGERIA", true),
   ghanaPay: envFlag("VITE_FEATURE_GHANA_PAY", false),
-  plaid: envFlag("VITE_FEATURE_PLAID", false),
+  plaid: envFlag("VITE_FEATURE_PLAID", true),
   canadaDomestic: envFlag("VITE_FEATURE_CANADA_DOMESTIC", false),
   stripe: false,
   /** Company Flutterwave — Africa collect + payout (NGN/GHS/KES/UGX/RWF/TZS/ZMW) + USD/CAD. */

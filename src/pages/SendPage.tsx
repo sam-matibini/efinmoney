@@ -301,7 +301,9 @@ const SendPage = () => {
   const startPlaidLink = useCallback(async () => {
     setPlaidLinking(true);
     try {
-      const { data, error } = await supabase.functions.invoke("plaid-create-link-token");
+      const { data, error } = await supabase.functions.invoke("plaid-create-link-token", {
+        body: { country_codes: ["CA", "US"] },
+      });
       if (error) throw error;
       if ((data as any)?.error) throw new Error((data as any).error);
       setPlaidLinkToken((data as any).link_token);

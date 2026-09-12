@@ -32,7 +32,9 @@ export default function LinkBankPanel({ walletCurrency, countryCode }: Props) {
   const startPlaid = useCallback(async () => {
     setLinking(true);
     try {
-      const { data, error } = await supabase.functions.invoke("plaid-create-link-token");
+      const { data, error } = await supabase.functions.invoke("plaid-create-link-token", {
+        body: { country_codes: PLAID_COUNTRIES.has(country) ? [country] : ["CA", "US"] },
+      });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
       setLinkToken(data.link_token);
@@ -41,7 +43,7 @@ export default function LinkBankPanel({ walletCurrency, countryCode }: Props) {
     } finally {
       setLinking(false);
     }
-  }, []);
+  }, [country]);
 
   const onPlaidSuccess = useCallback(
     async (public_token: string, metadata: { institution?: { name?: string } }) => {
@@ -72,8 +74,8 @@ export default function LinkBankPanel({ walletCurrency, countryCode }: Props) {
     <div className="space-y-4">
       <p className="text-sm text-muted-foreground">
         Link a bank with one tap, or add the account details manually. We ask only for what your
-        country's banking system requires. Plaid (Canada & US) also pulls a live bank balance for
-        transfer decisions.
+        country's banking system requires. Plaid Instant Auth (Canada & US) pulls a live balance
+        and can fund wallet top-ups or same-company bank moves.
       </p>
 
       <BankDetailsForm
@@ -94,7 +96,7 @@ export default function LinkBankPanel({ walletCurrency, countryCode }: Props) {
               ) : (
                 <Building2 className="mr-2 h-4 w-4" />
               )}
-              Link your bank instantly
+              Link your Canada / US bank
             </Button>
           ) : null
         }

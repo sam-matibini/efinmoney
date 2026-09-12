@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { usePlaidLink } from "react-plaid-link";
 import { toast } from "sonner";
 import {
+  ArrowDownToLine,
   ArrowRightLeft,
   Building2,
   Landmark,
@@ -40,6 +41,8 @@ import { useWallets } from "@/hooks/useWallets";
 import { useProfile } from "@/hooks/useProfile";
 import { useKyb } from "@/hooks/useKyb";
 import { useCreateTransfer } from "@/hooks/useTransfers";
+import { useCreateWallet } from "@/hooks/useCreateWallet";
+import { useVirtualAccounts, useCreateVirtualAccount } from "@/hooks/useVirtualAccounts";
 import { usePinGate } from "@/components/send/usePinGate";
 import { getCorridorBanks, resolveCorridorAccount } from "@/lib/flovide";
 import { PLAID_COUNTRIES, bankSchemaForCountry, validateBankFields } from "@/lib/bankFieldSchemas";
@@ -52,18 +55,36 @@ import {
   type LinkedBank,
   lastFourOf,
   payoutSpecFor,
+  canPlaidDebit,
+  shouldFundFromSourceBank,
 } from "@/lib/linkedBank";
 import {
   formatLiveBankLine,
   isPlaidBalanceStale,
   preferredLiveBalance,
 } from "@/lib/plaidLiveBalance";
+import { LOOP_CAD_INTERAC_ALIAS, LOOP_CAD_EFT, formatLoopEftLines } from "@/lib/loopCad";
+import BankPayInInstructions, { type PayInInstructions } from "@/components/payments/BankPayInInstructions";
 import type { NigeriaBank } from "@/lib/nombaNigeria";
 
 const fmt = (n: number, ccy: string) =>
   `${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${ccy}`;
 
-type Mode = "closed" | "add" | "withdraw" | "pay";
+function loopEftFields(raw: unknown): { label: string; value: string }[] {
+  const o = raw && typeof raw === "object" ? (raw as Record<string, string>) : {};
+  return formatLoopEftLines({
+    bankNumber: o.bankNumber || LOOP_CAD_EFT.bankNumber,
+    transitNumber: o.transitNumber || LOOP_CAD_EFT.transitNumber,
+    accountNumber: o.accountNumber || LOOP_CAD_EFT.accountNumber,
+  }).map((line) => {
+    const idx = line.indexOf(": ");
+    return idx === -1
+      ? { label: "EFT", value: line }
+      : { label: line.slice(0, idx), value: line.slice(idx + 2) };
+  });
+}
+
+type Mode = "closed" | "add" | "withdraw" | "pay" | "topup" | "plaidCountry" | "instructions";
 
 export default function LinkedBanksCard() {
   const { user } = useAuth();
@@ -73,6 +94,9 @@ export default function LinkedBanksCard() {
   const { data: wallets = [] } = useWallets();
   const { data: profile } = useProfile();
   const { business } = useKyb();
+  const { data: virtualAccounts = [] } = useVirtualAccounts();
+  const createWallet = useCreateWallet();
+  const createVa = useCreateVirtualAccount();
   const createTransfer = useCreateTransfer();
   const { requirePin, pinGate } = usePinGate();
 
@@ -92,6 +116,7 @@ export default function LinkedBanksCard() {
   const [linkToken, setLinkToken] = useState<string | null>(null);
   const [linking, setLinking] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [payIn, setPayIn] = useState<PayInInstructions | null>(null);
   const autoRefreshed = useRef(false);
 
   const isBusiness = !!business;
@@ -142,12 +167,14 @@ export default function LinkedBanksCard() {
           institution_number: a.institution_number || "",
           transit_number: a.branch_number || "",
           branch_number: a.branch_number || "",
+          routing_number: ccy === "USD" ? a.institution_number || "" : "",
         },
         liveAvailable: a.available_balance,
         liveCurrent: a.current_balance,
         liveCurrency: a.balances_iso_currency || a.currency_code,
         liveUpdatedAt: a.balances_updated_at,
         needsReconnect: itemStatus === "login_required",
+        plaidAccountId: a.id,
       });
     }
     for (const b of savedBanks) {
@@ -372,6 +399,68 @@ export default function LinkedBanksCard() {
   const walletFor = (ccy: string) =>
     wallets.find((w) => String(w.currency_code).toUpperCase() === ccy.toUpperCase());
 
+  const ensureWalletId = async (ccy: string): Promise<string> => {
+    const existing = walletFor(ccy);
+    if (existing) return existing.wallet_id;
+    const created = await createWallet.mutateAsync(ccy);
+    return created.id;
+  };
+
+  const vaFor = (ccy: string) =>
+    virtualAccounts.find(
+      (a) => a.status === "active" && String(a.currency_code).toUpperCase() === ccy.toUpperCase(),
+    );
+
+  const showPayIn = (data: PayInInstructions) => {
+    setPayIn(data);
+    setMode("instructions");
+  };
+
+  const runBankFundedCad = async (from: LinkedBank, to: LinkedBank, parsed: number, fee: number) => {
+    const spec = payoutSpecFor(to);
+    const walletId = await ensureWalletId(to.currency);
+    const transfer = await createTransfer.mutateAsync({
+      sender_wallet_id: walletId,
+      recipient_name: spec.recipientName,
+      recipient_account: spec.recipientAccount,
+      recipient_bank_code: spec.recipientBankCode || undefined,
+      recipient_bank_name: spec.recipientBankName || undefined,
+      recipient_country: spec.recipientCountry,
+      transfer_type: "bank",
+      payout_method: spec.payoutMethod,
+      source_currency: to.currency,
+      target_currency: to.currency,
+      source_amount: parsed,
+      target_amount: parsed,
+      exchange_rate: 1,
+      fee_amount: fee,
+      funding_source: "bank",
+    });
+    const { data, error } = await supabase.functions.invoke("intra-ca-transfer-create", {
+      body: {
+        plaid_account_id: from.plaidAccountId,
+        destination_wallet_id: walletId,
+        amount_cad: parsed + fee,
+        description: `Company bank move ${from.institution} → ${to.institution}`,
+        purpose: "transfer",
+        transfer_id: transfer.id,
+      },
+    });
+    if (error) throw error;
+    if (data?.error) throw new Error(data.error);
+    showPayIn({
+      heading: "Send from the source bank — not the wallet",
+      description: `Pay CAD from ${from.institution} ····${from.lastFour} to Loop Bank. When the deposit matches, we pay ${to.institution} ····${to.lastFour} automatically. You do not need a pre-funded CAD wallet.`,
+      fromBank: `${from.institution} ····${from.lastFour}`,
+      reference: data.reference,
+      fields: [
+        { label: "Interac Autodeposit", value: data.loop_alias || LOOP_CAD_INTERAC_ALIAS },
+        ...loopEftFields(data.loop_eft),
+      ],
+      note: data.message || "Include the payment reference in the Interac message or EFT memo.",
+    });
+  };
+
   const runPayout = async (from: LinkedBank, to: LinkedBank) => {
     const spec = payoutSpecFor(to);
     if (!spec.canPayout) {
@@ -382,11 +471,6 @@ export default function LinkedBanksCard() {
       toast.error("In-country transfers stay in the same currency. Use Send for FX.");
       return;
     }
-    const wallet = walletFor(to.currency);
-    if (!wallet) {
-      toast.error(`Open a ${to.currency} wallet first.`);
-      return;
-    }
     const parsed = Number(amount);
     if (!Number.isFinite(parsed) || parsed <= 0) {
       toast.error("Enter an amount.");
@@ -394,8 +478,41 @@ export default function LinkedBanksCard() {
     }
     const fee = retailPayoutFeeNative(to.currency)?.amount ?? 0;
     const total = parsed + fee;
+    const bankFunded = shouldFundFromSourceBank(from, to) && from.currency === "CAD";
+
+    if (bankFunded) {
+      setBusy(true);
+      try {
+        await runBankFundedCad(from, to, parsed, fee);
+        setAmount("");
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : "Could not start bank-to-bank transfer");
+      } finally {
+        setBusy(false);
+      }
+      return;
+    }
+
+    if (shouldFundFromSourceBank(from, to) && from.currency === "USD") {
+      const wallet = walletFor(to.currency);
+      const totalUsd = parsed + fee;
+      if (!wallet || Number(wallet.balance) < totalUsd) {
+        toast.message("Top up the USD wallet from this Plaid bank, then withdraw to the destination.");
+        setActive(from);
+        setMode("topup");
+        return;
+      }
+    }
+
+    const wallet = walletFor(to.currency);
+    if (!wallet) {
+      toast.error(`Open a ${to.currency} wallet first, or top up from a linked bank.`);
+      return;
+    }
     if (Number(wallet.balance) < total) {
-      toast.error(`Not enough ${to.currency} in your wallet (need ${fmt(total, to.currency)} including fees).`);
+      toast.error(
+        `Not enough ${to.currency} in your wallet (need ${fmt(total, to.currency)} including fees). Top up from a linked bank, or connect a Canadian bank with Plaid to pull from that account.`,
+      );
       return;
     }
 
@@ -436,11 +553,126 @@ export default function LinkedBanksCard() {
     }
   };
 
-  const openMove = (bank: LinkedBank, next: "withdraw" | "pay") => {
-    const spec = payoutSpecFor(bank);
-    if (next === "withdraw" && !spec.canPayout) {
-      toast.error(spec.reason || "Payout isn't available for this bank yet.");
+  const runTopup = async (bank: LinkedBank) => {
+    const parsed = Number(amount);
+    if (!Number.isFinite(parsed) || parsed <= 0) {
+      toast.error("Enter an amount.");
       return;
+    }
+    setBusy(true);
+    try {
+      const walletId = await ensureWalletId(bank.currency);
+
+      if (canPlaidDebit(bank) && bank.currency === "CAD") {
+        const { data, error } = await supabase.functions.invoke("intra-ca-transfer-create", {
+          body: {
+            plaid_account_id: bank.plaidAccountId,
+            destination_wallet_id: walletId,
+            amount_cad: parsed,
+            description: `Top up CAD wallet from ${bank.institution}`,
+            purpose: "topup",
+          },
+        });
+        if (error) throw error;
+        if (data?.error) throw new Error(data.error);
+        showPayIn({
+          heading: "Top up CAD from this bank",
+          description: `Send CAD from ${bank.institution} ····${bank.lastFour} to Loop Bank. Your CAD wallet credits when the deposit matches this reference.`,
+          fromBank: `${bank.institution} ····${bank.lastFour}`,
+          reference: data.reference,
+          fields: [
+            { label: "Interac Autodeposit", value: data.loop_alias || LOOP_CAD_INTERAC_ALIAS },
+            ...loopEftFields(data.loop_eft),
+          ],
+          note: data.message,
+        });
+        setAmount("");
+        return;
+      }
+
+      if (bank.currency === "USD") {
+        const { data, error } = await supabase.functions.invoke("wise-topup-intent", {
+          body: { action: "create", amount: parsed, wallet_id: walletId },
+        });
+        if (error) throw error;
+        if (data?.error) throw new Error(data.error);
+        const details = (data.account_details || []) as Array<{ label: string; value: string }>;
+        showPayIn({
+          heading: "Top up USD from this bank",
+          description: `Send USD from ${bank.institution} ····${bank.lastFour} using these deposit details. Include the reference so we can credit your USD wallet.`,
+          fromBank: `${bank.institution} ····${bank.lastFour}`,
+          reference: data.intent?.reference,
+          fields: details.length
+            ? details
+            : [{ label: "Instructions", value: (data.instructions || []).join(" ") || "Check Wise deposit details." }],
+          note: "ACH from a Plaid-linked US bank typically settles in 1–2 business days.",
+        });
+        setAmount("");
+        return;
+      }
+
+      if (bank.currency === "CAD") {
+        showPayIn({
+          heading: "Top up CAD from this bank",
+          description: `Send CAD from ${bank.institution} ····${bank.lastFour} to Loop Bank. Your CAD wallet credits when the deposit is matched.`,
+          fromBank: `${bank.institution} ····${bank.lastFour}`,
+          fields: [
+            { label: "Interac Autodeposit", value: LOOP_CAD_INTERAC_ALIAS },
+            ...loopEftFields(LOOP_CAD_EFT),
+          ],
+          note: "Connect this bank with Plaid (Canada) to attach a unique payment reference automatically.",
+        });
+        setAmount("");
+        return;
+      }
+
+      let va = vaFor(bank.currency);
+      if (!va && (bank.currency === "NGN" || bank.currency === "GHS")) {
+        await createVa.mutateAsync(bank.currency);
+        const { data } = await supabase
+          .from("virtual_accounts")
+          .select("*")
+          .eq("user_id", user!.id)
+          .eq("currency_code", bank.currency)
+          .eq("status", "active")
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        va = data as typeof va;
+      }
+      if (va) {
+        showPayIn({
+          heading: `Top up ${bank.currency} from this bank`,
+          description: `Send ${fmt(parsed, bank.currency)} from ${bank.institution} ····${bank.lastFour} to your eFinMoney receive account. The matching wallet credits when the deposit arrives.`,
+          fromBank: `${bank.institution} ····${bank.lastFour}`,
+          fields: [
+            { label: "Bank", value: va.bank_name },
+            { label: "Account", value: va.account_number },
+            { label: "Name", value: va.account_name },
+          ],
+        });
+        setAmount("");
+        return;
+      }
+
+      toast.message("Open Top up to finish this currency", {
+        description: `${bank.currency} deposits use the Top up page when a receive account is not on file.`,
+      });
+      navigate(`/wallet/topup?currency=${bank.currency}`);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not start wallet top-up");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const openMove = (bank: LinkedBank, next: "withdraw" | "pay" | "topup") => {
+    if (next !== "topup") {
+      const spec = payoutSpecFor(bank);
+      if (next === "withdraw" && !spec.canPayout) {
+        toast.error(spec.reason || "Payout isn't available for this bank yet.");
+        return;
+      }
     }
     if (!canMoveMoney) {
       toast.error(
@@ -469,9 +701,9 @@ export default function LinkedBanksCard() {
               {isBusiness ? "Company banks" : "Your banks"}
             </CardTitle>
             <p className="mt-1 text-sm text-muted-foreground">
-              Link a bank you already have. Withdraw from your eFinMoney wallet, or send to another
-              bank in the same country when that rail is live. Plaid-connected Canada and US accounts
-              show a live bank balance so you can decide transfers quickly.
+              Link Canada and US banks with Plaid for live balances. Move money between this
+              company’s accounts from the source bank when Plaid can debit it — otherwise withdraw
+              from the eFinMoney wallet. Top up a wallet from any linked bank.
             </p>
           </div>
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center shrink-0">
@@ -490,7 +722,7 @@ export default function LinkedBanksCard() {
             <Button
               type="button"
               variant="outline"
-              onClick={() => void startPlaid()}
+              onClick={() => setMode("plaidCountry")}
               disabled={linking}
             >
               {linking ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Building2 className="mr-2 h-4 w-4" />}
@@ -526,7 +758,9 @@ export default function LinkedBanksCard() {
               <p className="mt-2 text-sm font-medium">No banks linked yet</p>
               <p className="mt-1 text-sm text-muted-foreground">
                 Add the company’s operating account or your personal bank — Nigeria, Ghana, Kenya,
-                Canada, and the US are supported. Use Connect with Plaid for live Canada / US balances.
+                Canada, and the US are supported. Connect with Plaid to link Canadian and US accounts,
+                see live balances, top up a wallet, and send between company banks without pre-funding
+                the wallet.
               </p>
             </div>
           ) : (
@@ -593,6 +827,14 @@ export default function LinkedBanksCard() {
                       <Button
                         size="sm"
                         variant="outline"
+                        onClick={() => openMove(bank, "topup")}
+                      >
+                        <ArrowDownToLine className="mr-1.5 h-4 w-4" />
+                        Top up wallet
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
                         disabled={!spec.canPayout}
                         onClick={() => openMove(bank, "withdraw")}
                       >
@@ -602,7 +844,9 @@ export default function LinkedBanksCard() {
                       <Button
                         size="sm"
                         variant="outline"
-                        disabled={!spec.canPayout || sameCurrencyBanks(bank).length === 0}
+                        disabled={
+                          sameCurrencyBanks(bank).filter((b) => payoutSpecFor(b).canPayout).length === 0
+                        }
                         onClick={() => openMove(bank, "pay")}
                       >
                         <ArrowRightLeft className="mr-1.5 h-4 w-4" />
@@ -624,9 +868,9 @@ export default function LinkedBanksCard() {
           )}
           {linked.some((b) => b.source === "saved") && (
             <p className="text-xs text-muted-foreground">
-              Wallet amounts are your eFinMoney balance used to pay out. Live checking and savings
-              balances appear on banks connected with Plaid (Canada & US). Nigerian, Ghanaian, and
-              Kenyan corridor links are not covered by Plaid.
+              Plaid (Canada & US) can debit the source bank for same-company transfers and wallet
+              top-ups. Manual Nigerian, Ghanaian, and Kenyan links top up by sending to your
+              eFinMoney receive account; withdrawals still use the matching wallet.
             </p>
           )}
         </CardContent>
@@ -748,7 +992,11 @@ export default function LinkedBanksCard() {
           <DialogHeader>
             <DialogTitle>{mode === "withdraw" ? "Withdraw to your bank" : "Send to another linked bank"}</DialogTitle>
             <DialogDescription>
-              Same-currency, in-country payout from your eFinMoney wallet via {active ? payoutSpecFor(active).railLabel : "our rails"}.
+              {mode === "pay" && active && payTo && shouldFundFromSourceBank(active, payTo) && payTo.currency === "CAD"
+                ? `We’ll debit ${active.institution} via Plaid/Loop and pay ${payTo.institution} when the deposit matches. You don’t need a pre-funded wallet.`
+                : mode === "pay"
+                  ? "Same-currency move between this company’s linked banks. Plaid Canada/US sources pull from the bank; otherwise we use the eFinMoney wallet."
+                  : `Same-currency payout from your eFinMoney wallet via ${active ? payoutSpecFor(active).railLabel : "our rails"}.`}
             </DialogDescription>
           </DialogHeader>
           {active && (
@@ -758,47 +1006,75 @@ export default function LinkedBanksCard() {
                   <Label>Destination bank</Label>
                   <Select
                     value={payTo?.id || ""}
-                    onValueChange={(id) => setPayTo(sameCurrencyBanks(active).find((b) => b.id === id) || null)}
+                    onValueChange={(id) =>
+                      setPayTo(
+                        sameCurrencyBanks(active).filter((b) => payoutSpecFor(b).canPayout).find((b) => b.id === id) ||
+                          null,
+                      )
+                    }
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Choose a linked bank" />
                     </SelectTrigger>
                     <SelectContent>
-                      {sameCurrencyBanks(active).map((b) => (
-                        <SelectItem key={b.id} value={b.id}>
-                          {b.institution} ····{b.lastFour}
-                        </SelectItem>
-                      ))}
+                      {sameCurrencyBanks(active)
+                        .filter((b) => payoutSpecFor(b).canPayout)
+                        .map((b) => (
+                          <SelectItem key={b.id} value={b.id}>
+                            {b.institution} ····{b.lastFour}
+                          </SelectItem>
+                        ))}
                     </SelectContent>
                   </Select>
                 </div>
               )}
-              <p className="text-sm">
-                From eFinMoney wallet:{" "}
-                <span className="font-medium">
-                  {walletFor(active.currency)
-                    ? fmt(Number(walletFor(active.currency)!.balance), active.currency)
-                    : `No ${active.currency} wallet`}
-                </span>
-              </p>
-              {active.source === "plaid" && (
+              {mode === "pay" && payTo && shouldFundFromSourceBank(active, payTo) && payTo.currency === "CAD" ? (
                 <div className="rounded-lg border bg-muted/40 p-3 space-y-1">
-                  <p className="text-sm">
-                    Bank available:{" "}
-                    <span className="font-medium">
-                      {preferredLiveBalance(active.liveAvailable, active.liveCurrent) != null
-                        ? fmt(
-                            preferredLiveBalance(active.liveAvailable, active.liveCurrent)!,
-                            (active.liveCurrency || active.currency).toUpperCase(),
-                          )
-                        : "Not available yet"}
-                    </span>
-                  </p>
+                  <p className="text-sm font-medium">Funded from {active.institution} ····{active.lastFour}</p>
+                  {preferredLiveBalance(active.liveAvailable, active.liveCurrent) != null && (
+                    <p className="text-sm">
+                      Bank available:{" "}
+                      {fmt(
+                        preferredLiveBalance(active.liveAvailable, active.liveCurrent)!,
+                        (active.liveCurrency || active.currency).toUpperCase(),
+                      )}
+                    </p>
+                  )}
                   <p className="text-xs text-muted-foreground">
-                    Use the live bank figure to decide how much to move. This payout still debits
-                    your eFinMoney wallet, not the bank ledger.
+                    Settlement still lands in your CAD wallet for a moment so we can pay the destination bank. You do not top up first.
                   </p>
                 </div>
+              ) : (
+                <>
+                  <p className="text-sm">
+                    From eFinMoney wallet:{" "}
+                    <span className="font-medium">
+                      {walletFor(active.currency)
+                        ? fmt(Number(walletFor(active.currency)!.balance), active.currency)
+                        : `No ${active.currency} wallet`}
+                    </span>
+                  </p>
+                  {active.source === "plaid" && (
+                    <div className="rounded-lg border bg-muted/40 p-3 space-y-1">
+                      <p className="text-sm">
+                        Bank available:{" "}
+                        <span className="font-medium">
+                          {preferredLiveBalance(active.liveAvailable, active.liveCurrent) != null
+                            ? fmt(
+                                preferredLiveBalance(active.liveAvailable, active.liveCurrent)!,
+                                (active.liveCurrency || active.currency).toUpperCase(),
+                              )
+                            : "Not available yet"}
+                        </span>
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {mode === "withdraw"
+                          ? "This withdrawal debits the eFinMoney wallet, not the bank ledger."
+                          : "Connect Plaid on a Canadian source bank to pull from that account instead of the wallet."}
+                      </p>
+                    </div>
+                  )}
+                </>
               )}
               <p className="text-sm">
                 To:{" "}
@@ -855,6 +1131,139 @@ export default function LinkedBanksCard() {
               {busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
               Confirm
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={mode === "topup"} onOpenChange={(o) => !o && setMode("closed")}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Top up wallet from this bank</DialogTitle>
+            <DialogDescription>
+              {active?.source === "plaid" && active.currency === "CAD"
+                ? "We’ll give you Loop Bank details so this Plaid-linked Canadian account can fund your CAD wallet."
+                : active?.currency === "USD"
+                  ? "Send USD from this linked bank using the deposit details we generate for your USD wallet."
+                  : "Send from this linked bank to your eFinMoney receive account for this currency."}
+            </DialogDescription>
+          </DialogHeader>
+          {active && (
+            <div className="space-y-3">
+              <p className="text-sm">
+                From: <span className="font-medium">{active.institution} ····{active.lastFour}</span>
+              </p>
+              {active.source === "plaid" && preferredLiveBalance(active.liveAvailable, active.liveCurrent) != null && (
+                <p className="text-sm text-muted-foreground">
+                  Bank available{" "}
+                  {fmt(
+                    preferredLiveBalance(active.liveAvailable, active.liveCurrent)!,
+                    (active.liveCurrency || active.currency).toUpperCase(),
+                  )}
+                </p>
+              )}
+              <p className="text-sm">
+                To:{" "}
+                <span className="font-medium">
+                  {walletFor(active.currency)
+                    ? `eFinMoney ${active.currency} wallet · ${fmt(Number(walletFor(active.currency)!.balance), active.currency)}`
+                    : `New ${active.currency} wallet (we’ll open one)`}
+                </span>
+              </p>
+              <div className="space-y-2">
+                <Label>Amount ({active.currency})</Label>
+                <Input
+                  inputMode="decimal"
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                  placeholder="0.00"
+                />
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setMode("closed")}>
+              Cancel
+            </Button>
+            <Button
+              disabled={busy || !active}
+              onClick={() => {
+                if (!active) return;
+                const parsed = Number(amount);
+                requirePin(
+                  () => runTopup(active),
+                  Number.isFinite(parsed) ? fmt(parsed, active.currency) : undefined,
+                  `Top up from ${active.institution}`,
+                );
+              }}
+            >
+              {busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              Continue
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={mode === "plaidCountry"} onOpenChange={(o) => !o && setMode("closed")}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Connect a Canada or US bank</DialogTitle>
+            <DialogDescription>
+              Plaid Instant Auth links the login, pulls a live balance, and lets you top up or send
+              between this company’s accounts without pre-funding the wallet (Canada).
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-2">
+            <Button
+              variant="outline"
+              className="justify-start h-auto py-3"
+              disabled={linking}
+              onClick={() => {
+                setMode("closed");
+                void startPlaid(["CA"]);
+              }}
+            >
+              <Building2 className="mr-2 h-4 w-4" />
+              Canada — CAD checking / savings
+            </Button>
+            <Button
+              variant="outline"
+              className="justify-start h-auto py-3"
+              disabled={linking}
+              onClick={() => {
+                setMode("closed");
+                void startPlaid(["US"]);
+              }}
+            >
+              <Building2 className="mr-2 h-4 w-4" />
+              United States — USD ACH
+            </Button>
+            <Button
+              variant="outline"
+              className="justify-start h-auto py-3"
+              disabled={linking}
+              onClick={() => {
+                setMode("closed");
+                void startPlaid(["CA", "US"]);
+              }}
+            >
+              <Building2 className="mr-2 h-4 w-4" />
+              Both Canada and the US
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={mode === "instructions"} onOpenChange={(o) => !o && setMode("closed")}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Send from the linked bank</DialogTitle>
+            <DialogDescription>
+              Complete the transfer in your banking app using these details.
+            </DialogDescription>
+          </DialogHeader>
+          {payIn && <BankPayInInstructions data={payIn} />}
+          <DialogFooter>
+            <Button onClick={() => setMode("closed")}>Done</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

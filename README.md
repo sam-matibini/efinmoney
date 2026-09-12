@@ -39,12 +39,13 @@ Send checkout and CAD wallet collections take Interac Autodeposit through Fincra
 
 The Bank account page (`/wallet/receive`) lists company or personal linked banks.
 
+- **Connect with Plaid** — Instant Auth for **Canada and the US**. After linking, eFinMoney stores EFT (CA) or ACH routing (US) numbers, caches live **available** / **current** balances, and can fund CAD wallet top-ups plus same-company bank-to-bank moves without a pre-funded wallet.
+- **Top up wallet** — Send from the linked bank to the matching eFinMoney wallet (Loop Interac/EFT for CAD Plaid, Wise ACH details for USD, virtual account for NGN/GHS).
+- **Send to another bank** — When the source is a Plaid Canadian bank, we debit that bank (Loop pay-in) and pay the destination once the deposit matches. Other corridors still use the wallet if it has a balance.
 - **Link bank** — manual corridor details (NG/GH/KE) or country-specific fields.
-- **Connect with Plaid** — Instant Auth for Canada and the US. After linking, eFinMoney calls Plaid `/accounts/balance/get` and caches **available** and **current** balances on `plaid_accounts`.
-- The card shows **Bank available** (live extract) next to **eFinMoney wallet** (what in-country payouts actually debit). Refresh pulls a new extract; Plaid items are not re-fetched more than once per minute unless you force refresh.
-- Manual Nigerian / Ghanaian / Kenyan links cannot show a live bank ledger — Plaid does not cover those institutions. Those rows still show the matching eFinMoney wallet.
+- Manual Nigerian / Ghanaian / Kenyan links cannot be debited by Plaid. Those rows top up by sending to your eFinMoney receive account.
 
-Edge functions (deploy separately from GitHub): `plaid-create-link-token`, `plaid-exchange-token`, `plaid-refresh-balances`. Secrets: `PLAID_CLIENT_ID`, `PLAID_SECRET`, `PLAID_ENV`. SQL: `supabase/migrations/20260912030000_plaid_account_balances.sql`.
+Edge functions (deploy separately from GitHub): `plaid-create-link-token`, `plaid-exchange-token`, `plaid-refresh-balances`, `intra-ca-transfer-create`. Secrets: `PLAID_CLIENT_ID`, `PLAID_SECRET`, `PLAID_ENV`. SQL: `supabase/migrations/20260912030000_plaid_account_balances.sql`.
 
 ## KYC and KYB
 

@@ -52,6 +52,8 @@ export type LinkedBank = {
   liveCurrency?: string | null;
   liveUpdatedAt?: string | null;
   needsReconnect?: boolean;
+  /** `plaid_accounts.id` when this row came from Plaid. */
+  plaidAccountId?: string;
 };
 
 export type BankPayoutSpec = {
@@ -175,4 +177,22 @@ export function payoutSpecFor(bank: LinkedBank): BankPayoutSpec {
 export function lastFourOf(account: string): string {
   const digits = account.replace(/\s+/g, "");
   return digits.slice(-4) || "0000";
+}
+
+/** Plaid Auth items in Canada/US can fund a pay-in without a pre-funded wallet. */
+export function canPlaidDebit(bank: LinkedBank): boolean {
+  if (bank.source !== "plaid" || !bank.plaidAccountId) return false;
+  const c = (bank.country || "").toUpperCase();
+  return c === "CA" || c === "US";
+}
+
+/**
+ * Same-company, same-currency move that should debit the source bank (Plaid)
+ * instead of requiring the eFinMoney wallet to already hold the cash.
+ */
+export function shouldFundFromSourceBank(from: LinkedBank, to: LinkedBank): boolean {
+  if (from.id === to.id) return false;
+  if (from.currency.toUpperCase() !== to.currency.toUpperCase()) return false;
+  if (!canPlaidDebit(from)) return false;
+  return payoutSpecFor(to).canPayout;
 }
