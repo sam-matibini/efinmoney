@@ -5,6 +5,7 @@ import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.45.0
 import { filterLiveRails, isRetiredRail } from "./retiredPartners.ts";
 import { defaultPayoutRails, fincraPayoutSupported, isCanadaCadPayout, nombaPayoutSupported, sanitizeCanadaPayoutRails } from "./nomba-payout-corridors.ts";
 import { nombaApiConfigured } from "./nomba-api.ts";
+import { orderCadCollectRails, DEFAULT_CAD_COLLECT_RAILS } from "./cad-collect-rails.ts";
 
 export type RailDirection = "collect" | "payout";
 
@@ -173,9 +174,9 @@ export async function resolveCorridorRails(
   }
 
   if (direction === "collect" && (ccy === "CAD" || cc === "CA")) {
-    rails = rails.filter((r) => r !== "flovide" && r !== "paysafe" && r !== "flovide_interac");
+    rails = orderCadCollectRails(rails);
     if (!rails.length) {
-      rails = ["nomba", "fincra"];
+      rails = [...DEFAULT_CAD_COLLECT_RAILS];
       source = source === "none" ? "default" : source;
     }
   }
@@ -280,5 +281,7 @@ export function payoutFnForRail(rail: string): string | null {
 }
 
 export function collectMethodForRail(rail: string): string | null {
-  return COLLECT_METHOD_BY_RAIL[rail.trim().toLowerCase()] || null;
+  const id = rail.trim().toLowerCase();
+  if (id === "fincra_interac") return "interac";
+  return COLLECT_METHOD_BY_RAIL[id] || null;
 }

@@ -10,6 +10,10 @@ import {
   isNombaEmailBlockedError,
   nombaCheckoutEmailCandidates,
 } from "./nomba-customer-email.ts";
+import {
+  isNombaPaymentMethodError,
+  type NombaCheckoutMethod,
+} from "./nomba-checkout-methods.ts";
 
 export type NombaApiConfig = {
   clientId: string;
@@ -167,6 +171,8 @@ export async function createNombaCheckoutOrder(params: {
   /** Optional outlet/sub-account ID to credit (NOT the parent accountId header). */
   subAccountId?: string;
   meta?: Record<string, string>;
+  /** Nomba Checkout methods (Card, Transfer, Intl Card, Intl Transfer, …). */
+  allowedPaymentMethods?: NombaCheckoutMethod[] | string[];
 }): Promise<
   | { ok: true; checkoutLink: string; orderReference: string }
   | { ok: false; error: string; status?: number; raw?: unknown }
@@ -188,44 +194,67 @@ export async function createNombaCheckoutOrder(params: {
   ];
   const userId = params.userId || "guest";
   const emails = nombaCheckoutEmailCandidates(params.customerEmail, userId, extraBlocked);
+  const requestedMethods = (params.allowedPaymentMethods || [])
+    .map((m) => String(m).trim())
+    .filter(Boolean);
+  const methodAttempts: Array<string[] | undefined> = requestedMethods.length
+    ? [requestedMethods]
+    : [undefined];
+  if (requestedMethods.length > 1) {
+    const cardOnly = requestedMethods.filter((m) => /card|apple pay/i.test(m));
+    const eftOnly = requestedMethods.filter((m) => /transfer|ussd|qr/i.test(m));
+    if (cardOnly.length && cardOnly.length < requestedMethods.length) methodAttempts.push(cardOnly);
+    if (eftOnly.length && eftOnly.length < requestedMethods.length) methodAttempts.push(eftOnly);
+    methodAttempts.push(undefined);
+  }
 
   let lastError = "Nomba checkout failed";
   let lastStatus: number | undefined;
   let lastRaw: unknown;
   for (let i = 0; i < emails.length; i++) {
     const customerEmail = emails[i];
-    const order: Record<string, unknown> = {
-      amount: amountStr,
-      currency: params.currency.toUpperCase(),
-      callbackUrl: params.callbackUrl,
-      customerEmail,
-      orderReference: params.orderReference,
-      orderMetaData: params.meta,
-    };
-    if (subAccountId) order.accountId = subAccountId;
+    let emailBlocked = false;
+    for (const methods of methodAttempts) {
+      const order: Record<string, unknown> = {
+        amount: amountStr,
+        currency: params.currency.toUpperCase(),
+        callbackUrl: params.callbackUrl,
+        customerEmail,
+        orderReference: params.orderReference,
+        orderMetaData: params.meta,
+      };
+      if (subAccountId) order.accountId = subAccountId;
+      if (methods?.length) order.allowedPaymentMethods = methods;
 
-    const { ok, status, json } = await nombaCheckoutApiFetch("/v1/checkout/order", {
-      method: "POST",
-      body: JSON.stringify({ order }),
-    });
-    if (ok) {
-      const checkoutLink = String(json?.data?.checkoutLink || "");
-      const orderReference = String(json?.data?.orderReference || "");
-      if (checkoutLink) {
-        return { ok: true, checkoutLink, orderReference };
+      const { ok, status, json } = await nombaCheckoutApiFetch("/v1/checkout/order", {
+        method: "POST",
+        body: JSON.stringify({ order }),
+      });
+      if (ok) {
+        const checkoutLink = String(json?.data?.checkoutLink || "");
+        const orderReference = String(json?.data?.orderReference || "");
+        if (checkoutLink) {
+          return { ok: true, checkoutLink, orderReference };
+        }
+        const dataMsg = String(json?.data?.message || json?.data?.description || "").trim();
+        lastError = dataMsg || "Nomba returned no checkout link";
+        lastStatus = status;
+        lastRaw = json;
+      } else {
+        lastError = String(json?.description || json?.message || `Nomba checkout HTTP ${status}`);
+        lastStatus = status;
+        lastRaw = json;
       }
-      const dataMsg = String(json?.data?.message || json?.data?.description || "").trim();
-      lastError = dataMsg || "Nomba returned no checkout link";
-      lastStatus = status;
-      lastRaw = json;
-    } else {
-      lastError = String(json?.description || json?.message || `Nomba checkout HTTP ${status}`);
-      lastStatus = status;
-      lastRaw = json;
+      if (isNombaEmailBlockedError(lastError)) {
+        emailBlocked = true;
+        break;
+      }
+      // Only retry a narrower method set when Nomba rejected the method list.
+      if (!isNombaPaymentMethodError(lastError) && methods?.length) {
+        break;
+      }
     }
-    if (!isNombaEmailBlockedError(lastError) || i === emails.length - 1) {
-      break;
-    }
+    if (!emailBlocked) break;
   }
   return { ok: false, error: lastError, status: lastStatus, raw: lastRaw };
 }
@@ -244,6 +273,13 @@ export async function fetchNombaCheckoutTransaction(params: {
   const details = (data.transactionDetails && typeof data.transactionDetails === "object")
     ? data.transactionDetails as Record<string, unknown>
     : {};
+  const transfer = (data.transferDetails && typeof data.transferDetails === "object")
+    ? data.transferDetails as Record<string, unknown>
+    : {};
+  const order = (data.order && typeof data.order === "object")
+    ? data.order as Record<string, unknown>
+    : {};
+  const paymentMethod = String(order.paymentMethod ?? details.paymentMethod ?? "").toLowerCase();
   const statusCode = String(details.statusCode ?? data.status ?? "").toLowerCase();
   const dataMessage = String(data.message ?? details.message ?? "").toLowerCase();
   const successFlag = String(data.success ?? "").toLowerCase();
@@ -262,8 +298,19 @@ export async function fetchNombaCheckoutTransaction(params: {
     || statusCode.includes("success")
     || statusCode.includes("paid")
     || statusCode.includes("complete");
+  const transferPaid = Boolean(
+    transfer.sessionId
+    || transfer.paymentReference
+    || transfer.beneficiaryAccountNumber,
+  ) && (
+    paymentMethod.includes("transfer")
+    || paymentMethod.includes("bank")
+    || paymentMethod.includes("pay_by")
+    || bySuccessFlag
+    || byStatusWord
+  );
   // Do NOT use json.description — Nomba returns description:"success"/"Successful" for any OK lookup.
-  const paid = !explicitUnpaid && (bySuccessFlag || byStatus00 || byStatusWord);
+  const paid = !explicitUnpaid && (bySuccessFlag || byStatus00 || byStatusWord || transferPaid);
   return { ok, status, json, paid };
 }
 

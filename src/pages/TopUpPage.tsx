@@ -96,6 +96,7 @@ import { useFxRates } from "@/hooks/useFxRates";
 import ComingSoon from "@/components/common/ComingSoon";
 import { isLiveTopupCurrency, productFeatures } from "@/lib/productFeatures";
 import { FINCRA_CAD_INTERAC_ALIAS } from "@/lib/fincraCad";
+import { CAD_COLLECT_METHOD_IDS, orderCadCollectMethods } from "@/lib/cadCollectCheckout";
 import AppPage from "@/components/layout/AppPage";
 import { SectionBoundary } from "@/components/common/SectionBoundary";
 import { currencySymbol } from "@/lib/currency";
@@ -867,7 +868,7 @@ const TopUpPage = () => {
     const forceNombaCard =
       productFeatures.nombaNigeria
       && isNombaTopupLive(ccyUpper)
-      && (ccyUpper === "CAD" || ccyUpper === "NGN");
+      && ccyUpper === "NGN";
     const defaultRail = forceNombaCard ? "nomba" : defaultCollectPartner(ccyUpper);
     const collectPrimary =
       (forceNombaCard && "nomba")
@@ -880,8 +881,8 @@ const TopUpPage = () => {
       if (id === "flw_momo" && ccyUpper === "CAD") return false;
       if (id === "bank_va" && (ccyUpper === "NGN" || ccyUpper === "GHS") && productFeatures.flutterwave) return true;
       if (id === "bank_checkout" && (supportsFincraBankCheckout(ccyUpper) || ccyUpper === "GHS")) return true;
-      // CAD pay-in: Card, Bank (Plaid), Interac, and Wise are all live — never hide behind Nomba-only.
-      if (ccyUpper === "CAD" && ["nomba", "interac", "plaid", "wise", "wise_link", "dodo"].includes(id)) {
+      // CAD pay-in: Interac, EFT, Nomba card/bank, Wise — show every live rail (least-cost order later).
+      if (ccyUpper === "CAD" && (CAD_COLLECT_METHOD_IDS as readonly string[]).includes(id)) {
         return true;
       }
       // Always offer Wise as its own top-level rail when the feature is on.
@@ -946,19 +947,16 @@ const TopUpPage = () => {
       westernCardRail === "paypal"
       || (!productFeatures.square && productFeatures.paypal && rails.has("paypal"));
 
-    // Nomba Card first for CAD + NGN (hosted Checkout — not Worldline/Fincra).
+    // Nomba Card first for NGN. CAD Nomba card + EFT are listed below and sorted by cost.
     if (forceNombaCard) {
       payMethods.push({
         id: "nomba",
         tone: "card",
-        label: "Card",
-        description:
-          ccyUpper === "CAD"
-            ? "Visa / Mastercard — secure checkout"
-            : "Card or bank transfer",
+        label: "Card or bank transfer",
+        description: "Pay with a Naira card or bank transfer",
         content: (
           <SectionBoundary name="NombaTopUp">
-            <NombaTopUpCard walletId={walletId} walletCurrency={currency} initialAmount={amount} embedded onComplete={invalidateWallets} />
+            <NombaTopUpCard walletId={walletId} walletCurrency={currency} initialAmount={amount} embedded collectRails={["card", "eft"]} onComplete={invalidateWallets} />
           </SectionBoundary>
         ),
       });
@@ -1127,17 +1125,44 @@ const TopUpPage = () => {
       payMethods.push({
         id: "nomba",
         tone: "card",
-        label: "Card",
+        label: ccyUpper === "CAD" ? "Card" : "Card",
         description:
-          currency.toUpperCase() === "CAD"
-            ? "Visa / Mastercard — secure checkout"
+          ccyUpper === "CAD"
+            ? "Visa / Mastercard — Nomba checkout"
             : "Card or bank transfer",
         content: (
           <SectionBoundary name="NombaTopUp">
-            <NombaTopUpCard walletId={walletId} walletCurrency={currency} initialAmount={amount} embedded onComplete={invalidateWallets} />
+            <NombaTopUpCard
+              walletId={walletId}
+              walletCurrency={currency}
+              initialAmount={amount}
+              embedded
+              collectRails={ccyUpper === "CAD" ? ["card"] : ["card", "eft"]}
+              onComplete={invalidateWallets}
+            />
           </SectionBoundary>
         ),
       });
+      if (ccyUpper === "CAD") {
+        payMethods.push({
+          id: "nomba_eft",
+          tone: "bank",
+          label: "Bank (EFT)",
+          description: "Canadian bank transfer on Nomba checkout",
+          content: (
+            <SectionBoundary name="NombaEftTopUp">
+              <NombaTopUpCard
+                walletId={walletId}
+                walletCurrency={currency}
+                initialAmount={amount}
+                embedded
+                collectRails={["eft"]}
+                onComplete={invalidateWallets}
+              />
+            </SectionBoundary>
+          ),
+        });
+      }
     }
 
     if (showRail("lenhub") && false && rails.has("lenhub")) {
@@ -1156,7 +1181,7 @@ const TopUpPage = () => {
 
     const isCadWallet = currency.toUpperCase() === "CAD";
 
-    if (showRail("plaid") && isCadWallet && productFeatures.plaid) {
+    if (showRail("plaid") && isCadWallet && productFeatures.plaid && !productFeatures.fincraInterac) {
       payMethods.push({
         id: "plaid",
         tone: "bank",
@@ -1198,12 +1223,7 @@ const TopUpPage = () => {
       });
     }
 
-    if (
-      showRail("interac") &&
-      isCadWallet &&
-      !productFeatures.plaid &&
-      (rails.has("interac") || productFeatures.fincraInterac)
-    ) {
+    if (showRail("interac") && isCadWallet && (rails.has("interac") || productFeatures.fincraInterac)) {
       // CAD Interac via Fincra Autodeposit (`fincra-cad-interac`)
       const interacAmount = Number(amount);
       const useFincraCad = productFeatures.fincraInterac;
@@ -1240,16 +1260,14 @@ const TopUpPage = () => {
     }
 
 
-    if (showRail("fincra") && productFeatures.fincra && rails.has("fincra") && !forceNombaCard) {
-      const isCadViaUsd = currency.toUpperCase() === "CAD";
-      const cadQuote = isCadViaUsd ? quoteCadNombaTopup(amountNum || 0, fxRates) : null;
+    if (showRail("fincra") && productFeatures.fincra && rails.has("fincra") && !forceNombaCard && ccyUpper !== "CAD") {
       const fincraTone: PayTone =
         ["KES", "UGX", "TZS", "XAF", "XOF", "MWK", "GHS", "ZMW"].includes(currency.toUpperCase())
           ? "mobile"
           : "card";
       payMethods.push({
         id: "fincra",
-        tone: isCadViaUsd ? "bank" : fincraTone,
+        tone: fincraTone,
         label: fincraGatewayLabel(currency),
         description: "Pay on a secure checkout page",
         content: (
@@ -1257,35 +1275,11 @@ const TopUpPage = () => {
             <p className="text-sm text-muted-foreground">
               You’ll be redirected to a secure checkout to complete this payment.
             </p>
-            {isCadViaUsd && amountNum > 0 && (
-              cadQuote ? (
-                <div className="rounded-lg border bg-muted/40 p-3 text-sm space-y-1.5">
-                  <div className="flex justify-between gap-2">
-                    <span className="text-muted-foreground">Wallet credit</span>
-                    <span className="font-medium tabular-nums">{"C$"}{cadQuote.creditAmount.toFixed(2)} CAD</span>
-                  </div>
-                  <div className="flex justify-between gap-2">
-                    <span className="text-muted-foreground">Processing fee</span>
-                    <span className="font-medium tabular-nums">{"C$"}{cadQuote.feeAmount.toFixed(2)} CAD</span>
-                  </div>
-                  <div className="flex justify-between gap-2">
-                    <span className="text-muted-foreground">You pay</span>
-                    <span className="font-semibold tabular-nums">
-                      {"C$"}{(cadQuote.creditAmount + cadQuote.feeAmount).toFixed(2)} CAD
-                    </span>
-                  </div>
-                </div>
-              ) : (
-                <p className="text-xs text-amber-700 dark:text-amber-400">
-                  Checkout quote loading — try again in a moment.
-                </p>
-              )
-            )}
             <Button
               className="w-full"
               size="lg"
               onClick={() => void handleFincraTopUp()}
-              disabled={loading || !amountValid || (isCadViaUsd && !cadQuote)}
+              disabled={loading || !amountValid}
             >
               {loading ? "Opening checkout…" : "Continue to checkout"}
             </Button>
@@ -1294,7 +1288,20 @@ const TopUpPage = () => {
       });
     }
 
-    // Wise — own top-level category (CAD/USD/EUR/GBP pay link; bank deposit elsewhere)
+    // Wise — CAD bank EFT (account details) is cheaper than the hosted pay link.
+    if (showRail("wise") && productFeatures.wise && isCadWallet) {
+      payMethods.push({
+        id: "wise",
+        tone: "bank",
+        label: "Bank EFT (Wise)",
+        description: "Institution, transit and account — include your payment reference",
+        content: (
+          <SectionBoundary name="WiseCadEftTopUp">
+            <WiseTopUpCard walletId={walletId} walletCurrency={currency} initialAmount={amount} onComplete={invalidateWallets} />
+          </SectionBoundary>
+        ),
+      });
+    }
     if (showRail("wise_link") && productFeatures.wise && isWisePayCurrency(currency)) {
       payMethods.push({
         id: "wise_link",
@@ -1348,6 +1355,12 @@ const TopUpPage = () => {
         ),
       });
     }
+
+    if (ccyUpper === "CAD" && payMethods.length > 1) {
+      const ranked = orderCadCollectMethods(payMethods);
+      payMethods.length = 0;
+      payMethods.push(...ranked);
+    }
   }
 
   /** The auto-routed gateway is only the default selection now. */
@@ -1371,7 +1384,7 @@ const TopUpPage = () => {
   const forceNombaForWallet =
     productFeatures.nombaNigeria
     && isNombaTopupLive(currency.toUpperCase())
-    && (currency.toUpperCase() === "CAD" || currency.toUpperCase() === "NGN");
+    && currency.toUpperCase() === "NGN";
   const defaultRail = forceNombaForWallet
     ? "nomba"
     : defaultCollectPartner(currency);
@@ -1385,6 +1398,7 @@ const TopUpPage = () => {
   );
   const defaultMethodId =
     (forceNombaForWallet && payMethods.some((m) => m.id === "nomba") && "nomba")
+    || (currency.toUpperCase() === "CAD" && payMethods[0]?.id)
     || payMethods.find((m) => collectPrimaryIds.includes(m.id))?.id
     || payMethods.find((m) => m.id === GATEWAY_DEFAULT_METHOD[gateway])?.id
     || payMethods[0]?.id

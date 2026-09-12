@@ -8,6 +8,10 @@ import {
   nombaApiConfigured,
 } from "../_shared/nomba-api.ts";
 import {
+  nombaCheckoutAllowedPaymentMethods,
+  parseNombaCollectRails,
+} from "../_shared/nomba-checkout-methods.ts";
+import {
   quoteCadWalletViaNombaUsd,
   quoteSameCurrencyTopup,
   resolveFxRate,
@@ -78,7 +82,9 @@ Deno.serve(async (req) => {
       email,
       corridor: corridorHint,
       return_url,
+      payment_methods,
     } = body as Record<string, unknown>;
+    const collectRails = parseNombaCollectRails(payment_methods);
 
     const requestedCredit = Number(credit_amount ?? amount);
     const minCredit = 1;
@@ -235,6 +241,7 @@ Deno.serve(async (req) => {
           fx_rate: fxRate,
           email: customerEmail,
           return_url: returnUrl,
+          payment_methods: collectRails,
         },
       })
       .select("id")
@@ -258,10 +265,16 @@ Deno.serve(async (req) => {
         customerEmail,
         userId,
         orderReference: internalRef.slice(0, 50),
+        allowedPaymentMethods: nombaCheckoutAllowedPaymentMethods({
+          checkoutCurrency,
+          creditCurrency,
+          rails: collectRails,
+        }),
         meta: {
           efin_txn_id: String(txn.id),
           wallet_id: String(target_wallet_id),
           user_id: userId,
+          collect_rails: collectRails.join(","),
           app_return: returnUrl || `${appBase}/wallet/topup?walletId=${encodeURIComponent(String(target_wallet_id))}`,
         },
       });
@@ -273,13 +286,16 @@ Deno.serve(async (req) => {
           raw_response: { error: created.error, rail: "nomba_api" },
         }).eq("id", txn.id);
         const blockedEmail = /email is blocked/i.test(created.error);
+        const methodHint = /payment method|allowedPaymentMethods/i.test(created.error)
+          ? " Card and bank (EFT) were requested — try Interac or Wise if bank checkout is unavailable."
+          : "";
         const accountHint = created.error.toLowerCase().includes("account number")
           ? " Nomba needs Online Checkout enabled on your live parent account with a settlement account. Email docs@nomba.com — also verify NOMBA_SUBACCOUNT_ID is unset or is a real outlet ID (not the parent accountId)."
           : "";
         return json({
           error: blockedEmail
-            ? "Card checkout could not start. Pay with Interac, Wise, or wallet — or try card again in a moment."
-            : `${created.error}${accountHint}`,
+            ? "Checkout could not start. Pay with Interac, Wise, or wallet — or try card / bank again in a moment."
+            : `${created.error}${accountHint}${methodHint}`,
           code: blockedEmail ? "nomba_email_blocked" : "nomba_checkout_failed",
           hint: accountHint ? "checkout_account_setup" : undefined,
           ...(blockedEmail ? {} : { detail: created.error }),

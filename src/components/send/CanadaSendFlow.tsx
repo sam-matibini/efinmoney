@@ -862,26 +862,6 @@ const CanadaSendFlow = () => {
   const fallbackWallet = (wallets || [])[0];
 
   const cadFundingOptions: PaymentMethodOption<FundingSource>[] = [
-    ...(productFeatures.nombaNigeria
-      ? [{ id: "card" as const, label: "Card", sublabel: "Nomba · debit or credit", icon: CreditCard, tone: "card" as const }]
-      : []),
-    {
-      id: "bank",
-      label: "Bank",
-      sublabel: productFeatures.plaid ? "Link with Plaid or transfer from your bank" : "Transfer from your bank",
-      icon: Landmark,
-      tone: "bank",
-    },
-    {
-      id: "interac",
-      label: "Interac",
-      sublabel: "e-Transfer · Nomba",
-      icon: Banknote,
-      tone: "bank",
-    },
-    ...(productFeatures.wise && isWisePayCurrency("CAD")
-      ? [{ id: "wise" as const, label: "Wise", sublabel: "Bank or card via Wise", icon: Wallet, tone: "wise" as const }]
-      : []),
     {
       id: "wallet",
       label: "Wallet",
@@ -891,6 +871,26 @@ const CanadaSendFlow = () => {
       icon: Wallet,
       tone: "wallet",
     },
+    {
+      id: "interac",
+      label: "Interac",
+      sublabel: "e-Transfer Autodeposit",
+      icon: Banknote,
+      tone: "bank",
+    },
+    {
+      id: "bank",
+      label: "Bank EFT",
+      sublabel: productFeatures.plaid ? "Link with Plaid or transfer from your bank" : "Transfer from your bank",
+      icon: Landmark,
+      tone: "bank",
+    },
+    ...(productFeatures.wise && isWisePayCurrency("CAD")
+      ? [{ id: "wise" as const, label: "Wise", sublabel: "Bank EFT via Wise", icon: Wallet, tone: "wise" as const }]
+      : []),
+    ...(productFeatures.nombaNigeria
+      ? [{ id: "card" as const, label: "Card or bank (EFT)", sublabel: "Nomba checkout", icon: CreditCard, tone: "card" as const }]
+      : []),
   ];
 
   const totalFee = deliveryFee + cardFee;
@@ -955,11 +955,11 @@ const CanadaSendFlow = () => {
               total={totalCharged}
               currency="CAD"
               symbol="C$"
-              cardTitle="Card · Nomba"
+              cardTitle="Card or bank (EFT) · Nomba"
               cardProviderReady={productFeatures.nombaNigeria}
-              cardChargeNote="Pay with Visa, Mastercard, Amex or Verve on Nomba’s secure checkout. We credit your CAD wallet, then pay out Interac or EFT."
-              cardMinNote="Minimum card send is C$2.00 (Nomba checkout)."
-              interacTitle="Interac e-Transfer · Nomba"
+              cardChargeNote="Pay with Visa, Mastercard, or bank (EFT) on Nomba’s secure checkout. We credit your CAD wallet, then pay out Interac or EFT."
+              cardMinNote="Minimum Nomba collect is C$2.00."
+              interacTitle="Interac e-Transfer"
               interacDescription={`Confirm to open Interac checkout for C$${totalCharged.toFixed(2)}. After you confirm, send CAD Autodeposit to ${FINCRA_CAD_INTERAC_ALIAS} with your payment code. When the deposit matches, Nomba pays ${recipientName || "your recipient"}.`}
               insufficientBalance={insufficient}
               onTopUp={() => navigate("/wallet/topup")}
@@ -1137,6 +1137,7 @@ const CanadaSendFlow = () => {
           email: user.email,
           corridor: "international",
           return_url: returnUrl,
+          payment_methods: ["card", "eft"],
         });
         if (!collection.payment_link) throw new Error("Checkout link was empty");
         saveCanadaCardSend({
@@ -1767,8 +1768,8 @@ const CanadaSendFlow = () => {
               <ReviewRow
                 label="You pay with"
                 value={
-                  funding === "card" ? "Card · Nomba"
-                    : funding === "interac" ? "Interac e-Transfer · Nomba"
+                  funding === "card" ? "Card or bank (EFT) · Nomba"
+                    : funding === "interac" ? "Interac e-Transfer"
                     : funding === "bank" ? "Bank account"
                     : funding === "wise" ? "Wise"
                     : "CAD wallet"

@@ -90,6 +90,8 @@ function detectSuccess(payload: Record<string, unknown>, data: Record<string, un
 
   const event = String(payload.event ?? payload.type ?? eventType).toLowerCase();
   if (event.includes("success") || event.includes("completed") || event.includes("paid")) return true;
+  // Bank transfer / Pay by Bank / virtual account (EFT) use the same payment_success family.
+  if (event.includes("transfer") && (event.includes("success") || event.includes("complete"))) return true;
 
   const code = String(data.status_code ?? payload.status_code ?? data.code ?? payload.code ?? "");
   if (code === "00" || code === "200" || code === "202") return true;

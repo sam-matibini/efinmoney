@@ -29,6 +29,8 @@ interface Props {
   initialAmount?: string;
   /** Hide card chrome when nested in MoneyFlowShell */
   embedded?: boolean;
+  /** Nomba Checkout rails. CAD defaults to card + EFT. */
+  collectRails?: Array<"card" | "eft">;
 }
 
 function formatCredited(amount: number, currency: string): string {
@@ -37,7 +39,14 @@ function formatCredited(amount: number, currency: string): string {
   return `${sym}${amount.toLocaleString()} ${c}`;
 }
 
-export default function NombaTopUpCard({ walletId, walletCurrency, onComplete, initialAmount, embedded }: Props) {
+export default function NombaTopUpCard({
+  walletId,
+  walletCurrency,
+  onComplete,
+  initialAmount,
+  embedded,
+  collectRails,
+}: Props) {
   const { user } = useAuth();
   const { data: fxRates = [] } = useFxRates();
   const currency = walletCurrency.toUpperCase();
@@ -99,6 +108,11 @@ export default function NombaTopUpCard({ walletId, walletCurrency, onComplete, i
 
   if (!isNombaTopupCurrency(currency)) return null;
 
+  const rails = collectRails?.length
+    ? collectRails
+    : (["card", "eft"] as const);
+  const wantsCard = rails.includes("card");
+  const wantsEft = rails.includes("eft");
   const min = nombaMinAmount(currency);
   const corridor = isNigeria ? "nigeria" as const : "international" as const;
 
@@ -109,7 +123,7 @@ export default function NombaTopUpCard({ walletId, walletCurrency, onComplete, i
       return;
     }
     if (isCadViaUsd && !quote) {
-      toast.error("Card checkout is temporarily unavailable — try again shortly");
+      toast.error("Checkout is temporarily unavailable — try Interac, Wise, or try again shortly");
       return;
     }
     if (!email.trim() || !email.includes("@")) {
@@ -126,6 +140,7 @@ export default function NombaTopUpCard({ walletId, walletCurrency, onComplete, i
         email: email.trim(),
         corridor,
         return_url: `${window.location.origin}/wallet/topup?walletId=${walletId}`,
+        payment_methods: [...rails],
       });
       savePendingNombaTxn(result.transaction_id);
       toast.message("Opening secure checkout", {
@@ -138,13 +153,23 @@ export default function NombaTopUpCard({ walletId, walletCurrency, onComplete, i
     }
   };
 
-  const title = "Secure checkout";
+  const title = wantsCard && wantsEft
+    ? "Card or bank (EFT)"
+    : wantsEft
+      ? "Bank transfer (EFT)"
+      : "Secure checkout";
 
   const subtitle = isCadViaUsd
-    ? "Enter how much CAD you want in your wallet. Pay securely by card."
+    ? wantsCard && wantsEft
+      ? "Enter how much CAD you want in your wallet. Pay by card or bank (EFT) on the secure checkout page."
+      : wantsEft
+        ? "Pay from your Canadian bank on Nomba checkout. Your CAD wallet credits after the transfer matches."
+        : "Enter how much CAD you want in your wallet. Pay securely by card."
     : isInternational
-      ? `Card payment for your ${currency} wallet on a secure page.`
-      : "Card payment on a secure page. Your wallet credits when payment succeeds.";
+      ? wantsEft
+        ? `Card or bank payment for your ${currency} wallet on a secure page.`
+        : `Card payment for your ${currency} wallet on a secure page.`
+      : "Card or bank transfer on a secure page. Your wallet credits when payment succeeds.";
 
   const cadYouPay = isCadViaUsd && quote
     ? Math.round((quote.creditAmount + quote.feeAmount) * 100) / 100

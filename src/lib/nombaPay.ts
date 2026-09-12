@@ -94,6 +94,8 @@ export async function initiateNombaCollection(params: {
   email?: string;
   corridor?: "nigeria" | "international";
   return_url?: string;
+  /** Nomba Checkout rails: card, bank/EFT, or both (default both). */
+  payment_methods?: Array<"card" | "eft" | "bank" | "transfer">;
 }): Promise<NombaCollectionResult & { quote?: Record<string, unknown> }> {
   const { data, error } = await supabase.functions.invoke("nomba-collection", { body: params });
   if (error) throw new Error(await invokeErrorMessage(error));
@@ -113,7 +115,7 @@ export async function initiateNombaCollection(params: {
     const combined = `${payload.error} ${providerMsg} ${payload.code || ""}`;
     if (payload.code === "nomba_email_blocked" || /email is blocked/i.test(combined)) {
       throw new Error(
-        "Card checkout could not start. Pay with Interac, Wise, or wallet — or try card again in a moment.",
+        "Checkout could not start. Pay with Interac, Wise, or wallet — or try card / bank again in a moment.",
       );
     }
     throw new Error(payload.error);

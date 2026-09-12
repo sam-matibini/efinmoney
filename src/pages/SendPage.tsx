@@ -1358,6 +1358,7 @@ const SendPage = () => {
             email: user.email,
             corridor: sourceCurrency === "NGN" ? "nigeria" : "international",
             return_url: returnUrl,
+            payment_methods: sourceCurrency === "CAD" || sourceCurrency === "NGN" ? ["card", "eft"] : ["card"],
           });
           if (!collection.payment_link) {
             throw new Error("Checkout link was empty — try again or use wallet balance.");

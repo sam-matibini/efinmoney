@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { orderCadCollectRails } from "@/lib/cadCollectCheckout";
 
 export type RailDirection = "collect" | "payout";
 
@@ -168,7 +169,7 @@ export function collectMethodForPartner(partner: string): string | null {
 
 /** Code default when no collect policy is saved. */
 export const DEFAULT_COLLECT_PARTNER: Record<string, string> = {
-  CAD: "nomba",
+  CAD: "interac",
   USD: "square",
   EUR: "square",
   GBP: "square",
@@ -222,6 +223,7 @@ export function collectPayMethodIds(partnerOrMethod: string, currency?: string):
   const raw = partnerOrMethod.trim().toLowerCase();
   const method = collectMethodForPartner(raw) || raw;
   const ccy = (currency || "").toUpperCase();
+  if (method === "nomba" && ccy === "CAD") return ["nomba", "nomba_eft"];
   if (method === "square" || method === "paypal") return ["square"];
   if (method === "interac") return ["interac", "plaid"];
   if (method === "flutterwave") {
@@ -362,19 +364,20 @@ export async function resolveCollectMethodPreference(
       .map((r) => r.toLowerCase())
       .filter(Boolean)
       .filter(keepActive);
-    // CAD/NGN: Nomba Checkout is the live card collect — ignore stale Worldline/Fincra policies.
-    if ((ccy === "CAD" || ccy === "NGN") && keepActive("nomba")) {
+    // NGN: Nomba Checkout is the live card/bank collect — ignore stale Worldline policies.
+    if (ccy === "NGN" && keepActive("nomba")) {
       const rest = rails.filter((r) => r !== "nomba" && r !== "bambora" && r !== "worldline");
-      // CAD collection is Interac / Nomba / Fincra Autodeposit — never Kenya M-Pesa.
-      const cadSafe = ccy === "CAD"
-        ? rest.filter((r) => !["flutterwave", "flw", "paytota", "swychr", "ghana_pay", "elicate", "flovide"].includes(r))
-        : rest;
-      return { method: "nomba", rails: ["nomba", ...cadSafe], source: "policy" };
+      return { method: "nomba", rails: ["nomba", ...rest], source: "policy" };
     }
     if (ccy === "CAD") {
-      const cadCollect = rails.filter((r) =>
-        ["nomba", "interac", "fincra", "wise", "dodo", "paypal", "square"].includes(r)
-      );
+      const merged = [
+        ...rails,
+        ...(keepActive("interac") ? ["interac"] : []),
+        ...(keepActive("wise") ? ["wise"] : []),
+        ...(keepActive("nomba") ? ["nomba"] : []),
+        ...(keepActive("dodo") ? ["dodo"] : []),
+      ];
+      const cadCollect = orderCadCollectRails(merged);
       if (cadCollect.length) {
         const method = collectMethodForPartner(cadCollect[0] || "") || cadCollect[0];
         return { method, rails: cadCollect, source: "policy" };
@@ -386,7 +389,21 @@ export async function resolveCollectMethodPreference(
     }
   }
   const fallback = defaultCollectPartner(ccy);
-  if (fallback && (keepActive(fallback) || ((ccy === "CAD" || ccy === "NGN") && fallback === "nomba"))) {
+  if (fallback && (keepActive(fallback) || (ccy === "NGN" && fallback === "nomba") || (ccy === "CAD" && fallback === "interac"))) {
+    if (ccy === "CAD") {
+      const rails = orderCadCollectRails([
+        fallback,
+        ...(keepActive("interac") ? ["interac"] : []),
+        ...(keepActive("wise") ? ["wise"] : []),
+        ...(keepActive("nomba") ? ["nomba"] : []),
+        ...(keepActive("dodo") ? ["dodo"] : []),
+      ]);
+      return {
+        method: collectMethodForPartner(rails[0] || fallback) || rails[0] || fallback,
+        rails,
+        source: "default",
+      };
+    }
     return { method: collectMethodForPartner(fallback) || fallback, rails: [fallback], source: "default" };
   }
   return { method: null, rails: [], source: "none" };

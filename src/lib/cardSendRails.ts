@@ -60,7 +60,7 @@ const FINCRA_CARD_COLLECT = [
   "MWK",
 ] as const;
 
-/** Nomba Checkout collect — NGN card/bank/USSD; CAD card (USD charge → CAD wallet). */
+/** Nomba Checkout collect — NGN card/bank/USSD; CAD card + bank/EFT (USD charge → CAD wallet). */
 const NOMBA_CARD_COLLECT = ["NGN", "CAD"] as const;
 const NOMBA_CARD_MOMO_DEST = ["GHS", "KES", "UGX", "TZS", "RWF"] as const;
 

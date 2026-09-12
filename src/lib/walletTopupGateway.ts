@@ -272,9 +272,10 @@ export function swychrGatewayLabel(currency: string): string {
 /** Distinct from Fincra's "Card or bank transfer". */
 export function nombaGatewayLabel(currency: string): string {
   const c = currency.toUpperCase();
-  if (c === "CAD") return "Express card";
-  if (NOMBA_INTERNATIONAL_CURRENCIES.includes(c)) return "Express card";
-  return "Express card";
+  if (c === "CAD") return "Card or bank (EFT)";
+  if (c === "NGN") return "Card or bank transfer";
+  if (NOMBA_INTERNATIONAL_CURRENCIES.includes(c)) return "Card or bank";
+  return "Card or bank";
 }
 
 /** Short benefit tag for the method picker (never a vendor name). */
@@ -360,8 +361,10 @@ export function pickBestIntlTopupMethod(
   const pool = live.length > 0 ? live : available;
 
   let priority: IntlTopupMethod[];
-  if (c === "CAD" || c === "NGN") {
-    priority = ["nomba", "interac", "wise", "fincra", "flutterwave", "square", "paypal", "paytota", "dodo"];
+  if (c === "CAD") {
+    priority = ["interac", "wise", "nomba", "dodo", "paypal", "paytota", "fincra", "flutterwave", "square"];
+  } else if (c === "NGN") {
+    priority = ["nomba", "fincra", "flutterwave", "wise", "paytota", "dodo"];
   } else if (c === "USD" || c === "GBP" || c === "EUR") {
     priority = ["square", "paypal", "interac", "wise", "paytota", "dodo", "nomba", "flutterwave", "fincra"];
   } else {
@@ -412,7 +415,7 @@ export function intlMethodLabel(method: IntlTopupMethod, currency?: string): str
     if (currency?.toUpperCase() === "NGN") return "Card, bank or USSD";
     return "Card checkout";
   }
-  return "Express card";
+  return "Card or bank";
 }
 
 export function intlMethodDescription(method: IntlTopupMethod, currency: string): string {
@@ -469,7 +472,7 @@ export function intlMethodDescription(method: IntlTopupMethod, currency: string)
     return `Pay with card or bank transfer on a secure page for ${c}.`;
   }
   if (c === "CAD") {
-    return "Quick card payment — pay the USD equivalent, CAD wallet credits after confirmation.";
+    return "Pay by Visa, Mastercard, or bank (EFT) on a secure page — CAD wallet credits after confirmation.";
   }
   return `Quick card payment for your ${c} wallet — opens a secure page to finish.`;
 }
