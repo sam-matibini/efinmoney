@@ -68,9 +68,23 @@ async function runTool(name: string, args: Record<string, unknown>, sb: Any, use
       }));
     }
     case "get_my_kyc_status": {
-      const { data, error } = await sb.from("profiles").select("kyc_status, kyc_tier").eq("user_id", userId).maybeSingle();
+      const [{ data, error }, { data: business }] = await Promise.all([
+        sb.from("profiles").select("kyc_status, kyc_tier").eq("user_id", userId).maybeSingle(),
+        sb.from("business_profiles").select("kyb_status, legal_name").eq("owner_user_id", userId).maybeSingle(),
+      ]);
       if (error) return { error: error.message };
-      return data || { kyc_status: "unknown", kyc_tier: "unknown" };
+      if (business) {
+        return {
+          account_kind: "business",
+          kyb_status: business.kyb_status,
+          legal_name: business.legal_name,
+          personal_kyc_required: false,
+          note: "Business accounts use KYB, not personal KYC.",
+          kyc_status: data?.kyc_status ?? "not_required",
+          kyc_tier: data?.kyc_tier ?? null,
+        };
+      }
+      return { account_kind: "personal", ...(data || { kyc_status: "unknown", kyc_tier: "unknown" }) };
     }
     case "get_pending_kyc_count": {
       if (!isStaff) return { error: "not authorized" };

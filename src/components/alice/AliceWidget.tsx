@@ -18,6 +18,8 @@ import {
 import ReactMarkdown from "react-markdown";
 import { useAliceChat, type AliceMessage } from "@/hooks/useAliceChat";
 import { useProfile } from "@/hooks/useProfile";
+import { useKyb } from "@/hooks/useKyb";
+import { kybResumePath } from "@/lib/kybOnboarding";
 import LiveSupportChat from "@/components/support/LiveSupportChat";
 import BookingEmbed from "@/components/booking/BookingEmbed";
 import { ALICE_OPEN_EVENT, modeToTab, type AliceMode } from "@/components/alice/aliceBus";
@@ -63,6 +65,7 @@ function firstNameOf(fullName: string | null | undefined, email: string | null |
 export default function AliceWidget({ context }: { context: "user" | "admin" }) {
   const navigate = useNavigate();
   const { data: profile } = useProfile();
+  const { business } = useKyb();
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState<AliceTab>("home");
   const [overlay, setOverlay] = useState<"support" | "booking" | null>(null);
@@ -77,6 +80,16 @@ export default function AliceWidget({ context }: { context: "user" | "admin" }) 
 
   const kycCard = useMemo(() => {
     if (context !== "user" || !profile) return null;
+    // Business accounts verify with KYB, not personal KYC.
+    if (business?.id) {
+      if (business.kyb_status === "approved") return null;
+      return {
+        next: business.kyb_status === "pending_review" ? "KYB under review" : "Finish business verification",
+        label: "Business account · KYB, not personal KYC",
+        progress: business.kyb_status === "pending_review" ? 80 : 40,
+        href: kybResumePath(business),
+      };
+    }
     const status = (profile.kyc_status || "").toLowerCase();
     if (status === "approved" || status === "verified") return null;
     const started = Boolean(status && status !== "not_started");
@@ -84,8 +97,9 @@ export default function AliceWidget({ context }: { context: "user" | "admin" }) 
       next: started ? "Complete verification" : "Start verification",
       label: started ? "1 of 2 done · About 2 minutes left" : "0 of 2 done · About 3 minutes left",
       progress: started ? 50 : 12,
+      href: "/kyc",
     };
-  }, [context, profile]);
+  }, [context, profile, business]);
 
   const recentSnippet = useMemo(() => {
     const last = [...messages].reverse().find((m) => !m.pending && m.content.trim());
@@ -201,7 +215,7 @@ export default function AliceWidget({ context }: { context: "user" | "admin" }) 
                 <AliceCard
                   onClick={() => {
                     close();
-                    navigate("/kyc");
+                    navigate(kycCard.href);
                   }}
                 >
                   <div className="flex items-center justify-between gap-2 mb-1">
@@ -341,7 +355,7 @@ export default function AliceWidget({ context }: { context: "user" | "admin" }) 
                 <AliceCard
                   onClick={() => {
                     close();
-                    navigate("/kyc");
+                    navigate(kycCard.href);
                   }}
                 >
                   <p className="text-sm font-semibold">Finish account verification</p>

@@ -38,17 +38,31 @@ Deno.serve(async (req) => {
     if (rl === false) return new Response(JSON.stringify({ error: "Too many requests" }), { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
     const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
-    const { data: profile, error: pErr } = await admin
-      .from("profiles")
-      .select("email, full_name, phone_number, kyc_status")
-      .eq("user_id", userId)
-      .maybeSingle();
+    const [{ data: profile, error: pErr }, { data: business }] = await Promise.all([
+      admin
+        .from("profiles")
+        .select("email, full_name, phone_number, kyc_status")
+        .eq("user_id", userId)
+        .maybeSingle(),
+      admin
+        .from("business_profiles")
+        .select("legal_name, operating_name, business_email, business_phone, kyb_status")
+        .eq("owner_user_id", userId)
+        .maybeSingle(),
+    ]);
     if (pErr) {
       console.error("flw-create-virtual-account profile query", pErr);
       return new Response(JSON.stringify({ error: pErr.message || "Could not load profile" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
     if (!profile) return new Response(JSON.stringify({ error: "Profile not found" }), { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-    if (!["approved", "verified"].includes(String(profile.kyc_status))) {
+    const kycOk = ["approved", "verified"].includes(String(profile.kyc_status));
+    const kybOk = String(business?.kyb_status || "") === "approved";
+    // Business accounts complete KYB, not personal KYC.
+    if (business) {
+      if (!kybOk) {
+        return new Response(JSON.stringify({ error: "Business verification (KYB) must be approved before creating a virtual account" }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+    } else if (!kycOk) {
       return new Response(JSON.stringify({ error: "KYC must be approved before creating a virtual account" }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
@@ -62,8 +76,9 @@ Deno.serve(async (req) => {
     const { data: existing } = await admin.from("virtual_accounts").select("*").eq("user_id", userId).eq("currency_code", currency).eq("status", "active").maybeSingle();
     if (existing) return new Response(JSON.stringify({ virtual_account: existing }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
-    const { first, last } = splitName(profile.full_name);
-    const email = String(profile.email || user.email || "").trim();
+    const holderName = String(business?.legal_name || business?.operating_name || profile.full_name || "").trim();
+    const { first, last } = splitName(holderName);
+    const email = String(business?.business_email || profile.email || user.email || "").trim();
     if (!email) {
       return new Response(JSON.stringify({ error: "Your profile needs an email before we can issue a bank account" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
@@ -77,7 +92,7 @@ Deno.serve(async (req) => {
       firstname: first,
       lastname: last,
       narration: `eFin Money - ${first} ${last}`.trim(),
-      phonenumber: profile.phone_number || "",
+      phonenumber: business?.business_phone || profile.phone_number || "",
     };
 
     const { ok, json } = await flwV3Fetch("/virtual-account-numbers", { method: "POST", body: JSON.stringify(flwBody), timeoutMs: 20_000 });

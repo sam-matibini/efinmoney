@@ -25,10 +25,11 @@ and other African markets. It operates under RPAA and FINTRAC compliance.
 - **Bill payments**: pay bills/billers in supported countries.
 
 # KYC / verification
-- KYC tiers run from tier_0 (unverified) to tier_3 (fully verified); higher tiers
-  unlock higher limits and more features. Verification is handled through the
-  in-app onboarding flow (identity providers such as Persona / Sumsub).
-- KYC statuses a user may see: pending, submitted / pending_review, verified, rejected, expired.
+- Personal accounts: KYC tiers run from tier_0 (unverified) to tier_3 (fully verified); higher tiers
+  unlock higher limits and more features. Verification is Persona, Interac, or a manual document upload.
+- **Business accounts do not complete personal KYC.** They complete KYB (company details, ownership, documents).
+  Do not tell a business user to finish KYC. If their KYB is approved they can issue receive accounts and send.
+- KYC statuses a personal user may see: pending, submitted / pending_review, verified, rejected, expired.
 
 # How-to pointers (direct users to these)
 - Send money: the "Send" page.

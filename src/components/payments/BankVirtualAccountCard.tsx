@@ -9,8 +9,11 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import { useVirtualAccounts, useCreateVirtualAccount } from "@/hooks/useVirtualAccounts";
 import { useProfile } from "@/hooks/useProfile";
+import { useKyb } from "@/hooks/useKyb";
 import { useWallets } from "@/hooks/useWallets";
 import { BANK_VA_CURRENCIES, bankVaLabel, isBankVaCurrency } from "@/lib/bankVirtualAccounts";
+import { canIssueBankReceiveAccount } from "@/lib/identityGate";
+import { kybResumePath } from "@/lib/kybOnboarding";
 import { productFeatures } from "@/lib/productFeatures";
 
 type Props = {
@@ -30,6 +33,7 @@ export default function BankVirtualAccountCard({
 }: Props) {
   const { data: accounts, isLoading } = useVirtualAccounts();
   const { data: profile } = useProfile();
+  const { business } = useKyb();
   const { data: wallets } = useWallets();
   const create = useCreateVirtualAccount();
 
@@ -41,8 +45,8 @@ export default function BankVirtualAccountCard({
       : "NGN";
   const [currency, setCurrency] = useState(start);
 
-  const kycApproved =
-    profile?.kyc_status === "approved" || profile?.kyc_status === "verified";
+  const identityApproved = canIssueBankReceiveAccount({ profile, business });
+  const isBusiness = Boolean(business?.id);
 
   const active = useMemo(
     () =>
@@ -175,14 +179,20 @@ export default function BankVirtualAccountCard({
           {currency === "NGN" ? " Nigeria accounts may need a BVN on a verified profile." : ""}
         </p>
 
-        {!kycApproved && (
+        {!identityApproved && (
           <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-3 text-sm">
-            <p className="font-medium">Verify your identity first</p>
+            <p className="font-medium">
+              {isBusiness ? "Finish business verification first" : "Verify your identity first"}
+            </p>
             <p className="text-muted-foreground mt-1">
-              Bank deposit accounts need an approved KYC profile. You can still receive from other eFin users with your account number or @tag.
+              {isBusiness
+                ? "Bank deposit accounts need an approved business (KYB) profile — not personal KYC. You can still receive from other eFin users with your account number or @tag."
+                : "Bank deposit accounts need an approved KYC profile. You can still receive from other eFin users with your account number or @tag."}
             </p>
             <Button asChild size="sm" className="mt-3">
-              <Link to="/kyc">Complete verification</Link>
+              <Link to={isBusiness ? kybResumePath(business) : "/kyc"}>
+                {isBusiness ? "Open KYB" : "Complete verification"}
+              </Link>
             </Button>
           </div>
         )}
@@ -201,7 +211,7 @@ export default function BankVirtualAccountCard({
           </div>
         )}
 
-        <Button onClick={handleCreate} disabled={create.isPending || !kycApproved} className="w-full">
+        <Button onClick={handleCreate} disabled={create.isPending || !identityApproved} className="w-full">
           <Plus className="w-4 h-4 mr-2" />
           {create.isPending ? "Creating…" : `Generate ${currency} bank account`}
         </Button>
