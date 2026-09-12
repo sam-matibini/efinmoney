@@ -6,6 +6,10 @@ import {
   resolvePayoutNetwork,
   sanitizeCanadaPayoutRails,
 } from "../supabase/functions/_shared/nomba-payout-corridors.ts";
+import {
+  canResumeExecuteTransfer,
+  isStuckCanadaCadTransfer,
+} from "../supabase/functions/_shared/executeTransferResume.ts";
 import { findCountryByCode, isCanadaCountryCode } from "../src/lib/countries.ts";
 
 function assert(name: string, ok: boolean, detail?: unknown) {
@@ -74,6 +78,60 @@ assert("CANADA word maps to Canada", findCountryByCode("Canada")?.id === "Canada
 assert("isCanadaCountryCode CAD", isCanadaCountryCode("CAD"));
 assert("isCanadaCountryCode CA", isCanadaCountryCode("ca"));
 assert("NGN is not Canada country code", !isCanadaCountryCode("NGN"));
+
+assert("resume initiated", canResumeExecuteTransfer("initiated"));
+assert("resume funded", canResumeExecuteTransfer("funded"));
+assert("resume pending_ops", canResumeExecuteTransfer("pending_ops"));
+assert("resume pending_liquidity", canResumeExecuteTransfer("pending_liquidity"));
+assert("resume processing without provider ref", canResumeExecuteTransfer("processing", null));
+assert("block processing with provider ref", !canResumeExecuteTransfer("processing", "PAY-1"));
+assert("block completed", !canResumeExecuteTransfer("completed"));
+assert("block failed", !canResumeExecuteTransfer("failed"));
+assert("block reversed", !canResumeExecuteTransfer("reversed"));
+
+assert(
+  "stuck funded CAD is retryable",
+  isStuckCanadaCadTransfer({
+    status: "funded",
+    target_currency: "CAD",
+    source_currency: "CAD",
+    recipient_country: "CA",
+    payout_method: "interac",
+    transfer_type: "domestic_canada",
+  }),
+);
+assert(
+  "stuck pending_ops CAD is retryable",
+  isStuckCanadaCadTransfer({
+    status: "pending_ops",
+    target_currency: "CAD",
+    source_currency: "CAD",
+    recipient_country: "CAD",
+    payout_method: "interac",
+    transfer_type: "domestic_canada",
+  }),
+);
+assert(
+  "initiated CAD is not stuck yet",
+  !isStuckCanadaCadTransfer({
+    status: "initiated",
+    target_currency: "CAD",
+    source_currency: "CAD",
+    recipient_country: "CA",
+    payout_method: "interac",
+    transfer_type: "domestic_canada",
+  }),
+);
+assert(
+  "KES funded is not Canada stuck",
+  !isStuckCanadaCadTransfer({
+    status: "funded",
+    target_currency: "KES",
+    source_currency: "CAD",
+    recipient_country: "KE",
+    payout_method: "mpesa",
+  }),
+);
 
 if (process.exitCode) {
   console.error("CAD rail checks failed");

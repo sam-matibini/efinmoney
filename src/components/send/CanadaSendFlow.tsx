@@ -594,7 +594,11 @@ const CanadaSendFlow = () => {
         setLastTransferId(transfer.id);
         setCadPayIn(null);
         setStep(4);
-        toast.success("Transfer sent");
+        toast.success(
+          execData?.pending_ops
+            ? "Payment received — completing delivery to your recipient"
+            : "Transfer sent",
+        );
         const next = new URLSearchParams(searchParams);
         next.delete("canadaCard");
         next.delete("nomba");
@@ -1111,6 +1115,7 @@ const CanadaSendFlow = () => {
           : {}),
       } as any);
 
+      let execPendingOps = false;
       try {
         const body: Record<string, unknown> = {
           transfer_id: transfer.id,
@@ -1142,6 +1147,7 @@ const CanadaSendFlow = () => {
         if (execData?.success === false) {
           throw new Error(execData?.error || "Transfer failed");
         }
+        execPendingOps = execData?.pending_ops === true;
         const sec = execData?.payout?.security;
         if (sec?.question && sec?.answer) setSecurity({ question: sec.question, answer: sec.answer });
       } catch (e: any) {
@@ -1153,7 +1159,11 @@ const CanadaSendFlow = () => {
       setLastTransferId(transfer.id);
       setStep(4);
       setCardSubmitting(false);
-      toast.success("Canadian transfer initiated");
+      toast.success(
+        execPendingOps
+          ? "Payment received — completing delivery to your recipient"
+          : "Canadian transfer initiated",
+      );
 
       if (user && !pickedBeneficiaryId) {
         try {

@@ -29,6 +29,16 @@ export function parseCaMobile(raw: unknown): string | null {
   return null;
 }
 
+/** True for CA / CAD / CAN / Canada on a transfer country column. */
+export function isCanadaPayoutCountry(country?: string | null): boolean {
+  const raw = String(country || "").trim().toUpperCase();
+  return raw === "CA" || raw === "CAD" || raw === "CAN" || raw === "CANADA";
+}
+
+export function isCadInteracPayoutMethod(method?: string | null): boolean {
+  return String(method || "").toLowerCase().includes("interac");
+}
+
 export function isCadInteracPayout(t: {
   payout_method?: string | null;
   target_currency?: string | null;
@@ -36,7 +46,7 @@ export function isCadInteracPayout(t: {
   transfer_type?: string | null;
 }): boolean {
   const method = String(t.payout_method || "").toLowerCase();
-  if (!method.includes("interac")) return false;
+  if (!isCadInteracPayoutMethod(method)) return false;
   const ccy = String(t.target_currency || "").toUpperCase();
   const country = String(t.recipient_country || "").toUpperCase();
   const type = String(t.transfer_type || "").toLowerCase();

@@ -1,6 +1,8 @@
 import {
   CAD_INTERAC_MISSING_CONTACT,
   isCadInteracPayout,
+  isCadInteracPayoutMethod,
+  isCanadaPayoutCountry,
   parseCaMobile,
   parseInteracEmail,
   requireCadInteracDestination,
@@ -72,6 +74,14 @@ const allowed = requireCadInteracDestination({
   recipient_phone: "4165550199",
 });
 assert("phone-only collection allowed", allowed.required && allowed.ok && allowed.dest.consumerIdType === "PHONE");
+
+assert("CA is Canada payout country", isCanadaPayoutCountry("CA"));
+assert("CAD is Canada payout country", isCanadaPayoutCountry("CAD"));
+assert("Canada word is payout country", isCanadaPayoutCountry("Canada"));
+assert("KE is not Canada payout country", !isCanadaPayoutCountry("KE"));
+assert("interac method match", isCadInteracPayoutMethod("interac"));
+assert("interac substring match", isCadInteracPayoutMethod("canada_interac"));
+assert("eft is not interac method", !isCadInteracPayoutMethod("eft"));
 
 if (process.exitCode) {
   console.error("cad Interac payout checks failed");

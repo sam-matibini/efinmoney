@@ -18,12 +18,26 @@ import {
 } from "../_shared/treasury-worker.ts";
 
 import { isCanadaCadPayout, resolvePayoutNetwork } from "../_shared/nomba-payout-corridors.ts";
+import { isStuckCanadaCadTransfer } from "../_shared/executeTransferResume.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
 
 function resolveNetwork(payoutMethod: string | null | undefined, currency: string): string {
   return resolvePayoutNetwork(payoutMethod, currency);
+}
+
+async function invokeExecuteTransfer(transferId: string) {
+  const res = await fetch(`${SUPABASE_URL}/functions/v1/execute-transfer`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${SERVICE_KEY}`,
+      "x-internal-secret": SERVICE_KEY,
+    },
+    body: JSON.stringify({ transfer_id: transferId }),
+  });
+  return res.json();
 }
 
 async function invokeNombaPayout(transferId: string) {
@@ -118,9 +132,12 @@ Deno.serve(async (req) => {
         transferType: t.transfer_type,
         sourceCurrency: t.source_currency,
       })) {
-        const payout = await invokeNombaPayout(t.id);
+        // Full Canada chain (Nomba → Flovide → Paysafe), not Nomba-only.
+        const payout = await invokeExecuteTransfer(t.id);
         let action: string;
-        if (payout?.pending_liquidity || payout?.queued) {
+        if (payout?.pending_ops) {
+          action = "held_ops";
+        } else if (payout?.pending_liquidity || payout?.queued) {
           action = "still_queued";
         } else if (payout?.success) {
           action = "payout_sent";
@@ -130,7 +147,7 @@ Deno.serve(async (req) => {
         (results.processed as unknown[]).push({
           transfer_id: t.id,
           action,
-          rail: "nomba",
+          rail: payout?.payout?.rail ?? payout?.rail ?? "canada",
           error: payout?.error ?? payout?.provider_message ?? null,
           payout,
         });
@@ -232,6 +249,43 @@ Deno.serve(async (req) => {
       });
     }
     results.nomba_retries = nombaRetries;
+
+    // 5. Resume Canada CAD payouts stuck after wallet debit (funded / pending_ops).
+    const { data: stuckCad } = await db
+      .from("transfers")
+      .select("*")
+      .eq("target_currency", "CAD")
+      .in("status", ["funded", "pending_ops", "processing"])
+      .order("created_at", { ascending: true })
+      .limit(20);
+
+    const cadRetries: unknown[] = [];
+    const already = new Set(
+      (results.processed as { transfer_id?: string }[]).map((r) => r.transfer_id).filter(Boolean),
+    );
+    for (const t of stuckCad ?? []) {
+      if (already.has(t.id)) continue;
+      if (!isStuckCanadaCadTransfer(t)) continue;
+      const payout = await invokeExecuteTransfer(t.id);
+      let action: string;
+      if (payout?.pending_ops) {
+        action = "held_ops";
+      } else if (payout?.pending_liquidity || payout?.queued) {
+        action = "still_queued";
+      } else if (payout?.success) {
+        action = "payout_sent";
+      } else {
+        action = "payout_failed";
+      }
+      cadRetries.push({
+        transfer_id: t.id,
+        action,
+        rail: payout?.payout?.rail ?? payout?.rail ?? "canada",
+        error: payout?.error ?? payout?.provider_message ?? null,
+        payout,
+      });
+    }
+    results.cad_retries = cadRetries;
 
     return json({ ok: true, ...results });
   } catch (e) {

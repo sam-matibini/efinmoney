@@ -9,6 +9,7 @@ import { explainPayoutError, notifyOpsBrief, notifyOpsFailoverPing } from "../_s
 import { validatePayoutMin } from "../_shared/payoutMins.ts";
 import { nombaApiConfigured } from "../_shared/nomba-api.ts";
 import { requireCadInteracDestination } from "../_shared/cadInteracPayout.ts";
+import { canResumeExecuteTransfer } from "../_shared/executeTransferResume.ts";
 import { isCanadaCadPayout, resolvePayoutNetwork } from "../_shared/nomba-payout-corridors.ts";
 
 const corsHeaders = {
@@ -159,20 +160,36 @@ Deno.serve(async (req) => {
       });
     }
 
+    if (!canResumeExecuteTransfer(transfer.status, transfer.provider_reference)) {
+      return new Response(JSON.stringify({ error: `Transfer already ${transfer.status}` }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const { data: existingLedger } = await supabase
+      .from("ledger_entries")
+      .select("id")
+      .eq("reference_type", "transfer")
+      .eq("reference_id", transfer_id)
+      .limit(1);
+    const ledgerPosted = !!(existingLedger && existingLedger.length > 0);
+
     // CAD Interac payout: require email or Canadian mobile BEFORE collecting
     // (card charge, wallet debit, or Interac pay-in). Missing contact must not
     // draw funds and then fail the recipient payout.
     const cadInteracGate = requireCadInteracDestination(transfer);
     if (cadInteracGate.required && !cadInteracGate.ok) {
-      await supabase
-        .from("fincra_cad_interac_intents")
-        .update({ status: "cancelled" })
-        .eq("transfer_id", transfer_id)
-        .in("status", ["pending", "awaiting_payment"]);
-      await supabase.from("transfers").update({
-        status: "failed",
-        failure_reason: cadInteracGate.error.slice(0, 500),
-      }).eq("id", transfer_id);
+      if (!ledgerPosted) {
+        await supabase
+          .from("fincra_cad_interac_intents")
+          .update({ status: "cancelled" })
+          .eq("transfer_id", transfer_id)
+          .in("status", ["pending", "awaiting_payment"]);
+        await supabase.from("transfers").update({
+          status: "failed",
+          failure_reason: cadInteracGate.error.slice(0, 500),
+        }).eq("id", transfer_id);
+      }
       return new Response(JSON.stringify({
         error: cadInteracGate.error,
         code: "missing_interac_contact",
@@ -192,12 +209,15 @@ Deno.serve(async (req) => {
     }
 
     // Block payout while a linked Interac/Loop pay-in is still unpaid.
-    const { data: unpaidIntent } = await supabase
-      .from("fincra_cad_interac_intents")
-      .select("id, status, reference")
-      .eq("transfer_id", transfer_id)
-      .in("status", ["pending", "awaiting_payment"])
-      .maybeSingle();
+    // Skip on resume: wallet (or card) already collected and posted.
+    const { data: unpaidIntent } = !ledgerPosted && transfer.status === "initiated"
+      ? await supabase
+        .from("fincra_cad_interac_intents")
+        .select("id, status, reference")
+        .eq("transfer_id", transfer_id)
+        .in("status", ["pending", "awaiting_payment"])
+        .maybeSingle()
+      : { data: null };
     if (unpaidIntent) {
       return new Response(JSON.stringify({
         error: "Awaiting Loop Bank deposit — payout releases after Interac/EFT is matched",
@@ -218,13 +238,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    if (transfer.status !== "initiated") {
-      return new Response(JSON.stringify({ error: `Transfer already ${transfer.status}` }), {
-        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    {
+    if (!ledgerPosted) {
       const destCcy = String(transfer.target_currency || "").toUpperCase();
       const destCountry = String(transfer.recipient_country || "").toUpperCase();
       if (!isLivePayoutCurrency(destCcy) && !isLivePayoutCurrency(destCountry)) {
@@ -241,7 +255,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    if (!Number(transfer.target_amount) || Number(transfer.target_amount) <= 0) {
+    if (!ledgerPosted && (!Number(transfer.target_amount) || Number(transfer.target_amount) <= 0)) {
       await supabase.from("transfers").update({
         status: "failed",
         failure_reason: "Amount too small after fees — recipient would receive 0",
@@ -253,7 +267,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    {
+    if (!ledgerPosted) {
       const destCcy = String(transfer.target_currency || transfer.source_currency || "").toUpperCase();
       const destAmt = Number(transfer.target_amount);
       const minErr = validatePayoutMin(destCcy, destAmt);
@@ -271,7 +285,8 @@ Deno.serve(async (req) => {
     const isCardFunded = (payload.funding_source || transfer.funding_source) === "card";
 
     // Wallet / bank-funded (Interac prepaid): require real ledger balance before payout.
-    if (!isCardFunded && transfer.sender_wallet_id) {
+    // Skip on resume — the debit is already posted, so available balance is short by design.
+    if (!ledgerPosted && !isCardFunded && transfer.sender_wallet_id) {
       const needed = Number(transfer.source_amount) + Number(transfer.fee_amount || 0);
       const { data: balRows } = await supabase
         .from("ledger_entries")
@@ -297,7 +312,7 @@ Deno.serve(async (req) => {
     // If the charge fails, we never touch the ledger and the transfer is marked failed.
     // If the caller already charged the card upstream (e.g. via stripe-charge-saved-card),
     // they pass `prefunded: true` and we skip the re-charge — only record the reference.
-    if (isCardFunded) {
+    if (isCardFunded && !ledgerPosted) {
       if (payload.prefunded) {
         if (payload.charge_reference) {
           await supabase.from("transfers")
@@ -347,14 +362,7 @@ Deno.serve(async (req) => {
     }
 
     // Idempotency: skip if already has a journal posted
-    const { data: existing } = await supabase
-      .from("ledger_entries")
-      .select("id")
-      .eq("reference_type", "transfer")
-      .eq("reference_id", transfer_id)
-      .limit(1);
-
-    if (!existing || existing.length === 0) {
+    if (!ledgerPosted) {
       // Look up debit account: card-funded → 1102 Stripe Card Receivable;
       // wallet-funded → customer wallet liability (21xx).
       const liabLookup = isCardFunded
@@ -937,7 +945,7 @@ Deno.serve(async (req) => {
                 "Content-Type": "application/json",
                 "x-internal-secret": Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "",
               },
-              body: JSON.stringify({ transfer_id }),
+              body: JSON.stringify({ transfer_id, skip_wallet_refund: true }),
             },
           );
           const legacyResult = await res.json();

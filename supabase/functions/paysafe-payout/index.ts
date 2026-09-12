@@ -1,5 +1,9 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
-import { resolveCadInteracDestination } from "../_shared/cadInteracPayout.ts";
+import {
+  isCadInteracPayoutMethod,
+  isCanadaPayoutCountry,
+  resolveCadInteracDestination,
+} from "../_shared/cadInteracPayout.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -179,7 +183,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    if (transfer.recipient_country !== "CA" || transfer.target_currency !== "CAD") {
+    if (!isCanadaPayoutCountry(transfer.recipient_country) || transfer.target_currency !== "CAD") {
       return new Response(JSON.stringify({ error: "Paysafe payout only supports CAD/CA" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -208,7 +212,7 @@ Deno.serve(async (req) => {
     let handleBody: Record<string, unknown> = {};
     let security: { question: string; answer: string } | null = null;
 
-    if (transfer.payout_method === "interac") {
+    if (isCadInteracPayoutMethod(transfer.payout_method)) {
       const dest = resolveCadInteracDestination({
         recipient_account: transfer.recipient_account,
         recipient_phone: transfer.recipient_phone,
@@ -217,7 +221,9 @@ Deno.serve(async (req) => {
       if (!dest.ok) {
         const reason = dest.error;
         const refunded = skipWalletRefund ? false : await refundWallet(supabase, transfer, reason);
-        await supabase.from("transfers").update({ status: "failed", failure_reason: reason }).eq("id", transfer.id);
+        if (!skipWalletRefund) {
+          await supabase.from("transfers").update({ status: "failed", failure_reason: reason }).eq("id", transfer.id);
+        }
         return new Response(JSON.stringify({
           success: false,
           error: reason,
@@ -245,15 +251,20 @@ Deno.serve(async (req) => {
         profile: { firstName, lastName },
         billingDetails,
       };
-    } else if (transfer.payout_method === "eft") {
+    } else if (
+      String(transfer.payout_method || "").toLowerCase().includes("eft")
+      || String(transfer.payout_method || "").toLowerCase() === "bank"
+    ) {
       const rawParts = (transfer.recipient_account || "").split("-");
       const rawInstitution = (rawParts[0] || "").replace(/\D/g, "");
       const rawTransit = (rawParts[1] || "").replace(/\D/g, "");
       const accountNumber = String(rawParts[2] || "").replace(/\D/g, "");
       if (!rawInstitution || !rawTransit || !accountNumber) {
         const reason = "The Canadian bank details look incorrect. Your money has been returned. Please double-check the institution, transit, and account numbers.";
-        const refunded = await refundWallet(supabase, transfer, reason);
-        await supabase.from("transfers").update({ status: "failed", failure_reason: reason }).eq("id", transfer.id);
+        const refunded = skipWalletRefund ? false : await refundWallet(supabase, transfer, reason);
+        if (!skipWalletRefund) {
+          await supabase.from("transfers").update({ status: "failed", failure_reason: reason }).eq("id", transfer.id);
+        }
         return new Response(JSON.stringify({ success: false, error: reason, refunded }), {
           status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
@@ -281,8 +292,10 @@ Deno.serve(async (req) => {
       };
     } else {
       const reason = "This Canadian delivery method isn't supported. Your money has been returned to your wallet.";
-      const refunded = await refundWallet(supabase, transfer, reason);
-      await supabase.from("transfers").update({ status: "failed", failure_reason: reason }).eq("id", transfer.id);
+      const refunded = skipWalletRefund ? false : await refundWallet(supabase, transfer, reason);
+      if (!skipWalletRefund) {
+        await supabase.from("transfers").update({ status: "failed", failure_reason: reason }).eq("id", transfer.id);
+      }
       return new Response(JSON.stringify({ success: false, error: reason, refunded }), {
         status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -290,12 +303,7 @@ Deno.serve(async (req) => {
 
     const failAndRefund = async (reason: string, details?: any) => {
       let refunded = false;
-      if (skipWalletRefund) {
-        await supabase.from("transfers").update({
-          status: "failed",
-          failure_reason: reason,
-        }).eq("id", transfer.id);
-      } else {
+      if (!skipWalletRefund) {
         refunded = await refundWallet(supabase, transfer, reason);
         await supabase.from("transfers").update({
           status: "failed",
@@ -385,15 +393,14 @@ Deno.serve(async (req) => {
           }).eq("id", t.id);
         }
       } else if (errBody?.transfer_id && errBody?.skip_wallet_refund) {
-        await supabase.from("transfers").update({
-          status: "failed",
-          failure_reason: "We couldn't complete this Canadian transfer right now.",
-        }).eq("id", errBody.transfer_id);
+        // Leave status for execute-transfer to hold pending_ops (do not refund or fail).
       }
     } catch (_) { /* ignore */ }
     return new Response(JSON.stringify({
       success: false,
-      error: "We couldn't complete this Canadian transfer right now. Your money has been returned to your wallet. Please try again later.",
+      error: skipWalletRefund
+        ? "We couldn't complete this Canadian transfer right now. Please try again later."
+        : "We couldn't complete this Canadian transfer right now. Your money has been returned to your wallet. Please try again later.",
     }), {
       status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

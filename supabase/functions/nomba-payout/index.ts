@@ -404,17 +404,20 @@ Deno.serve(async (req) => {
           error_class: "hard",
         }, 400);
       }
-      if (!dest.dest.email) {
-        // Nomba Interac needs an email. Soft-fail so Paysafe can send to mobile.
+      const email = dest.dest.email;
+      const phone = dest.dest.phone;
+      const beneficiary: Record<string, unknown> = {};
+      if (email) beneficiary.beneficiaryEmail = email;
+      if (phone) beneficiary.beneficiaryPhone = phone;
+      if (!email && !phone) {
         return json({
           success: false,
-          error: "Nomba Interac payout requires recipient email; trying next rail",
-          code: "interac_email_required",
+          error: dest.error || "Nomba Interac payout requires recipient email or mobile",
+          code: "missing_interac_contact",
           rail: "nomba",
-          error_class: "retryable",
+          error_class: "hard",
         }, 400);
       }
-      const email = dest.dest.email;
 
       const payload: Record<string, unknown> = {
         amount: payoutAmount,
@@ -426,9 +429,7 @@ Deno.serve(async (req) => {
         paymentMethod: "INTERAC",
         accountType: "INDIVIDUAL",
         narration: narrative,
-        beneficiary: {
-          beneficiaryEmail: email,
-        },
+        beneficiary,
       };
       if (lockedExchangeRateId) payload.lockedExchangeRateId = lockedExchangeRateId;
 
@@ -438,7 +439,7 @@ Deno.serve(async (req) => {
         reference,
         amount: payoutAmount,
         currency: "CAD",
-        account_number: email,
+        account_number: email || phone || "",
         bank_code: "INTERAC",
         account_name: accountName,
         status: "pending",
