@@ -42,7 +42,7 @@ const SCHEMAS: Record<string, BankSchema> = {
       {
         key: "interac_email",
         label: "Interac Autodeposit email",
-        helper: "Personal mailbox for e-Transfer payouts — not an eFinMoney login",
+        helper: "Personal or business mailbox registered for Interac Autodeposit",
         placeholder: "ap@company.com",
         maxLength: 254,
       },

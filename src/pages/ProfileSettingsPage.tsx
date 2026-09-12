@@ -26,7 +26,6 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { cn } from "@/lib/utils";
 import { ISO_COUNTRIES, findIsoCountry } from "@/lib/isoCountries";
 import {
-  interacEmailRejectedReason,
   isCanadianProfile,
   parseInteracEmail,
 } from "@/lib/cadInteracPayout";
@@ -103,19 +102,12 @@ const ProfileSettingsPage = () => {
       country_code: (profile as any)?.country_code,
       default_currency: (profile as any)?.default_currency,
     });
-    const loginEmail = (email || user.email || "").trim().toLowerCase();
     const cleanedInterac = parseInteracEmail(interacEmail);
     if (interacEmail.trim() && !cleanedInterac) {
       toast.error("Enter a valid Interac Autodeposit email.");
       return;
     }
-    if (cleanedInterac) {
-      const conflict = interacEmailRejectedReason(cleanedInterac, [loginEmail]);
-      if (conflict) {
-        toast.error(conflict);
-        return;
-      }
-    } else if (canadian && interacEmail.trim()) {
+    if (!cleanedInterac && canadian && interacEmail.trim()) {
       toast.error("Enter a valid Interac Autodeposit email.");
       return;
     }
@@ -349,7 +341,7 @@ const ProfileSettingsPage = () => {
               disabled={isLoading}
             />
             <p className="text-xs text-muted-foreground">
-              Changing your email requires confirmation via the new address. This is your login — not the Interac Autodeposit address Nomba uses for CAD payouts.
+              Changing your email requires confirmation via the new address. You can use this same mailbox for Interac Autodeposit.
             </p>
           </div>
 
@@ -365,12 +357,12 @@ const ProfileSettingsPage = () => {
                 type="email"
                 value={interacEmail}
                 onChange={(e) => setInteracEmail(e.target.value)}
-                placeholder="you@personalmail.com"
+                placeholder="you@company.com"
                 disabled={isLoading}
                 autoComplete="off"
               />
               <p className="text-xs text-muted-foreground">
-                Autodeposit address Nomba uses to pay you in CAD. Must be different from your eFinMoney login email above — using the same mailbox causes Nomba Interac errors.
+                Personal or business Autodeposit address Nomba uses to pay you in CAD. It can be the same as your login email.
               </p>
             </div>
           )}

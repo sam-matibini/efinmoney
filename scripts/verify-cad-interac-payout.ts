@@ -1,6 +1,5 @@
 import {
   CAD_INTERAC_MISSING_CONTACT,
-  INTERAC_LOGIN_EMAIL_CONFLICT,
   isCadInteracPayout,
   isCadInteracPayoutMethod,
   isCanadaPayoutCountry,
@@ -84,38 +83,29 @@ assert("interac method match", isCadInteracPayoutMethod("interac"));
 assert("interac substring match", isCadInteracPayoutMethod("canada_interac"));
 assert("eft is not interac method", !isCadInteracPayoutMethod("eft"));
 
-const blockedLogin = resolveCadInteracDestination({
-  recipient_email: "sam@efin.money",
-});
-assert("rejects eFinMoney login as Interac dest", !blockedLogin.ok && blockedLogin.ok === false);
-
-const blockedSame = resolveCadInteracDestination({
+const allowedLogin = resolveCadInteracDestination({
   recipient_email: "jane@gmail.com",
   blocked_emails: ["jane@gmail.com"],
 });
-assert("rejects blocked login email", !blockedSame.ok && blockedSame.ok === false);
+assert("profile login email is a valid Interac dest", allowedLogin.ok && allowedLogin.ok && allowedLogin.dest.email === "jane@gmail.com");
 
-const phoneFallback = resolveCadInteracDestination({
-  recipient_email: "sam@efin.money",
-  recipient_phone: "4165550123",
+const businessEmail = resolveCadInteracDestination({
+  recipient_email: "ap@acme.com",
 });
-assert(
-  "falls back to mobile when login email is unusable",
-  phoneFallback.ok && phoneFallback.ok && phoneFallback.dest.consumerIdType === "PHONE",
-);
+assert("business Interac email is allowed", businessEmail.ok && businessEmail.ok && businessEmail.dest.email === "ap@acme.com");
+
+const platformLogin = resolveCadInteracDestination({
+  recipient_email: "sam@efin.money",
+});
+assert("efin.money profile email is allowed as Interac dest", platformLogin.ok && platformLogin.ok && platformLogin.dest.email === "sam@efin.money");
 
 const prefersInteracCol = resolveCadInteracDestination({
   interac_email: "autodeposit@gmail.com",
   recipient_email: "sam@efin.money",
 });
 assert(
-  "prefers dedicated Interac email over login email",
+  "prefers dedicated Interac email column when both are set",
   prefersInteracCol.ok && prefersInteracCol.ok && prefersInteracCol.dest.email === "autodeposit@gmail.com",
-);
-
-assert(
-  "conflict copy is set",
-  INTERAC_LOGIN_EMAIL_CONFLICT.includes("Nomba"),
 );
 
 if (process.exitCode) {

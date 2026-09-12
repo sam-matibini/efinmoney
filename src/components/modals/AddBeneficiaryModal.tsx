@@ -563,7 +563,7 @@ const AddBeneficiaryModal = ({ open, onOpenChange, editing, onSaved, defaultCate
               <Label>Interac Autodeposit email <span className="text-muted-foreground font-normal">(optional if mobile is set)</span></Label>
               <Input type="email" value={interacEmail} onChange={(e) => setInteracEmail(e.target.value)} placeholder="payee@example.com" />
               <p className="text-xs text-muted-foreground">
-                Nomba pays this Autodeposit address. Do not use an eFinMoney login email — that mailbox is rejected. Leave blank if you only have their cell number.
+                Nomba pays this Autodeposit address — personal or business, including the same mailbox they use to sign in. Leave blank if you only have their cell number.
               </p>
             </div>
           )}

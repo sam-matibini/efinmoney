@@ -135,7 +135,7 @@ export function bankTransferMethodsFor(country: string, _currency?: string): Ban
       opts.push({
         id: "interac",
         label: "Interac e-Transfer",
-        description: "Autodeposit to a personal email or Canadian mobile — not an eFinMoney login.",
+        description: "Autodeposit to any Interac email or Canadian mobile — personal or business.",
         typical: "Minutes",
       });
     }

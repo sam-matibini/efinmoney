@@ -400,9 +400,6 @@ Deno.serve(async (req) => {
           || (transfer as Record<string, unknown>).interac_email,
         recipient_email: (transfer as Record<string, unknown>).recipient_email
           || body.recipient_email,
-        blocked_emails: [
-          senderProfile?.email,
-        ],
       });
       if (!dest.ok) {
         return json({

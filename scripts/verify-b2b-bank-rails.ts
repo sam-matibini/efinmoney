@@ -99,10 +99,10 @@ const caInterac = payoutSpecFor(
   }),
   "interac",
 );
-assert("CA Interac with email can payout", caInterac.canPayout && caInterac.payoutMethod === "interac");
+assert("CA Interac with business email can payout", caInterac.canPayout && caInterac.payoutMethod === "interac");
 assert("CA Interac destination is email", caInterac.recipientAccount === "ap@acme.com");
 
-assert("eFinMoney Interac email is rejected", !payoutSpecFor(
+assert("profile login email can be Interac dest", payoutSpecFor(
   bank({ ...ca, details: { ...ca.details, interac_email: "user@efin.money" } }),
   "interac",
 ).canPayout);

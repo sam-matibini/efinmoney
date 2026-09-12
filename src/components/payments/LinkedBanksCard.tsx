@@ -1291,7 +1291,7 @@ export default function LinkedBanksCard() {
                     {payoutMethod === "interac" && (
                       <div className="space-y-2 rounded-lg border bg-muted/40 p-3">
                         <p className="text-xs text-muted-foreground">
-                          Interac Autodeposit needs a personal email or Canadian mobile. Do not use an eFinMoney login.
+                          Interac Autodeposit needs any registered email (personal or business) or a Canadian mobile. This can be the same address used to sign in.
                         </p>
                         <div className="space-y-1">
                           <Label htmlFor="b2b-interac-email">Interac email</Label>

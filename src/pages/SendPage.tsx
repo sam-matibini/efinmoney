@@ -437,9 +437,8 @@ const SendPage = () => {
     return resolveCadInteracDestination({
       recipient_account: recipientEmail,
       recipient_phone: recipientPhone,
-      blocked_emails: [user?.email, profile?.email],
     });
-  }, [isCanadaIntlPayout, cadPayoutMode, recipientEmail, recipientPhone, user?.email, profile?.email]);
+  }, [isCanadaIntlPayout, cadPayoutMode, recipientEmail, recipientPhone]);
 
   // Fetch Nigerian banks list when NGN destination is selected (Nomba primary, FLW fallback)
   useEffect(() => {
@@ -3070,7 +3069,7 @@ const SendPage = () => {
                                             className="transition-shadow focus-visible:ring-2 focus-visible:ring-primary/40"
                                           />
                                           <p className="text-xs text-muted-foreground">
-                                            Canadian Interac e-Transfer needs an Autodeposit email or a 10-digit mobile — at least one. Use the recipient’s Interac email, not their eFinMoney login. We will not collect payment if both are missing.
+                                            Canadian Interac e-Transfer needs an Autodeposit email or a 10-digit mobile — at least one. Personal or business mailboxes are both valid, including the same address used to sign in. We will not collect payment if both are missing.
                                           </p>
                                         </motion.div>
                                         </>

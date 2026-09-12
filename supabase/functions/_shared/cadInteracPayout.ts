@@ -3,10 +3,10 @@
 export const CAD_INTERAC_MISSING_CONTACT =
   "Add the recipient’s Interac email or Canadian mobile number. The transfer cannot complete if both are missing.";
 
-export const INTERAC_LOGIN_EMAIL_CONFLICT =
-  "Use a personal Interac Autodeposit email — not an eFinMoney login email. Nomba rejects that address for Interac.";
+/** @deprecated Interac Autodeposit accepts any mailbox, including the profile login. */
+export const INTERAC_LOGIN_EMAIL_CONFLICT = "";
 
-/** Mailboxes Nomba must not receive as Interac beneficiaryEmail. */
+/** Platform domains that Nomba Checkout `customerEmail` must not use. Interac destinations are not restricted to these. */
 export const INTERAC_PLATFORM_DOMAINS = new Set([
   "efin.money",
   "efintax.biz",
@@ -25,21 +25,11 @@ export function parseInteracEmail(raw: unknown): string | null {
   return s;
 }
 
-function emailDomain(email: string): string {
-  const at = email.lastIndexOf("@");
-  return at >= 0 ? email.slice(at + 1) : "";
-}
-
-/** True when this address must not be sent to Nomba as an Interac destination. */
+/** Interac Autodeposit accepts any valid mailbox (personal, business, or the profile login). */
 export function interacEmailRejectedReason(
-  raw: unknown,
-  extraBlocked: unknown[] = [],
+  _raw?: unknown,
+  _extraBlocked: unknown[] = [],
 ): string | null {
-  const email = parseInteracEmail(raw);
-  if (!email) return null;
-  const blocked = extraBlocked.map((b) => String(b || "").trim().toLowerCase()).filter(Boolean);
-  if (blocked.includes(email)) return INTERAC_LOGIN_EMAIL_CONFLICT;
-  if (INTERAC_PLATFORM_DOMAINS.has(emailDomain(email))) return INTERAC_LOGIN_EMAIL_CONFLICT;
   return null;
 }
 
@@ -107,35 +97,21 @@ export function resolveCadInteracDestination(input: {
   recipient_phone?: unknown;
   recipient_email?: unknown;
   interac_email?: unknown;
-  /** Login / profile emails that must not be used as Interac destinations. */
+  /** Ignored. Kept so older callers still type-check. */
   blocked_emails?: unknown[];
 }): { ok: true; dest: CadInteracDest } | { ok: false; error: string } {
   const account = String(input.recipient_account ?? "").trim();
-  const blocked = input.blocked_emails || [];
-  const candidates = [
-    parseInteracEmail(input.interac_email),
-    parseInteracEmail(input.recipient_email),
-    account.includes("@") ? parseInteracEmail(account) : null,
-  ].filter(Boolean) as string[];
-
-  let email: string | null = null;
-  let rejected: string | null = null;
-  for (const candidate of candidates) {
-    const reason = interacEmailRejectedReason(candidate, blocked);
-    if (reason) {
-      rejected = reason;
-      continue;
-    }
-    email = candidate;
-    break;
-  }
+  const email =
+    parseInteracEmail(input.interac_email)
+    || parseInteracEmail(input.recipient_email)
+    || (account.includes("@") ? parseInteracEmail(account) : null);
 
   const phone =
     parseCaMobile(input.recipient_phone)
     || (!account.includes("@") ? parseCaMobile(account) : null);
 
   if (!email && !phone) {
-    return { ok: false, error: rejected || CAD_INTERAC_MISSING_CONTACT };
+    return { ok: false, error: CAD_INTERAC_MISSING_CONTACT };
   }
 
   if (email) {
@@ -175,6 +151,6 @@ export function requireCadInteracDestination(transfer: {
   | { required: true; ok: false; error: string } {
   if (!isCadInteracPayout(transfer)) return { required: false };
   const resolved = resolveCadInteracDestination(transfer);
-  if (!resolved.ok) return { required: true, ok: false, error: resolved.error };
+  if (resolved.ok === false) return { required: true, ok: false, error: resolved.error };
   return { required: true, ok: true, dest: resolved.dest };
 }
