@@ -500,3 +500,10 @@ verify_jwt = false
 
 [functions.verto-webhook]
 verify_jwt = false
+
+# Public auth emails — called while the user is signed out.
+[functions.send-signup-confirmation]
+verify_jwt = false
+
+[functions.send-password-reset]
+verify_jwt = false

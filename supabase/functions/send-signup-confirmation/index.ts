@@ -29,11 +29,46 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
+const ENTITY_TYPES = new Set([
+  "sole_proprietorship",
+  "partnership",
+  "corporation",
+  "llc",
+  "cooperative",
+  "ngo",
+  "trust",
+  "other",
+]);
+
 const json = (status: number, body: unknown) =>
   new Response(JSON.stringify(body), {
     status,
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
+
+const alreadyRegistered = (msg: string) =>
+  /already registered|already been registered|user already exists/i.test(msg);
+
+type AdminClient = ReturnType<typeof createClient>;
+
+async function findExistingUser(admin: AdminClient, email: string) {
+  const normalized = email.trim().toLowerCase();
+  const { data: profileRow } = await admin
+    .from("profiles")
+    .select("user_id")
+    .ilike("email", normalized)
+    .limit(1)
+    .maybeSingle();
+  if (profileRow?.user_id) {
+    const { data, error } = await admin.auth.admin.getUserById(profileRow.user_id);
+    if (!error && data?.user) return data.user;
+  }
+  return null;
+}
+
+function asTrimmed(value: unknown): string | null {
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+}
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
@@ -70,8 +105,6 @@ Deno.serve(async (req) => {
       auth: { autoRefreshToken: false, persistSession: false },
     });
 
-    // Build user_metadata so the handle_new_user trigger + the rest
-    // of the post-signup pipeline work the same as before.
     const fullName = name || [first_name, last_name].filter(Boolean).join(" ").trim();
     const userMetadata: Record<string, unknown> = {};
     if (fullName) userMetadata.full_name = fullName;
@@ -80,8 +113,19 @@ Deno.serve(async (req) => {
     if (country) userMetadata.country = country;
     if (account_type) userMetadata.account_type = account_type;
 
-    // Step 1 — create the user (unconfirmed). email_confirm: false means
-    // the user can't sign in until they click the link we send.
+    const isBusiness = account_type === "business";
+    const safeRedirect = typeof redirect_to === "string" && redirect_to.startsWith("/")
+      ? redirect_to
+      : isBusiness
+        ? "/onboarding/business/details"
+        : "/onboarding/identity";
+
+    // Step 1 — create the user (unconfirmed). If this email already started
+    // signup, resume that account instead of returning 409 (the client would
+    // otherwise show a generic "non-2xx" toast).
+    let userId: string;
+    let createdNew = false;
+
     const { data: created, error: createErr } = await admin.auth.admin.createUser({
       email,
       password,
@@ -89,21 +133,36 @@ Deno.serve(async (req) => {
       user_metadata: userMetadata,
     });
 
-    if (createErr || !created?.user) {
+    if (created?.user && !createErr) {
+      userId = created.user.id;
+      createdNew = true;
+    } else {
       const msg = createErr?.message || "Failed to create user";
-      // Map common Supabase errors to friendlier responses
-      const status = /already registered|already been registered/i.test(msg) ? 409 : 400;
-      return json(status, { error: msg });
+      if (!alreadyRegistered(msg)) {
+        return json(400, { error: msg });
+      }
+      const existing = await findExistingUser(admin, email);
+      if (!existing) {
+        return json(409, {
+          error: "This email already has an account. Sign in instead.",
+        });
+      }
+      if (existing.email_confirmed_at) {
+        return json(409, {
+          error: "This email already has an account. Sign in instead.",
+        });
+      }
+      const { error: updErr } = await admin.auth.admin.updateUserById(existing.id, {
+        password,
+        user_metadata: userMetadata,
+      });
+      if (updErr) {
+        console.warn("[send-signup-confirmation] update unconfirmed user:", updErr.message);
+      }
+      userId = existing.id;
     }
 
     // Step 2 — generate a confirmation token (no stock Supabase email).
-    // Email CTA must land on our app /auth/confirm, not /auth/v1/verify.
-    const isBusiness = account_type === "business";
-    const safeRedirect = typeof redirect_to === "string" && redirect_to.startsWith("/")
-      ? redirect_to
-      : isBusiness
-        ? "/onboarding/business/details"
-        : "/onboarding/identity";
     const appOrigin = getPublicAppOrigin();
     const redirectTo = `${appOrigin}/auth/confirm?type=signup&next=${encodeURIComponent(safeRedirect)}`;
 
@@ -115,9 +174,7 @@ Deno.serve(async (req) => {
 
     const tokenHash = extractHashedToken(link?.properties);
     if (linkErr || !tokenHash) {
-      // Clean up the half-created user so they don't end up in a
-      // unconfirmable state.
-      await admin.auth.admin.deleteUser(created.user.id);
+      if (createdNew) await admin.auth.admin.deleteUser(userId);
       console.error("[send-signup-confirmation] generateLink:", linkErr?.message);
       return json(500, { error: "Failed to generate confirmation link" });
     }
@@ -129,97 +186,83 @@ Deno.serve(async (req) => {
       appOrigin,
     });
 
-    // Step 2.5 — apply the extended profile fields (street, city, phone,
-    // etc.) so the user lands on the next page with their data already
-    // saved. handle_new_user() has already created the profile row from
-    // user_metadata; this just patches the extra fields onto it.
-    // Business signups skip date of birth and nationality — those belong
-    // on beneficial owners during KYB, not on the company login.
+    // Step 2.5 — patch profile fields. Business signups skip DOB / nationality.
     if (profile && typeof profile === "object") {
       const patch: Record<string, string | null> = {};
-      if (fullName)              patch.full_name = fullName;
-      if (profile.street)        patch.street_address = profile.street;
-      if (profile.city)          patch.city = profile.city;
-      if (profile.state)         patch.state_province = profile.state;
-      if (profile.postal_code)   patch.postal_code = profile.postal_code;
-      if (profile.country_code)  patch.address_country = profile.country_code;
-      if (profile.phone)         patch.phone_number = profile.phone;
+      if (fullName) patch.full_name = fullName;
+      if (profile.street) patch.street_address = profile.street;
+      if (profile.city) patch.city = profile.city;
+      if (profile.state) patch.state_province = profile.state;
+      if (profile.postal_code) patch.postal_code = profile.postal_code;
+      if (profile.country_code) patch.address_country = profile.country_code;
+      if (profile.phone) patch.phone_number = profile.phone;
       if (!isBusiness) {
         if (profile.date_of_birth) patch.date_of_birth = profile.date_of_birth;
-        if (profile.occupation)    patch.occupation = profile.occupation;
-        if (profile.nationality)   patch.nationality = profile.nationality;
+        if (profile.occupation) patch.occupation = profile.occupation;
+        if (profile.nationality) patch.nationality = profile.nationality;
       }
 
       if (Object.keys(patch).length > 0) {
         const { error: patchErr } = await admin
           .from("profiles")
           .update(patch)
-          .eq("user_id", created.user.id);
+          .eq("user_id", userId);
         if (patchErr) {
           console.warn("[send-signup-confirmation] profile patch:", patchErr.message);
-          // Non-fatal — confirmation email still goes out.
         }
       }
     }
 
-    // Step 2.6 — seed the KYB business profile so company details from
-    // signup are waiting on /onboarding/business/details.
-    if (isBusiness && business && typeof business === "object") {
-      const ENTITY_TYPES = new Set([
-        "sole_proprietorship",
-        "partnership",
-        "corporation",
-        "llc",
-        "cooperative",
-        "ngo",
-        "trust",
-        "other",
-      ]);
-      const legalName = typeof business.legal_name === "string" ? business.legal_name.trim() : "";
-      const entityType = ENTITY_TYPES.has(business.entity_type) ? business.entity_type : "corporation";
-      const incorporationCountry =
-        (typeof business.country_code === "string" && business.country_code.trim()) ||
-        (typeof country === "string" && country.trim()) ||
-        "CA";
+    // Step 2.6 — seed / refresh the KYB row. Never fail signup if this errors.
+    if (isBusiness && business && typeof business === "object" && !Array.isArray(business)) {
+      try {
+        const legalName = asTrimmed(business.legal_name);
+        const entityType = ENTITY_TYPES.has(String(business.entity_type))
+          ? String(business.entity_type)
+          : "corporation";
+        const incorporationCountry = (
+          asTrimmed(business.country_code) ||
+          asTrimmed(country) ||
+          "CA"
+        )
+          .slice(0, 2)
+          .toUpperCase();
 
-      if (legalName) {
-        const { error: bizErr } = await admin.from("business_profiles").insert({
-          owner_user_id: created.user.id,
-          legal_name: legalName,
-          entity_type: entityType,
-          incorporation_country: String(incorporationCountry).slice(0, 2).toUpperCase(),
-          incorporation_region: typeof business.state === "string" ? business.state.trim() || null : null,
-          registration_number:
-            typeof business.registration_number === "string"
-              ? business.registration_number.trim() || null
-              : null,
-          tax_id: typeof business.tax_id === "string" ? business.tax_id.trim() || null : null,
-          industry: typeof business.industry === "string" ? business.industry.trim() || null : null,
-          website: typeof business.website === "string" ? business.website.trim() || null : null,
-          business_phone:
-            typeof business.business_phone === "string"
-              ? business.business_phone.trim() || null
-              : null,
-          business_email:
-            typeof business.business_email === "string"
-              ? business.business_email.trim() || email
-              : email,
-          street_address: typeof business.street === "string" ? business.street.trim() || null : null,
-          city: typeof business.city === "string" ? business.city.trim() || null : null,
-          state_province: typeof business.state === "string" ? business.state.trim() || null : null,
-          postal_code:
-            typeof business.postal_code === "string" ? business.postal_code.trim() || null : null,
-          address_country: String(incorporationCountry).slice(0, 2).toUpperCase(),
-          kyb_status: "in_progress",
-          current_step: "details",
-        });
-        if (bizErr) {
-          console.warn("[send-signup-confirmation] business_profiles insert:", bizErr.message);
+        if (legalName) {
+          const row = {
+            owner_user_id: userId,
+            legal_name: legalName,
+            entity_type: entityType,
+            incorporation_country: incorporationCountry,
+            incorporation_region: asTrimmed(business.state),
+            registration_number: asTrimmed(business.registration_number),
+            tax_id: asTrimmed(business.tax_id),
+            industry: asTrimmed(business.industry),
+            website: asTrimmed(business.website),
+            business_phone: asTrimmed(business.business_phone),
+            business_email: asTrimmed(business.business_email) || email,
+            street_address: asTrimmed(business.street),
+            city: asTrimmed(business.city),
+            state_province: asTrimmed(business.state),
+            postal_code: asTrimmed(business.postal_code),
+            address_country: incorporationCountry,
+            kyb_status: "in_progress",
+            current_step: "details",
+          };
+          const { error: bizErr } = await admin
+            .from("business_profiles")
+            .upsert(row, { onConflict: "owner_user_id" });
+          if (bizErr) {
+            console.warn("[send-signup-confirmation] business_profiles upsert:", bizErr.message);
+          }
         }
+      } catch (bizCatch) {
+        console.warn("[send-signup-confirmation] business seed:", bizCatch);
       }
     }
 
-    // Step 3 — send the branded email.
+    // Step 3 — send the branded email. If dispatch fails the account still
+    // exists; return 200 so the client can show "check your inbox" + resend.
     const sendRes = await fetch(`${SUPABASE_URL}/functions/v1/send-email`, {
       method: "POST",
       headers: {
@@ -239,11 +282,10 @@ Deno.serve(async (req) => {
 
     if (!sendRes.ok) {
       console.error("[send-signup-confirmation] send-email failed:", await sendRes.text());
-      // Don't delete the user — they can still request a new link.
-      return json(502, { error: "Failed to dispatch email" });
+      return json(200, { ok: true, user_id: userId, email_sent: false });
     }
 
-    return json(200, { ok: true, user_id: created.user.id });
+    return json(200, { ok: true, user_id: userId, email_sent: true });
   } catch (e) {
     console.error("[send-signup-confirmation] error:", e);
     return json(500, { error: "Unexpected error" });

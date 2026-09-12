@@ -2,6 +2,7 @@ import { useState, useEffect, createContext, useContext, ReactNode } from 'react
 import { supabase } from '@/integrations/supabase/client';
 import { User, Session } from '@supabase/supabase-js';
 import { identifyUser, resetAnalytics, track } from '@/lib/analytics';
+import { edgeFunctionErrorMessage } from '@/lib/invokeEdgeFunction';
 
 interface SignupAddress {
   street: string;
@@ -180,7 +181,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         },
       });
 
-      if (error) throw error;
+      if (error) {
+        const msg = await edgeFunctionErrorMessage(error);
+        const bodyMsg = (data as { error?: string } | null)?.error;
+        throw new Error(bodyMsg || msg);
+      }
       const body = (data as { error?: string } | null) ?? null;
       if (body?.error) throw new Error(body.error);
 
@@ -193,7 +198,37 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       return { error: null };
     } catch (error) {
-      return { error: error as Error };
+      const msg = await edgeFunctionErrorMessage(error);
+      const recoverable =
+        /already registered|already been registered|already has an account|failed to dispatch email|non-2xx|unexpected error/i.test(
+          msg,
+        );
+      if (recoverable) {
+        const appOrigin = (import.meta.env.VITE_APP_URL || "https://www.efin.money").replace(/\/+$/, "");
+        const { error: resendErr } = await supabase.auth.resend({
+          type: "signup",
+          email,
+          options: { emailRedirectTo: `${appOrigin}/auth/confirm` },
+        });
+        if (!resendErr) {
+          track("user_signed_up", { email, recovered: true });
+          return { error: null };
+        }
+        const rm = resendErr.message || "";
+        if (/already (been )?registered|already confirmed|already exists/i.test(rm)) {
+          return {
+            error: new Error("This email already has an account. Sign in instead."),
+          };
+        }
+      }
+      if (/non-2xx/i.test(msg)) {
+        return {
+          error: new Error(
+            "We couldn't finish creating the account. If you already started signup, check your inbox or sign in.",
+          ),
+        };
+      }
+      return { error: new Error(msg) };
     }
   };
 
