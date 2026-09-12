@@ -160,6 +160,63 @@ const RISK_PENALTY: Record<string, number> = {
   critical: 0.8,
 };
 
+export type RoutingStrategy =
+  | "lowest_cost"
+  | "highest_profit"
+  | "highest_expected_profit"
+  | "best_overall";
+
+/**
+ * Re-rank scored candidates. Availability filters run first; this only orders
+ * who is tried first. `lowest_cost` is the Nomba/Fincra payout rule.
+ */
+export function rankByStrategy(
+  candidates: ScoredCandidate[],
+  strategy?: string | null,
+): ScoredCandidate[] {
+  const list = [...candidates];
+  const s = String(strategy || "best_overall");
+  if (s === "lowest_cost") {
+    return list.sort(
+      (a, b) =>
+        a.total_cost - b.total_cost
+        || num(b.success_rate, b.reliability_score) - num(a.success_rate, a.reliability_score)
+        || a.priority - b.priority,
+    );
+  }
+  if (s === "highest_profit" || s === "highest_expected_profit") {
+    return list.sort(
+      (a, b) => b.expected_profit - a.expected_profit || a.total_cost - b.total_cost || a.priority - b.priority,
+    );
+  }
+  return list.sort((a, b) => b.score - a.score || a.priority - b.priority);
+}
+
+/** Reorder rail ids using scored partner_code → total_cost (unknown rails keep their relative order at the end). */
+export function orderRailsByLeastCost(
+  rails: string[],
+  candidates: Array<{ partner_code: string; total_cost: number }>,
+): string[] {
+  const cost = new Map<string, number>();
+  for (const c of candidates) {
+    const code = String(c.partner_code || "").trim().toLowerCase();
+    if (!code || cost.has(code)) continue;
+    cost.set(code, num(c.total_cost));
+  }
+  const known: string[] = [];
+  const unknown: string[] = [];
+  const seen = new Set<string>();
+  for (const raw of rails) {
+    const r = raw.trim().toLowerCase();
+    if (!r || seen.has(r)) continue;
+    seen.add(r);
+    if (cost.has(r)) known.push(r);
+    else unknown.push(r);
+  }
+  known.sort((a, b) => (cost.get(a) ?? 0) - (cost.get(b) ?? 0));
+  return [...known, ...unknown];
+}
+
 /**
  * Score a candidate 0..1 using the active rule's weights.
  * Profit is normalised against the best profit in the candidate set.

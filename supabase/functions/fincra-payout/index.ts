@@ -136,6 +136,12 @@ const FINCRA_MM_CODE: Record<string, string> = {
   "ZMW:zamtel": "ZAMTEL",
   "RWF:mtn": "MTN",
   "RWF:airtel": "AIRTEL",
+  "XOF:orange": "ORANGE",
+  "XOF:mtn": "MTN",
+  "XOF:moov": "MOOV",
+  "XOF:wave": "WAVE",
+  "XAF:mtn": "MTN",
+  "XAF:orange": "ORANGE",
 };
 
 /** Currencies we will try as Fincra funding wallets (after preferred). */
@@ -149,6 +155,9 @@ const DIAL_BY_CURRENCY: Record<string, string> = {
   TZS: "255",
   ZMW: "260",
   RWF: "250",
+  XOF: "221",
+  XAF: "237",
+  ZAR: "27",
 };
 
 function splitName(full: string): { firstName: string; lastName: string } {
@@ -312,6 +321,9 @@ const CURRENCY_TO_COUNTRY: Record<string, string> = {
   TZS: "TZ",
   ZMW: "ZM",
   RWF: "RW",
+  XOF: "SN",
+  XAF: "CM",
+  ZAR: "ZA",
 };
 
 function preferredFundingCurrency(body: PayoutRequest, dest: string): string {

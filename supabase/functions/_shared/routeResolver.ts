@@ -4,6 +4,7 @@
 import {
   applyMarginFloor,
   applyPartnerScores,
+  rankByStrategy,
   scoreCandidates,
   type CandidateInput,
   type CustomerPricingRow,
@@ -449,6 +450,9 @@ export async function resolveRoute(
     candidates = scored.candidates;
   }
 
+  // Availability already dropped ineligible partners. Honour the active
+  // payout rule (lowest_cost = Nomba vs Fincra by total cost).
+  candidates = rankByStrategy(candidates, rule?.strategy);
 
   // Pins float to the top, in override order.
   if (pinned.length) {

@@ -17,7 +17,8 @@
     "test:cad-interac": "node --experimental-strip-types scripts/verify-cad-interac-payout.ts",
     "test:cad-rails": "node --experimental-strip-types scripts/verify-cad-rails.ts",
     "test:nomba-email": "node --experimental-strip-types scripts/verify-nomba-customer-email.ts",
-    "test:fincra-rfi": "node --experimental-strip-types scripts/verify-fincra-rfi.ts"
+    "test:fincra-rfi": "node --experimental-strip-types scripts/verify-fincra-rfi.ts",
+    "test:nomba-fincra": "node --experimental-strip-types scripts/verify-nomba-fincra-corridors.ts"
   },
   "dependencies": {
     "@adyen/adyen-web": "^6.39.0",

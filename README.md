@@ -38,6 +38,14 @@ Send checkout and CAD wallet collections take Interac Autodeposit through Fincra
 
 **CAD Interac payout (Canadian recipients):** email and mobile are each optional, but at least one is required. The APIs refuse collection (card charge, wallet debit, Interac pay-in) until a valid destination is on the transfer. **Canadian profiles** store a dedicated Interac Autodeposit email (`profiles.interac_email`) separate from the login email — Nomba Checkout never uses the Interac mailbox or `@efin.money` as `customerEmail` (Nomba returns “The provided email is blocked”); it uses the payer’s personal login or `payer.{id}@efinsuite.com`. Nomba Interac payouts reject eFinMoney login addresses (`@efin.money`). Apply `supabase/migrations/20260912124500_profile_interac_email_schema_cache.sql` in the Supabase SQL editor (or `supabase db push`) so PostgREST reloads the schema cache — without that, Profile Settings save fails with “Could not find the 'interac_email' column of 'profiles' in the schema cache”. The app still saves billing without that column and keeps Interac on auth `user_metadata` until the SQL is applied. Also in `supabase/production-sql.sql` section 7. Redeploy: `nomba-collection`, `nomba-payout`. **CAD rails:** Nomba Checkout for cards; Fincra Autodeposit for Interac pay-in (`fincra-cad-interac`); Nomba Global Payout for Interac/EFT send. Paysafe and Flovide are not used for CAD collect or CAD payout. If Nomba fails after the wallet is debited, the transfer stays `funded` / `pending_ops` and `execute-transfer` / `treasury-worker` can resume. Redeploy: `execute-transfer`, `treasury-worker`, `nomba-payout`, `payment-link-claim`, `flovide-payout`, `paysafe-payout`. Check: `npm run test:cad-interac`, `npm run test:nomba-email`, and `npm run test:cad-rails`.
 
+## Nomba / Fincra payout corridors (availability + least cost)
+
+Send is live to every destination Nomba or Fincra can pay: **Uganda (CAD→UGX)**, Tanzania, Rwanda, Ghana, Kenya, Nigeria, Zambia (Fincra only), West/Central Africa XOF/XAF, Ethiopia, DR Congo, South Africa, UAE, UK, eurozone, US, and Canada CAD.
+
+Payout rule: among **available** rails, try the **lowest total cost** first, then fail over. Nomba and Fincra compete on those corridors. **Canada CAD payout stays Nomba Interac/EFT** (never Fincra payout, never M-Pesa). Zambia stays Fincra (Nomba has no ZMW).
+
+SQL: `supabase/migrations/20260912180000_activate_nomba_fincra_corridors.sql`. Redeploy: `execute-transfer`, `nomba-payout`, `fincra-payout`. Check: `npm run test:nomba-fincra`.
+
 ## Bank tab: Plaid, Fincra, Verto, Nomba
 
 The Bank account page (`/wallet/receive`) lists company or personal linked banks.

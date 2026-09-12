@@ -37,14 +37,24 @@ export const COUNTRIES: CountryInfo[] = [
     { id: "vodafone", label: "Vodafone", payout: "vodafone_money" },
     { id: "airteltigo", label: "AirtelTigo", payout: "airteltigo_money" },
   ]},
-  { id: "Uganda", country: "Uganda", code: "UGX", flag: "🇺🇬", method: "MoMo", payout: "airtel_money", region: "Africa", symbol: "USh" },
-  { id: "Tanzania", country: "Tanzania", code: "TZS", flag: "🇹🇿", method: "M-Pesa", payout: "mpesa", region: "Africa", symbol: "TSh" },
+  { id: "Uganda", country: "Uganda", code: "UGX", flag: "🇺🇬", method: "MoMo", payout: "mtn_mobile", region: "Africa", symbol: "USh", networks: [
+    { id: "mtn", label: "MTN", payout: "mtn_mobile" },
+    { id: "airtel", label: "Airtel", payout: "airtel_money" },
+  ]},
+  { id: "Tanzania", country: "Tanzania", code: "TZS", flag: "🇹🇿", method: "M-Pesa", payout: "mpesa", region: "Africa", symbol: "TSh", networks: [
+    { id: "vodacom", label: "Vodacom M-Pesa", payout: "mpesa" },
+    { id: "airtel", label: "Airtel", payout: "airtel_money" },
+    { id: "tigo", label: "Tigo", payout: "tigo_money" },
+  ]},
   { id: "Zambia", country: "Zambia", code: "ZMW", flag: "🇿🇲", method: "MoMo", payout: "mtn_mobile", region: "Africa", symbol: "ZK", networks: [
     { id: "mtn", label: "MTN", payout: "mtn_mobile" },
     { id: "airtel", label: "Airtel", payout: "airtel_money" },
     { id: "zamtel", label: "Zamtel", payout: "zamtel_money" },
   ] },
-  { id: "Rwanda", country: "Rwanda", code: "RWF", flag: "🇷🇼", method: "MoMo", payout: "mtn_mobile", region: "Africa", symbol: "RF" },
+  { id: "Rwanda", country: "Rwanda", code: "RWF", flag: "🇷🇼", method: "MoMo", payout: "mtn_mobile", region: "Africa", symbol: "RF", networks: [
+    { id: "mtn", label: "MTN", payout: "mtn_mobile" },
+    { id: "airtel", label: "Airtel", payout: "airtel_money" },
+  ]},
   { id: "Ethiopia", country: "Ethiopia", code: "ETB", flag: "🇪🇹", method: "Bank Transfer", payout: "bank", region: "Africa" },
   { id: "Senegal", country: "Senegal", code: "XOF", flag: "🇸🇳", method: "Wave/Orange", payout: "mobile_money", region: "Africa" },
   { id: "Ivory Coast", country: "Ivory Coast", code: "XOF", flag: "🇨🇮", method: "Wave/Orange", payout: "mobile_money", region: "Africa" },
@@ -142,11 +152,13 @@ export const COUNTRIES: CountryInfo[] = [
 ];
 
 export const POPULAR_COUNTRY_IDS = [
-  "Canada", "United States", "Nigeria", "Ghana", "Kenya", "Zambia",
+  "Canada", "United States", "Nigeria", "Ghana", "Kenya", "Uganda", "Zambia",
 ];
 
 /**
- * Live pay-in / payout destinations. Every other country is shown as Coming soon.
+ * Live send destinations: everywhere Nomba or Fincra can pay out.
+ * Canada CAD stays Nomba Interac/EFT (not Fincra, not M-Pesa).
+ * Zambia stays Fincra (Nomba has no ZMW).
  */
 export const LIVE_SEND_COUNTRY_IDS = [
   "Canada",
@@ -154,7 +166,33 @@ export const LIVE_SEND_COUNTRY_IDS = [
   "Nigeria",
   "Ghana",
   "Kenya",
+  "Uganda",
+  "Tanzania",
+  "Rwanda",
   "Zambia",
+  "Senegal",
+  "Ivory Coast",
+  "Benin",
+  "Togo",
+  "Burkina Faso",
+  "Mali",
+  "Niger",
+  "Cameroon",
+  "Congo",
+  "Ethiopia",
+  "DR Congo",
+  "South Africa",
+  "UAE",
+  "United Kingdom",
+  "Germany",
+  "France",
+  "Italy",
+  "Spain",
+  "Netherlands",
+  "Belgium",
+  "Portugal",
+  "Ireland",
+  "Austria",
 ] as const;
 
 export const LIVE_SEND_COUNTRIES: CountryInfo[] = LIVE_SEND_COUNTRY_IDS
@@ -178,7 +216,34 @@ const ISO2_TO_COUNTRY_ID: Record<string, string> = {
   NGA: "Nigeria",
   GH: "Ghana",
   KE: "Kenya",
+  UG: "Uganda",
+  TZ: "Tanzania",
+  RW: "Rwanda",
   ZM: "Zambia",
+  SN: "Senegal",
+  CI: "Ivory Coast",
+  BJ: "Benin",
+  TG: "Togo",
+  BF: "Burkina Faso",
+  ML: "Mali",
+  NE: "Niger",
+  CM: "Cameroon",
+  CG: "Congo",
+  ET: "Ethiopia",
+  CD: "DR Congo",
+  ZA: "South Africa",
+  AE: "UAE",
+  GB: "United Kingdom",
+  UK: "United Kingdom",
+  DE: "Germany",
+  FR: "France",
+  IT: "Italy",
+  ES: "Spain",
+  NL: "Netherlands",
+  BE: "Belgium",
+  PT: "Portugal",
+  IE: "Ireland",
+  AT: "Austria",
 };
 
 /** True for CAD currency, ISO2/ISO3, or the word Canada. */

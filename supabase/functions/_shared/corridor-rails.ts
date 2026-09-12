@@ -3,7 +3,7 @@
  */
 import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { filterLiveRails, isRetiredRail } from "./retiredPartners.ts";
-import { defaultPayoutRails, isCanadaCadPayout, nombaPayoutSupported, sanitizeCanadaPayoutRails } from "./nomba-payout-corridors.ts";
+import { defaultPayoutRails, fincraPayoutSupported, isCanadaCadPayout, nombaPayoutSupported, sanitizeCanadaPayoutRails } from "./nomba-payout-corridors.ts";
 import { nombaApiConfigured } from "./nomba-api.ts";
 
 export type RailDirection = "collect" | "payout";
@@ -31,6 +31,9 @@ const CURRENCY_TO_ISO2: Record<string, string> = {
   ZAR: "ZA",
   XOF: "SN",
   XAF: "CM",
+  ETB: "ET",
+  CDF: "CD",
+  AED: "AE",
   CAD: "CA",
   USD: "US",
   GBP: "GB",
@@ -48,10 +51,18 @@ const NAME_TO_ISO2: Record<string, string> = {
   ZAMBIA: "ZM",
   "SOUTH AFRICA": "ZA",
   SENEGAL: "SN",
+  "IVORY COAST": "CI",
+  "COTE D IVOIRE": "CI",
   CAMEROON: "CM",
+  ETHIOPIA: "ET",
+  "DR CONGO": "CD",
+  CONGO: "CG",
   CANADA: "CA",
   "UNITED STATES": "US",
   "UNITED KINGDOM": "GB",
+  UAE: "AE",
+  GERMANY: "DE",
+  FRANCE: "FR",
 };
 
 /** Ordered rails: preferred first, then failover (deduped). */
@@ -139,13 +150,19 @@ export async function resolveCorridorRails(
     if (rails.length) source = "default";
   }
 
-  // Always try Nomba first when configured + corridor supported — even if an older
-  // admin policy lists Flovide/Fincra ahead of Nomba.
-  if (direction === "payout" && rails.length && nombaApiConfigured()) {
-    if (nombaPayoutSupported({ currency: ccy, country: cc || country, method })) {
-      const rest = rails.filter((r) => r !== "nomba");
-      if (rails[0] !== "nomba") {
-        rails = ["nomba", ...rest];
+  // Make Nomba and Fincra available on every corridor they support. Do not
+  // force Nomba first — execute-transfer reorders by least cost. Canada CAD
+  // is sanitized to Nomba-only below.
+  if (direction === "payout") {
+    if (nombaApiConfigured() && nombaPayoutSupported({ currency: ccy, country: cc || country, method })) {
+      if (!rails.includes("nomba")) rails = ["nomba", ...rails];
+    }
+    if (fincraPayoutSupported(ccy, cc || country)) {
+      if (!rails.includes("fincra")) {
+        const i = rails.indexOf("nomba");
+        rails = i >= 0
+          ? [...rails.slice(0, i + 1), "fincra", ...rails.slice(i + 1)]
+          : ["fincra", ...rails];
       }
     }
   }

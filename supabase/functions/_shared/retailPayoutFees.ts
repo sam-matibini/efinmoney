@@ -4,6 +4,25 @@ export const RETAIL_PAYOUT_FEE_USD: Record<string, number> = {
   GH: 2,
   KES: 2,
   KE: 2,
+  UGX: 2,
+  UG: 2,
+  TZS: 2,
+  TZ: 2,
+  RWF: 2,
+  RW: 2,
+  XOF: 2,
+  XAF: 2,
+  ETB: 2,
+  ET: 2,
+  CDF: 2,
+  CD: 2,
+  ZAR: 3,
+  ZA: 3,
+  AED: 3,
+  AE: 3,
+  GBP: 2,
+  GB: 2,
+  EUR: 2,
   ZMW: 3,
   ZM: 3,
 };
@@ -16,7 +35,11 @@ export const RETAIL_PAYOUT_FEE_NATIVE: Record<string, { currency: string; amount
 };
 
 export const LIVE_PAYIN_CURRENCIES = ["NGN", "GHS", "KES", "ZMW", "CAD", "USD"] as const;
-export const LIVE_PAYOUT_CURRENCIES = ["NGN", "GHS", "KES", "ZMW", "CAD", "USD"] as const;
+export const LIVE_PAYOUT_CURRENCIES = [
+  "NGN", "GHS", "KES", "UGX", "TZS", "RWF", "ZMW",
+  "XOF", "XAF", "ETB", "CDF", "ZAR", "AED",
+  "CAD", "USD", "GBP", "EUR",
+] as const;
 
 export function retailPayoutFeeUsd(destCurrencyOrCountry: string | null | undefined): number | null {
   const key = String(destCurrencyOrCountry || "").toUpperCase();
@@ -38,6 +61,10 @@ export function isLivePayinCurrency(code: string | null | undefined): boolean {
 export function isLivePayoutCurrency(code: string | null | undefined): boolean {
   const c = String(code || "").toUpperCase();
   if ((LIVE_PAYOUT_CURRENCIES as readonly string[]).includes(c)) return true;
-  if (["NG", "GH", "KE", "ZM", "CA", "US"].includes(c)) return true;
-  return ["NIGERIA", "GHANA", "KENYA", "ZAMBIA", "CANADA", "UNITED STATES", "USA"].includes(c);
+  if (["NG", "GH", "KE", "UG", "TZ", "RW", "ZM", "SN", "CI", "CM", "ET", "CD", "ZA", "AE", "CA", "US", "GB", "DE", "FR"].includes(c)) return true;
+  return [
+    "NIGERIA", "GHANA", "KENYA", "UGANDA", "TANZANIA", "RWANDA", "ZAMBIA",
+    "SENEGAL", "IVORY COAST", "CAMEROON", "ETHIOPIA", "DR CONGO", "SOUTH AFRICA",
+    "UAE", "CANADA", "UNITED STATES", "USA", "UNITED KINGDOM", "GERMANY", "FRANCE",
+  ].includes(c);
 }

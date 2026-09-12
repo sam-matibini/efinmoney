@@ -416,3 +416,17 @@ export function nombaBankPaymentMethod(currency: string, country: string, method
   if (currency === "CAD" && m.includes("eft")) return "EFT";
   return "BANK";
 }
+
+/** Currencies Fincra can pay out (CAD is Interac collect only — never CAD payout). */
+export const FINCRA_PAYOUT_CURRENCIES = new Set([
+  "NGN", "GHS", "KES", "UGX", "TZS", "ZMW", "ZAR", "XOF", "XAF", "RWF",
+]);
+
+export function fincraPayoutSupported(currency?: string | null, country?: string | null): boolean {
+  const ccy = String(currency || "").trim().toUpperCase();
+  if (isCanadaCadPayout({ currency: ccy, country, method: "interac" })) return false;
+  if (ccy === "CAD") return false;
+  const cc = String(country || "").trim().toUpperCase();
+  if (cc === "CA" && (ccy === "CAD" || !ccy)) return false;
+  return FINCRA_PAYOUT_CURRENCIES.has(ccy);
+}

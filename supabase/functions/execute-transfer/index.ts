@@ -1,6 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { dispatchRoutedPayout } from "../_shared/routingExecute.ts";
-import { observeRoute } from "../_shared/routeResolver.ts";
+import { observeRoute, resolveRoute } from "../_shared/routeResolver.ts";
 import { recordEconomics } from "../_shared/transactionEconomics.ts";
 import { assertQuotedFee } from "../_shared/pricingService.ts";
 import { isLivePayoutCurrency } from "../_shared/retailPayoutFees.ts";
@@ -11,6 +11,7 @@ import { nombaApiConfigured } from "../_shared/nomba-api.ts";
 import { requireCadInteracDestination } from "../_shared/cadInteracPayout.ts";
 import { canResumeExecuteTransfer } from "../_shared/executeTransferResume.ts";
 import { isCanadaCadPayout, resolvePayoutNetwork } from "../_shared/nomba-payout-corridors.ts";
+import { orderRailsByLeastCost } from "../_shared/routingEngine.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -533,7 +534,7 @@ Deno.serve(async (req) => {
       Deno.env.get("FINCRA_SECRET_KEY")?.trim()
       && Deno.env.get("FINCRA_BUSINESS_ID")?.trim()
     );
-    const FINCRA_MOMO = new Set(["KES", "GHS", "UGX", "TZS", "ZMW", "RWF"]);
+    const FINCRA_MOMO = new Set(["KES", "GHS", "UGX", "TZS", "ZMW", "RWF", "XOF", "XAF"]);
     const isNigeriaBank =
       targetCurrency === "NGN" &&
       transfer.payout_method === "bank" &&
@@ -545,9 +546,9 @@ Deno.serve(async (req) => {
       !!transfer.recipient_account &&
       !!transfer.recipient_bank_code;
 
-    // Corridors Fincra can serve → fixed priority chain (not random).
-    // Order: Nomba (default) → Fincra → Flutterwave → … when no admin policy.
-    // EXCEPTION: Zambia MoMo stays Fincra-only (Nomba does not support ZMW).
+    // Zambia MoMo stays Fincra-only (Nomba does not support ZMW).
+    // Kenya and Uganda (and every other Nomba+Fincra corridor) use availability
+    // + least-cost between Nomba and Fincra — not an exclusive rail.
     const fincraCapable =
       !isCanada
       && transfer.payout_method !== "card_push"
@@ -559,9 +560,7 @@ Deno.serve(async (req) => {
     // Zambia MoMo is Fincra-exclusive: Nomba has no ZMW corridor.
     const zambiaMomo = isMobileMoneyMethod && (isZambia || targetCurrency === "ZMW");
     const fincraExclusiveCorridor = zambiaMomo;
-    // Kenya is Nomba-exclusive: no failover to Fincra/Flovide/Flutterwave/Paytota/Swychr.
-    const kenyaNombaExclusive =
-      (isKenya || targetCurrency === "KES") && transfer.payout_method !== "card_push";
+    // Kenya is Nomba+Fincra with least-cost ranking (no exclusive rail).
 
 
 
@@ -587,20 +586,11 @@ Deno.serve(async (req) => {
       recipientCountry || transfer.recipient_country,
       transfer.payout_method,
     );
-    // Kenya: Nomba only, whatever the saved policy/failover list says.
     // Canada CAD: never follow an admin policy that lists Flutterwave/Fincra MoMo
     // (that produces "Unsupported network mpesa for CAD"). Dedicated Interac/EFT chain below.
-    const policyRails = kenyaNombaExclusive
-      ? (nombaApiConfigured() ? ["nomba"] : [])
-      : isCanada
-      ? []
-      : resolvedPolicyRails;
+    let policyRails = isCanada ? [] : [...resolvedPolicyRails];
     let policyRouted = false;
 
-
-    // Routing engine (Phase 3): only takes over when an operator has switched the
-    // active rule to live AND enabled live routing on this corridor. Otherwise the
-    // existing hardcoded rails below run exactly as before.
     const routeRequest = {
       direction: "payout" as const,
       source_currency: transfer.source_currency,
@@ -612,14 +602,25 @@ Deno.serve(async (req) => {
       amount: Number(transfer.source_amount) || 0,
     };
 
+    if (!isCanada && policyRails.length > 1) {
+      try {
+        const ranked = await resolveRoute(supabase, routeRequest);
+        if (ranked.candidates.length) {
+          policyRails = orderRailsByLeastCost(policyRails, ranked.candidates);
+          console.log("least-cost payout rails", policyRails, "strategy", ranked.rule?.strategy);
+        }
+      } catch (e) {
+        console.error("least-cost rail ranking failed, using policy order", e);
+      }
+    }
+
     let engineRouted = false;
     // Zambia MoMo and ops force_rail skip the routing engine — Fincra-only for ZMW.
-    // Kenya skips it too — Nomba-exclusive corridor.
     // Canada CAD skips it — Interac/EFT only, never Kenya M-Pesa scoring.
     // Admin / code-default payout rails also skip the scoring engine (explicit ops choice).
     if (
       !forceFincraOnly && !fincraExclusiveCorridor && !zambiaMomo
-      && !kenyaNombaExclusive && !isCanada && policyRails.length === 0
+      && !isCanada && policyRails.length === 0
     ) {
 
 
@@ -743,15 +744,6 @@ Deno.serve(async (req) => {
             }).eq("id", transfer_id);
           }
         }
-      } else if (kenyaNombaExclusive) {
-        // Kenya is Nomba-exclusive: fail cleanly instead of falling back to another rail.
-        payoutResult = {
-          success: false,
-          rail: "nomba",
-          error: "Nomba is not configured for Kenya payouts",
-          code: "partner_not_configured",
-          force_rail: "nomba_exclusive",
-        };
       } else if (forceFincraOnly || fincraExclusiveCorridor) {
 
         // Zambia MoMo (and ops force_rail): Fincra only — Nomba has no ZMW corridor.
