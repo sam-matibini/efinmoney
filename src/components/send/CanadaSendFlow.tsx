@@ -57,7 +57,6 @@ import WiseInteracInvoiceCheckout from "@/components/payments/WiseInteracInvoice
 import CadBankEftCheckout from "@/components/payments/CadBankEftCheckout";
 import { cadSendPayInCheckout } from "@/lib/cadCollectCheckout";
 import { productFeatures } from "@/lib/productFeatures";
-import { FINCRA_CAD_INTERAC_ALIAS } from "@/lib/fincraCad";
 import { isWisePayCurrency } from "@/lib/wisePayLink";
 import { CAD_INTERAC_MISSING_CONTACT, resolveCadInteracDestination } from "@/lib/cadInteracPayout";
 import {
@@ -882,7 +881,7 @@ const CanadaSendFlow = () => {
     {
       id: "interac",
       label: "Interac",
-      sublabel: "e-Transfer · Fincra Autodeposit",
+      sublabel: "e-Transfer · Auto-deposit",
       icon: Banknote,
       tone: "bank",
     },
@@ -894,7 +893,7 @@ const CanadaSendFlow = () => {
       tone: "bank",
     },
     ...(productFeatures.nombaNigeria
-      ? [{ id: "card" as const, label: "Card", sublabel: "Nomba checkout", icon: CreditCard, tone: "card" as const }]
+      ? [{ id: "card" as const, label: "Card", sublabel: "Debit or Credit · Visa/Mastercard", icon: CreditCard, tone: "card" as const }]
       : []),
   ];
 
@@ -960,12 +959,12 @@ const CanadaSendFlow = () => {
               total={totalCharged}
               currency="CAD"
               symbol="C$"
-              cardTitle="Card · Nomba"
+              cardTitle="Debit or Credit"
               cardProviderReady={productFeatures.nombaNigeria}
-              cardChargeNote="Visa, Mastercard, or debit on Nomba’s secure checkout. We credit your CAD wallet, then pay the recipient."
-              cardMinNote="Minimum Nomba collect is C$2.00."
-              interacTitle="Interac e-Transfer · Fincra"
-              interacDescription={`Confirm to open Fincra Interac Autodeposit for C$${totalCharged.toFixed(2)}. Send CAD to ${FINCRA_CAD_INTERAC_ALIAS} with your payment code. Fincra matches the deposit; Nomba then pays ${recipientName || "your recipient"}.`}
+              cardChargeNote="Visa, Mastercard, or debit on a secure checkout. We credit your CAD wallet, then pay the recipient."
+              cardMinNote="Minimum card collect is C$2.00."
+              interacTitle="Interac e-Transfer"
+              interacDescription={`Confirm to open Interac Auto-deposit for C$${totalCharged.toFixed(2)}. Send CAD with your payment code. The deposit is matched, then we pay ${recipientName || "your recipient"}.`}
               insufficientBalance={insufficient}
               onTopUp={() => navigate("/wallet/topup")}
             />
@@ -1786,8 +1785,8 @@ const CanadaSendFlow = () => {
               <ReviewRow
                 label="You pay with"
                 value={
-                  funding === "card" ? "Card · Nomba"
-                    : funding === "interac" ? "Interac e-Transfer · Fincra"
+                  funding === "card" ? "Debit or Credit · Visa/Mastercard"
+                    : funding === "interac" ? "Interac e-Transfer · Auto-deposit"
                     : funding === "bank" ? "Bank EFT · Nuvei coming soon"
                     : funding === "wise" ? "Wise"
                     : "CAD wallet"

@@ -2381,7 +2381,7 @@ const SendPage = () => {
 
   const fundingMethodOptions: PaymentMethodOption<FundingSource>[] = [
     ...(cardFundingAvailable
-      ? [{ id: "card" as const, label: "Card", sublabel: "Nomba · debit or credit", icon: CreditCard, tone: "card" as const }]
+      ? [{ id: "card" as const, label: "Card", sublabel: "Debit or Credit · Visa/Mastercard", icon: CreditCard, tone: "card" as const }]
       : []),
     {
       id: "bank" as const,
@@ -2396,7 +2396,7 @@ const SendPage = () => {
       ? [{
           id: "interac" as const,
           label: "Interac",
-          sublabel: "e-Transfer · Fincra",
+          sublabel: "e-Transfer · Auto-deposit",
           icon: Banknote,
           tone: "bank" as const,
         }]
@@ -3267,12 +3267,12 @@ const SendPage = () => {
                                         currency={sourceCurrency}
                                         symbol={sourceSymbol}
                                         cardProviderReady={!!cardSendProvider}
-                                        cardTitle={productFeatures.nombaNigeria ? "Card · Nomba" : undefined}
-                                        cardChargeNote={productFeatures.nombaNigeria ? "Visa, Mastercard, Amex or Verve on Nomba’s secure checkout." : null}
-                                        interacTitle="Interac e-Transfer · Fincra"
+                                        cardTitle={productFeatures.nombaNigeria ? "Debit or Credit" : undefined}
+                                        cardChargeNote={productFeatures.nombaNigeria ? "Visa, Mastercard, Amex or Verve on a secure checkout." : null}
+                                        interacTitle="Interac e-Transfer"
                                         interacDescription={
                                           productFeatures.fincraInterac
-                                            ? `Confirm to open Fincra Interac Autodeposit for ${sourceSymbol}${totalCharge.toFixed(2)}. Send CAD to the Autodeposit email with your payment code.`
+                                            ? `Confirm to open Interac Auto-deposit for ${sourceSymbol}${totalCharge.toFixed(2)}. Send CAD with your payment code.`
                                             : undefined
                                         }
                                         cardMinNote={

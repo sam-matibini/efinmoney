@@ -20,8 +20,7 @@ export default function NuveiEftComingSoon({ className }: { className?: string }
       </div>
       <p className="text-xs text-muted-foreground leading-relaxed">
         Canadian bank debit through Nuvei Payment Middleware (sandbox). Live keys are not
-        available yet — Confirm still uses your linked bank / Loop EFT. Card stays Nomba.
-        Interac stays Fincra Autodeposit.
+        available yet — Confirm still uses your linked bank / Loop EFT.
       </p>
       <p className="text-[11px] text-muted-foreground">
         API: {NUVEI_MW_DOCS.replace("https://", "")}

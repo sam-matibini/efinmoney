@@ -95,7 +95,6 @@ import { useFxRates } from "@/hooks/useFxRates";
 import ComingSoon from "@/components/common/ComingSoon";
 import NuveiEftComingSoon from "@/components/payments/NuveiEftComingSoon";
 import { isLiveTopupCurrency, productFeatures } from "@/lib/productFeatures";
-import { FINCRA_CAD_INTERAC_ALIAS } from "@/lib/fincraCad";
 import { CAD_COLLECT_METHOD_IDS, orderCadCollectMethods } from "@/lib/cadCollectCheckout";
 import AppPage from "@/components/layout/AppPage";
 import { SectionBoundary } from "@/components/common/SectionBoundary";
@@ -1112,7 +1111,7 @@ const TopUpPage = () => {
         id: "epay",
         tone: "card",
         label: "ePay (test)",
-        description: "CAD credit · charged in USD on ePay",
+        description: "Asia",
         content: (
           <SectionBoundary name="EpayTopUp">
             <EpayTopUpCard walletId={walletId} walletCurrency={currency} initialAmount={amount} embedded onComplete={invalidateWallets} />
@@ -1128,7 +1127,7 @@ const TopUpPage = () => {
         label: ccyUpper === "CAD" ? "Card" : "Card",
         description:
           ccyUpper === "CAD"
-            ? "Visa / Mastercard — Nomba checkout"
+            ? "Debit/Credit Card — Visa/Mastercard"
             : "Card or bank transfer",
         content: (
           <SectionBoundary name="NombaTopUp">
@@ -1148,7 +1147,7 @@ const TopUpPage = () => {
           id: "nomba_eft",
           tone: "bank",
           label: "Bank",
-          description: "Nuvei EFT coming soon · Nomba bank transfer",
+          description: "Nuvei EFT coming soon",
           content: (
             <SectionBoundary name="NombaEftTopUp">
               <div className="space-y-3">
@@ -1231,7 +1230,7 @@ const TopUpPage = () => {
         tone: "bank",
         label: "Interac e-Transfer",
         description: productFeatures.fincraInterac
-          ? `Fincra Autodeposit · ${FINCRA_CAD_INTERAC_ALIAS}`
+          ? "Auto-deposit"
           : "Use bank account to make instant payments",
         content: (
           <SectionBoundary name="CadInteracTopUp">

@@ -6,7 +6,6 @@ import { CurrencyFlag } from "@/components/ui/FlagImage";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { CardFieldsInputs, type CardFieldsValue } from "@/components/payments/cardFields";
 import { productFeatures } from "@/lib/productFeatures";
-import { FINCRA_CAD_INTERAC_ALIAS } from "@/lib/fincraCad";
 import PayMethodMark, { CardBrandMark } from "@/components/money/PayMethodMark";
 import NuveiEftComingSoon from "@/components/payments/NuveiEftComingSoon";
 
@@ -206,8 +205,8 @@ const MethodCheckoutPanel = ({
           <p className="mt-1 text-xs text-muted-foreground">
             {interacDescription
               || (fincraOn
-                ? `Confirm to open Interac checkout for ${symbol}${money(total)} ${currency}. Send CAD Autodeposit to ${FINCRA_CAD_INTERAC_ALIAS} with your payment code. Fincra matches the deposit; Nomba then pays the recipient.`
-                : `Confirm to open checkout for ${symbol}${money(total)} ${currency}. Send Interac Autodeposit — payout releases when the deposit matches.`)}
+                ? `Confirm to open Interac checkout for ${symbol}${money(total)} ${currency}. Send CAD Auto-deposit with your payment code.`
+                : `Confirm to open checkout for ${symbol}${money(total)} ${currency}. Send Interac Auto-deposit — payout releases when the deposit matches.`)}
           </p>
         </div>
         <ChargeSummary amount={amount} fee={fee} total={total} currency={currency} symbol={symbol} debitLabel="Interac from your bank" />
