@@ -43,27 +43,31 @@ Deno.serve(async (req) => {
       purpose?: string;
     };
 
-    const plaid_account_id = String(body.plaid_account_id || "");
+    const plaid_account_id = String(body.plaid_account_id || "").trim();
     const destination_wallet_id = String(body.destination_wallet_id || "");
     const amount_cad = Number(body.amount_cad);
     const description = String(body.description || "").trim();
     const linkedTransferId = String(body.transfer_id || "").trim();
     const purpose = String(body.purpose || "topup").toLowerCase();
 
-    if (!plaid_account_id || !destination_wallet_id || !Number.isFinite(amount_cad)) {
+    if (!destination_wallet_id || !Number.isFinite(amount_cad)) {
       return json({ error: "Missing fields" }, 400);
     }
     if (amount_cad <= 0 || amount_cad > 25000) {
       return json({ error: "Amount must be between 0.01 and 25,000 CAD" }, 400);
     }
 
-    const { data: pa } = await supabase
-      .from("plaid_accounts")
-      .select("*")
-      .eq("id", plaid_account_id)
-      .eq("user_id", user.id)
-      .maybeSingle();
-    if (!pa) return json({ error: "Bank account not found" }, 404);
+    let pa: { id: string; name?: string | null; mask?: string | null } | null = null;
+    if (plaid_account_id) {
+      const { data } = await supabase
+        .from("plaid_accounts")
+        .select("*")
+        .eq("id", plaid_account_id)
+        .eq("user_id", user.id)
+        .maybeSingle();
+      if (!data) return json({ error: "Bank account not found" }, 404);
+      pa = data;
+    }
 
     const { data: wallet } = await supabase
       .from("wallets")
@@ -107,12 +111,14 @@ Deno.serve(async (req) => {
       .from("intra_ca_transfers")
       .insert({
         user_id: user.id,
-        plaid_account_id,
+        plaid_account_id: pa?.id || null,
         destination_wallet_id,
         amount_cad: amount,
         description:
           description ||
-          `Plaid→Loop CAD pay-in (${pa.name || "bank"} ••${pa.mask || ""})`,
+          (pa
+            ? `Plaid→Loop CAD pay-in (${pa.name || "bank"} ••${pa.mask || ""})`
+            : "EFT→Loop CAD pay-in"),
         status: "processing",
         reference,
       })
@@ -134,7 +140,7 @@ Deno.serve(async (req) => {
       claimed_sent_at: new Date().toISOString(),
       sender_name: senderName,
       sender_email: user.email || null,
-      sender_bank: pa.name || null,
+      sender_bank: pa?.name || null,
       purpose: purpose === "transfer" ? "transfer" : purpose === "merchant_collection" ? "merchant_collection" : "topup",
       transfer_id: purpose === "transfer" && linkedTransferId ? linkedTransferId : null,
     }).then(({ error }) => {
@@ -157,7 +163,7 @@ Deno.serve(async (req) => {
       hosted_mandate_url: null,
       stripe_status: null,
       message:
-        "Bank linked via Plaid. Send Interac Autodeposit/EFT to Loop Bank with this reference; wallet credits and any linked payout release only after the deposit matches.",
+        "Send EFT to Loop Bank with this reference. Plaid does not pull CAD. Wallet credits and any linked payout release only after the deposit matches.",
     });
   } catch (e) {
     console.error(e);

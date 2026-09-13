@@ -103,3 +103,20 @@ export function defaultCadCollectRail(available: string[]): string | null {
   const ordered = orderCadCollectRails(available);
   return ordered[0] || null;
 }
+
+/** Funding sources on CAD Send after the customer taps Next / Confirm. */
+export type CadSendFunding = "wallet" | "card" | "bank" | "interac" | "wise";
+
+/**
+ * Checkout rail for CAD Send pay-in.
+ *
+ * Linked bank / Plaid stays on EFT. Fincra Autodeposit is only when they
+ * picked Interac. Plaid Auth does not pull CAD — the customer still pushes
+ * EFT (or optional Interac) to Loop after the bank is linked.
+ */
+export function cadSendPayInCheckout(
+  funding: CadSendFunding,
+): "wallet" | "card" | "eft" | "interac" | "wise" {
+  if (funding === "bank") return "eft";
+  return funding;
+}

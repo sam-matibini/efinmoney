@@ -16,14 +16,23 @@ interface Props {
   transferId?: string;
   purpose?: "topup" | "transfer" | "merchant_collection";
   lang?: Lang;
-  /** Auto-open Plaid bank login on mount (Zum Interac flow). Default true. */
+  /**
+   * `eft` (default for linked-bank checkout): Loop institution / transit / account.
+   * `interac`: Loop Autodeposit alias as a secondary option — never Fincra.
+   */
+  rail?: "eft" | "interac";
+  /** Skip Plaid Link and register this already-linked `plaid_accounts.id`. */
+  existingAccountId?: string;
+  fromBankLabel?: string;
+  /** Auto-open Plaid on mount. Off for EFT after a bank is already linked. */
   autoOpen?: boolean;
   onComplete?: () => void;
 }
 
 /**
- * Interac pay-in: auto-open bank login → authorize payment request → Loop Bank.
- * Not a "link bank" management screen — Plaid opens to complete the transfer.
+ * CAD bank pay-in via Plaid + Loop Bank.
+ * Plaid Auth does not pull CAD. After link, the customer pushes EFT (or
+ * optional Interac) to Loop. This is not Fincra Autodeposit.
  */
 export default function PlaidInvoicePayIn({
   walletId,
@@ -31,9 +40,13 @@ export default function PlaidInvoicePayIn({
   transferId,
   purpose = "topup",
   lang = "en",
-  autoOpen = true,
+  rail = "eft",
+  existingAccountId,
+  fromBankLabel,
+  autoOpen,
   onComplete,
 }: Props) {
+  const shouldAutoOpen = autoOpen ?? rail === "interac";
   const { user } = useAuth();
   const qc = useQueryClient();
   const [linkToken, setLinkToken] = useState<string | null>(null);
@@ -47,21 +60,22 @@ export default function PlaidInvoicePayIn({
   const [dismissed, setDismissed] = useState(false);
   const autoStarted = useRef(false);
   const completedRef = useRef(false);
+  const registeredRef = useRef(false);
 
   const createDebit = useCallback(
-    async (plaidAccountId: string) => {
+    async (plaidAccountId?: string | null) => {
       setPaying(true);
       try {
         const { data, error } = await supabase.functions.invoke("intra-ca-transfer-create", {
           body: {
-            plaid_account_id: plaidAccountId,
+            ...(plaidAccountId ? { plaid_account_id: plaidAccountId } : {}),
             destination_wallet_id: walletId,
             amount_cad: Math.round(amount * 100) / 100,
             purpose,
             transfer_id: transferId || undefined,
             description: transferId
-              ? `Interac→Loop pay-in for transfer ${transferId}`
-              : "Interac→Loop CAD wallet top-up",
+              ? `EFT→Loop pay-in for transfer ${transferId}`
+              : "EFT→Loop CAD wallet top-up",
           },
         });
         if (error) throw new Error(await edgeFunctionErrorMessage(error));
@@ -74,18 +88,18 @@ export default function PlaidInvoicePayIn({
         // only after Loop deposit match (wise-webhook → credit → execute-transfer).
         toast.message(
           lang === "fr"
-            ? "Banque liée — envoyez le Virement Interac à Loop Bank pour libérer le paiement."
-            : "Bank linked — send Interac e-Transfer to Loop Bank to release payment.",
+            ? "Envoyez un virement TEF à Loop Bank avec la référence pour libérer le paiement."
+            : "Send an EFT to Loop Bank with the reference to release payment.",
         );
 
-        setDoneRef(String(data?.reference || ""));
+        setDoneRef(String(data?.reference || transferId || ""));
         setLoopAlias(String(data?.loop_alias || LOOP_CAD_INTERAC_ALIAS));
-        setLoopEft(data?.loop_eft && typeof data.loop_eft === "object" ? data.loop_eft : null);
+        setLoopEft(data?.loop_eft && typeof data.loop_eft === "object" ? data.loop_eft : LOOP_CAD_EFT);
         setDone(true);
         // Keep checkout open so the user can copy Loop deposit instructions.
         // Parent onComplete fires only after funds settle (poll) or explicit dismiss.
       } catch (e) {
-        toast.error(e instanceof Error ? e.message : "Could not authorize bank payment");
+        toast.error(e instanceof Error ? e.message : "Could not start bank payment");
         setDismissed(true);
       } finally {
         setPaying(false);
@@ -214,7 +228,7 @@ export default function PlaidInvoicePayIn({
 
         await createDebit(accountId);
       } catch (e) {
-        toast.error(e instanceof Error ? e.message : "Could not complete Interac payment");
+        toast.error(e instanceof Error ? e.message : "Could not complete bank payment");
         setDismissed(true);
         setPaying(false);
       } finally {
@@ -304,26 +318,42 @@ export default function PlaidInvoicePayIn({
     open();
   }, [linkToken, ready, open]);
 
-  // Auto-open bank login when Interac is selected (Zum-style).
+  // Register EFT matching as soon as we have a linked account (or with no Plaid).
   useEffect(() => {
-    if (!autoOpen || autoStarted.current || done) return;
+    if (done || paying || registeredRef.current) return;
+    if (existingAccountId) {
+      registeredRef.current = true;
+      void createDebit(existingAccountId);
+      return;
+    }
+    if (rail === "eft" && !shouldAutoOpen) {
+      registeredRef.current = true;
+      void createDebit(null);
+    }
+  }, [createDebit, done, existingAccountId, paying, rail, shouldAutoOpen]);
+
+  // Auto-open Plaid only when the caller wants a fresh bank login (not after link).
+  useEffect(() => {
+    if (!shouldAutoOpen || autoStarted.current || done || existingAccountId) return;
     autoStarted.current = true;
     void startBankLogin();
-  }, [autoOpen, done, startBankLogin]);
+  }, [shouldAutoOpen, done, existingAccountId, startBankLogin]);
 
   if (done) {
     const eft = loopEft || LOOP_CAD_EFT;
     const detailsText = [
       `Amount: CAD ${amount.toFixed(2)}`,
-      `Send to: ${loopAlias}`,
       doneRef ? `Reference: ${doneRef}` : null,
+      fromBankLabel ? `From: ${fromBankLabel}` : null,
       "",
       "EFT / bank transfer (Loop Bank):",
       `Institution (Bank #): ${eft.bankNumber}`,
       `Transit #: ${eft.transitNumber}`,
       `Account #: ${eft.accountNumber}`,
+      "",
+      `Optional Interac Autodeposit: ${loopAlias}`,
     ]
-      .filter(Boolean)
+      .filter((line) => line !== null)
       .join("\n");
 
     if (settled) {
@@ -349,33 +379,42 @@ export default function PlaidInvoicePayIn({
         <div className="flex items-center gap-2 rounded-lg border bg-muted/40 p-3 text-sm text-muted-foreground">
           <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
           {lang === "fr"
-            ? "En attente du dépôt Loop Bank — le paiement n'est pas encore reçu."
-            : "Waiting for Loop Bank deposit — payment not received yet."}
+            ? "En attente du virement TEF vers Loop Bank — le paiement n'est pas encore reçu."
+            : "Waiting for EFT to Loop Bank — payment not received yet."}
         </div>
         <p className="text-xs text-muted-foreground leading-relaxed">
           {lang === "fr"
-            ? `Envoyez exactement CAD ${amount.toFixed(2)} par Virement Interac Autodeposit à ${loopAlias}, avec la référence dans le message.`
-            : `Send exactly CAD ${amount.toFixed(2)} via Interac Autodeposit to ${loopAlias}, with the reference in the message.`}
+            ? `Envoyez exactement CAD ${amount.toFixed(2)} par TEF depuis ${fromBankLabel || "votre banque liée"} vers Loop Bank. Mettez la référence dans le mémo.`
+            : `Send exactly CAD ${amount.toFixed(2)} by EFT from ${fromBankLabel || "your linked bank"} to Loop Bank. Put the reference in the memo.`}
         </p>
         <div className="space-y-2 rounded-lg border p-3 text-sm">
           <div className="flex justify-between gap-2">
             <span className="text-muted-foreground">{lang === "fr" ? "Montant" : "Amount"}</span>
             <span className="font-semibold tabular-nums">CAD {amount.toFixed(2)}</span>
           </div>
-          <div className="flex justify-between gap-2">
-            <span className="text-muted-foreground">{lang === "fr" ? "Envoyer à" : "Send to"}</span>
-            <span className="font-mono text-xs">{loopAlias}</span>
-          </div>
+          {fromBankLabel && (
+            <div className="flex justify-between gap-2">
+              <span className="text-muted-foreground">{lang === "fr" ? "De" : "From"}</span>
+              <span className="text-right text-xs font-medium">{fromBankLabel}</span>
+            </div>
+          )}
           {doneRef && (
             <div className="flex justify-between gap-2">
               <span className="text-muted-foreground">Ref</span>
               <span className="font-mono text-xs">{doneRef}</span>
             </div>
           )}
-          <div className="border-t pt-2 text-xs text-muted-foreground space-y-0.5">
-            <p>Institution: {eft.bankNumber}</p>
-            <p>Transit: {eft.transitNumber}</p>
-            <p>Account: {eft.accountNumber}</p>
+          <div className="border-t pt-2 space-y-1">
+            <p className="text-xs font-semibold">{lang === "fr" ? "TEF Loop Bank" : "Loop Bank EFT"}</p>
+            <p className="text-xs text-muted-foreground">Institution: {eft.bankNumber}</p>
+            <p className="text-xs text-muted-foreground">Transit: {eft.transitNumber}</p>
+            <p className="text-xs text-muted-foreground">Account: {eft.accountNumber}</p>
+          </div>
+          <div className="border-t pt-2 space-y-1">
+            <p className="text-xs text-muted-foreground">
+              {lang === "fr" ? "Interac optionnel (Loop, pas Fincra)" : "Optional Interac (Loop, not Fincra)"}
+            </p>
+            <p className="font-mono text-xs">{loopAlias}</p>
           </div>
         </div>
         <Button
@@ -388,7 +427,7 @@ export default function PlaidInvoicePayIn({
           }}
         >
           <Copy className="mr-2 h-4 w-4" />
-          {lang === "fr" ? "Copier les détails" : "Copy details"}
+          {lang === "fr" ? "Copier les détails TEF" : "Copy EFT details"}
         </Button>
       </div>
     );
@@ -399,9 +438,13 @@ export default function PlaidInvoicePayIn({
   return (
     <div className="space-y-5 py-2">
       <div className="rounded-lg border border-primary/20 bg-primary/5 p-3 text-xs text-muted-foreground leading-relaxed">
-        {lang === "fr"
-          ? "Votre banque s'ouvre pour autoriser le Virement Interac. Les fonds sont collectés vers Loop Bank."
-          : "Your bank is opening so you can authorize the Interac e-Transfer. Funds collect to Loop Bank."}
+        {rail === "eft"
+          ? lang === "fr"
+            ? "Paiement par TEF vers Loop Bank. Plaid n'effectue pas de prélèvement CAD — envoyez le virement depuis le compte lié."
+            : "Pay by EFT to Loop Bank. Plaid does not pull CAD — send the transfer from your linked account."
+          : lang === "fr"
+            ? "Votre banque s'ouvre pour autoriser le paiement. Les fonds sont collectés vers Loop Bank."
+            : "Your bank is opening so you can authorize the payment. Funds collect to Loop Bank."}
       </div>
 
       {busy && !dismissed ? (
@@ -410,25 +453,33 @@ export default function PlaidInvoicePayIn({
           <p className="text-sm font-medium">
             {paying
               ? lang === "fr"
-                ? "Confirmation du paiement…"
-                : "Confirming payment…"
+                ? "Préparation des détails TEF…"
+                : "Preparing EFT details…"
               : lang === "fr"
                 ? "Ouverture de la connexion bancaire…"
                 : "Opening bank login…"}
           </p>
           <p className="text-xs text-muted-foreground">
-            {lang === "fr"
-              ? "Connectez-vous et autorisez le montant demandé."
-              : "Sign in and authorize the requested amount."}
+            {paying
+              ? lang === "fr"
+                ? "Ensuite, envoyez le virement depuis votre banque liée."
+                : "Next, send the transfer from your linked bank."
+              : lang === "fr"
+                ? "Connectez-vous pour lier le compte."
+                : "Sign in to link the account."}
           </p>
           <p className="text-sm font-semibold tabular-nums">CAD {amount.toFixed(2)}</p>
         </div>
       ) : (
         <div className="space-y-4">
           <p className="text-sm text-muted-foreground">
-            {lang === "fr"
-              ? "La fenêtre bancaire s'est fermée. Rouvrez-la pour terminer le paiement Interac."
-              : "Bank window closed. Re-open it to finish your Interac payment."}
+            {rail === "eft"
+              ? lang === "fr"
+                ? "Liez une banque (facultatif) pour attacher une référence, ou copiez les détails TEF à l'étape suivante."
+                : "Link a bank (optional) to attach a matching reference, or continue with EFT details."
+              : lang === "fr"
+                ? "La fenêtre bancaire s'est fermée. Rouvrez-la pour terminer le paiement."
+                : "Bank window closed. Re-open it to finish your payment."}
           </p>
           <div className="flex items-center justify-between text-sm">
             <span className="text-muted-foreground">{lang === "fr" ? "Montant" : "Amount"}</span>
@@ -443,11 +494,11 @@ export default function PlaidInvoicePayIn({
             {(opening || paying) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             <Building2 className="mr-2 h-4 w-4" />
             {lang === "fr"
-              ? `Ouvrir ma banque — payer CAD ${amount.toFixed(2)}`
-              : `Open my bank — pay CAD ${amount.toFixed(2)}`}
+              ? `Lier ma banque — CAD ${amount.toFixed(2)}`
+              : `Link my bank — CAD ${amount.toFixed(2)}`}
           </Button>
           <p className="text-center text-[11px] text-muted-foreground">
-            {lang === "fr" ? "Vers Loop Bank · Interac" : "To Loop Bank · Interac"}
+            {lang === "fr" ? "Vers Loop Bank · TEF" : "To Loop Bank · EFT"}
           </p>
         </div>
       )}

@@ -59,6 +59,8 @@ import { verifySquareCheckout } from "@/components/payments/SquareTopUpCard";
 
 import { isWisePayCurrency } from "@/lib/wisePayLink";
 import WiseInteracInvoiceCheckout from "@/components/payments/WiseInteracInvoiceCheckout";
+import CadBankEftCheckout from "@/components/payments/CadBankEftCheckout";
+import { cadSendPayInCheckout } from "@/lib/cadCollectCheckout";
 import SendHeaderCountry from "@/components/send/SendHeaderCountry";
 import RecipientQuickBox from "@/components/send/RecipientQuickBox";
 import FlutterwaveCardForm from "@/components/payments/FlutterwaveCardForm";
@@ -198,7 +200,14 @@ const SendPage = () => {
     { transferId: string; walletId: string; amount: number; currency: string } | null
   >(null);
   const [bankCheckoutFunding, setBankCheckoutFunding] = useState<
-    { transferId: string; walletId: string; amount: number; currency: string } | null
+    {
+      transferId: string;
+      walletId: string;
+      amount: number;
+      currency: string;
+      plaidAccountId?: string;
+      fromBankLabel?: string;
+    } | null
   >(null);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [saveModalOpen, setSaveModalOpen] = useState(false);     // pre-filled Add modal
@@ -971,6 +980,7 @@ const SendPage = () => {
     }
 
     // Bank transfer checkout: park the payout, then collect from the sender's bank.
+    // CAD Bank / Plaid stays on EFT (Loop) — never Fincra Interac Autodeposit.
     if (funding === "bank") {
       const wallet =
         selectedWallet ||
@@ -985,16 +995,25 @@ const SendPage = () => {
           funding_source: "bank",
           sender_wallet_id: wallet.wallet_id,
         });
-        if (sourceCurrency.toUpperCase() === "CAD") {
-          setInteracFunding({ transferId: tid, walletId: wallet.wallet_id, amount: totalCharge });
-        } else {
-          setBankCheckoutFunding({
-            transferId: tid,
-            walletId: wallet.wallet_id,
-            amount: totalCharge,
-            currency: sourceCurrency,
-          });
-        }
+        const selectedBank =
+          activeSources.find((s) => s.id === selectedSourceId) || activeSources[0];
+        const plaidAccountId = (plaidAccounts as { id?: string }[]).some(
+          (a) => a.id === selectedBank?.id,
+        )
+          ? selectedBank?.id
+          : undefined;
+        setBankCheckoutFunding({
+          transferId: tid,
+          walletId: wallet.wallet_id,
+          amount: totalCharge,
+          currency: sourceCurrency,
+          plaidAccountId,
+          fromBankLabel: selectedBank
+            ? `${selectedBank.institution || selectedBank.display_name || "Bank"}${
+                selectedBank.last_four ? ` ····${selectedBank.last_four}` : ""
+              }`
+            : undefined,
+        });
         goToStep(4);
       } catch (e: any) {
         toast.error(e?.message || "Could not start bank checkout");
@@ -1173,24 +1192,6 @@ const SendPage = () => {
         } else {
           toast.error(raw || 'Transfer failed. Please try again.');
         }
-      } finally {
-        setConfirming(false);
-      }
-      return;
-    }
-
-
-    // ── Bank: queue as pending; debit takes 1-2 business days ────────────
-    if (funding === 'bank') {
-      try {
-        const tid = await createTransferRecord();
-        await supabase.from('transfers').update({ status: 'processing' }).eq('id', tid);
-        qc.invalidateQueries({ queryKey: ["transfers"] });
-        qc.invalidateQueries({ queryKey: ["dashboard-transfers"] });
-        toast.success('Bank transfer initiated — funds will be debited within 1-2 business days');
-        goToStep(4);
-      } catch (e: any) {
-        toast.error(e?.message || 'Could not initiate bank transfer');
       } finally {
         setConfirming(false);
       }
@@ -3472,7 +3473,9 @@ const SendPage = () => {
                                     )}
                                     {fundingSource === 'bank' && (
                                       <p className="text-xs text-muted-foreground text-center">
-                                        Next you’ll pay from your bank app. We collect the amount, then send it to the recipient.
+                                        {sourceCurrency.toUpperCase() === "CAD"
+                                          ? "Next you’ll send a Canadian EFT from your linked bank. This is not Interac Autodeposit."
+                                          : "Next you’ll pay from your bank app. We collect the amount, then send it to the recipient."}
                                       </p>
                                     )}
                                     {fundingSource === "card" && !inlineCardEntry && (
@@ -3588,6 +3591,28 @@ const SendPage = () => {
                                   </SectionBoundary>
                                 ) : bankCheckoutFunding ? (
                                   <SectionBoundary name="BankSendCheckout">
+                                    {bankCheckoutFunding.currency.toUpperCase() === "CAD"
+                                      && cadSendPayInCheckout("bank") === "eft" ? (
+                                      <CadBankEftCheckout
+                                        walletId={bankCheckoutFunding.walletId}
+                                        purpose="transfer"
+                                        transferId={bankCheckoutFunding.transferId}
+                                        amount={bankCheckoutFunding.amount}
+                                        invoiceId={bankCheckoutFunding.transferId}
+                                        payeeName="eFinMoney"
+                                        comment="Thank you for your business"
+                                        lineItem={`eFinMoney Transfer${
+                                          recipientName ? ` (to ${recipientName})` : ""
+                                        }`}
+                                        plaidAccountId={bankCheckoutFunding.plaidAccountId}
+                                        fromBankLabel={bankCheckoutFunding.fromBankLabel}
+                                        onExit={() => {
+                                          setBankCheckoutFunding(null);
+                                          goToStep(3);
+                                        }}
+                                        onComplete={() => setBankCheckoutFunding(null)}
+                                      />
+                                    ) : (
                                     <div className="space-y-3">
                                       <BankAccountCheckout
                                         purpose="send"
@@ -3612,6 +3637,7 @@ const SendPage = () => {
                                         Back
                                       </Button>
                                     </div>
+                                    )}
                                   </SectionBoundary>
                                 ) : linkResult ? (
                                   <SectionBoundary name="PaymentLinkSuccess"><PaymentLinkSuccess

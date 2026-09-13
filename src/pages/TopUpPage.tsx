@@ -1185,10 +1185,8 @@ const TopUpPage = () => {
       payMethods.push({
         id: "plaid",
         tone: "bank",
-        label: "Interac e-Transfer",
-        description: productFeatures.fincraInterac
-          ? `Send CAD to ${FINCRA_CAD_INTERAC_ALIAS}`
-          : "Use bank account to make instant payments",
+        label: "Bank EFT (Plaid)",
+        description: "Send CAD by EFT from your linked bank to Loop Bank",
         content: (
           <SectionBoundary name="CadCollection">
             <CadCollectionPanel

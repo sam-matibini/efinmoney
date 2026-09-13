@@ -330,9 +330,9 @@ const MethodCheckoutPanel = ({
           <p className="text-sm font-semibold">Bank transfer checkout</p>
         </div>
         <p className="text-sm text-muted-foreground">
-          Confirm to open a bank-transfer checkout. Pay the exact amount from your bank app.
-          We credit the matching wallet, then pay the recipient. Linking a bank is optional —
-          it only helps you remember which account you will send from.
+          {currency.toUpperCase() === "CAD"
+            ? "Confirm to open Canadian EFT checkout. Send the exact amount from your linked bank (institution, transit, account). Linking with Plaid attaches a matching reference. This is not Interac Autodeposit."
+            : "Confirm to open a bank-transfer checkout. Pay the exact amount from your bank app. We credit the matching wallet, then pay the recipient. Linking a bank is optional — it only helps you remember which account you will send from."}
         </p>
         {bankSources.length > 0 ? (
           <>

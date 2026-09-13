@@ -225,7 +225,8 @@ export function collectPayMethodIds(partnerOrMethod: string, currency?: string):
   const ccy = (currency || "").toUpperCase();
   if (method === "nomba" && ccy === "CAD") return ["nomba", "nomba_eft"];
   if (method === "square" || method === "paypal") return ["square"];
-  if (method === "interac") return ["interac", "plaid"];
+  if (method === "interac") return ["interac"];
+  if (method === "plaid") return ["plaid"];
   if (method === "flutterwave") {
     // CAD/USD/EUR/GBP collect is card/bank — never Kenya M-Pesa.
     if (["CAD", "USD", "EUR", "GBP"].includes(ccy)) return ["flw_hosted"];

@@ -9,6 +9,7 @@ import {
   orderCadCollectRails,
   defaultCadCollectRail,
   isCadUnsafeCollectRail,
+  cadSendPayInCheckout,
 } from "../src/lib/cadCollectCheckout.ts";
 import { orderCadCollectRails as orderCadCollectRailsEdge } from "../supabase/functions/_shared/cad-collect-rails.ts";
 
@@ -87,6 +88,10 @@ assert(
 
 assert("auto-pick CAD prefers Interac", defaultCadCollectRail(["nomba", "interac", "wise", "dodo"]) === "interac");
 assert("auto-pick CAD falls back to Nomba when Interac off", defaultCadCollectRail(["nomba", "dodo"]) === "nomba");
+
+assert("CAD bank Next is EFT not Interac", cadSendPayInCheckout("bank") === "eft");
+assert("CAD Interac Next stays Interac", cadSendPayInCheckout("interac") === "interac");
+assert("CAD Wise Next stays Wise", cadSendPayInCheckout("wise") === "wise");
 
 if (process.exitCode) {
   console.error("CAD collect checks failed");

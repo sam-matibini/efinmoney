@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
 import { Landmark, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -18,7 +17,7 @@ import {
   type BankCheckoutPurpose,
 } from "@/lib/bankCheckout";
 import BankPayInInstructions, { type PayInInstructions } from "@/components/payments/BankPayInInstructions";
-import { FINCRA_CAD_INTERAC_ALIAS } from "@/lib/fincraCad";
+import CadBankEftCheckout from "@/components/payments/CadBankEftCheckout";
 
 const fmt = (n: number, ccy: string) =>
   `${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${ccy}`;
@@ -31,6 +30,7 @@ export default function BankAccountCheckout({
   transferId,
   destLabel,
   fromBankLabel,
+  plaidAccountId,
   onComplete,
 }: {
   purpose: BankCheckoutPurpose;
@@ -40,6 +40,7 @@ export default function BankAccountCheckout({
   transferId?: string;
   destLabel: string;
   fromBankLabel?: string;
+  plaidAccountId?: string;
   onComplete?: () => void;
 }) {
   const { user } = useAuth();
@@ -174,22 +175,30 @@ export default function BankAccountCheckout({
   };
 
   if (ccy === "CAD") {
-    return (
-      <div className="space-y-3 rounded-xl border-2 border-pay-bank/30 bg-pay-bank/5 p-4">
-        <div className="flex items-center gap-2">
-          <Landmark className="h-4 w-4 text-pay-bank" />
-          <p className="text-sm font-semibold">Canadian bank checkout</p>
+    if (!walletId && !wallet?.wallet_id) {
+      return (
+        <div className="rounded-xl border border-dashed p-4 text-sm text-muted-foreground">
+          Open a CAD wallet first so we can match the EFT deposit.
         </div>
-        <p className="text-sm text-muted-foreground">
-          CAD bank pay-in uses Interac Autodeposit ({FINCRA_CAD_INTERAC_ALIAS}) or a linked Plaid
-          account on the Bank tab. That path already funds {destLabel}.
-        </p>
-        <Button asChild className="w-full">
-          <Link to={purpose === "send" ? "/send" : "/wallet/topup?currency=CAD&method=interac"}>
-            Open Interac checkout
-          </Link>
-        </Button>
-      </div>
+      );
+    }
+    return (
+      <CadBankEftCheckout
+        walletId={walletId || wallet!.wallet_id}
+        purpose={purpose === "send" ? "transfer" : "topup"}
+        transferId={transferId}
+        amount={validAmt ? parsed : amountProp}
+        lineItem={
+          purpose === "send"
+            ? `eFinMoney Transfer (to ${destLabel})`
+            : `eFinMoney CAD wallet top-up`
+        }
+        payeeName="eFinMoney"
+        comment="Thank you for your business"
+        plaidAccountId={plaidAccountId}
+        fromBankLabel={fromBankLabel}
+        onComplete={onComplete}
+      />
     );
   }
 

@@ -7,11 +7,11 @@ export type CheckoutMethod = "card" | "interac" | "eft" | "wise" | "plaid" | "lo
 interface Props {
   value?: CheckoutMethod | null;
   onChange: (method: CheckoutMethod) => void;
-  /** Interac Autodeposit push to Loop. Default true. */
+  /** Interac Autodeposit push (Fincra). Default true. */
   interacAvailable?: boolean;
   /** Visa Direct / debit card row. */
   cardAvailable?: boolean;
-  /** @deprecated Prefer interacAvailable — Plaid is wired through Interac. */
+  /** Linked bank / Plaid EFT — not Interac. */
   plaidAvailable?: boolean;
   eftAvailable?: boolean;
   wiseAvailable?: boolean;
@@ -51,7 +51,7 @@ function MethodRow({ title, description, icon, iconClassName, onSelect }: RowPro
 }
 
 /**
- * Zum-style method list: Interac Autodeposit + optional Loop Billing link + card.
+ * Zum-style method list: Interac Autodeposit, bank EFT / Plaid, Loop Billing, card.
  */
 export default function CheckoutMethodGrid({
   onChange,
@@ -66,17 +66,26 @@ export default function CheckoutMethodGrid({
   lang = "en",
 }: Props) {
   const t = CHECKOUT_STRINGS[lang];
-  const showInterac = interacAvailable || plaidAvailable;
+  const showEft = eftAvailable || plaidAvailable;
 
   return (
     <div className="divide-y border-t">
-      {showInterac && (
+      {interacAvailable && (
         <MethodRow
           title={interacTitle ?? t.interac}
           description={interacDescription ?? t.interacDesc}
           icon={<Send className="h-5 w-5 text-white" />}
           iconClassName="bg-emerald-500"
-          onSelect={() => onChange(plaidAvailable && !interacAvailable ? "plaid" : "interac")}
+          onSelect={() => onChange("interac")}
+        />
+      )}
+      {showEft && (
+        <MethodRow
+          title={t.eft}
+          description={t.eftDesc}
+          icon={<Building2 className="h-5 w-5 text-white" />}
+          iconClassName="bg-slate-500"
+          onSelect={() => onChange(plaidAvailable ? "plaid" : "eft")}
         />
       )}
       {loopBillingAvailable && (
@@ -95,15 +104,6 @@ export default function CheckoutMethodGrid({
           icon={<CreditCard className="h-5 w-5 text-white" />}
           iconClassName="bg-sky-500"
           onSelect={() => onChange("card")}
-        />
-      )}
-      {eftAvailable && (
-        <MethodRow
-          title={t.eft}
-          description={t.eftDesc}
-          icon={<Building2 className="h-5 w-5 text-white" />}
-          iconClassName="bg-slate-500"
-          onSelect={() => onChange("eft")}
         />
       )}
       {wiseAvailable && (

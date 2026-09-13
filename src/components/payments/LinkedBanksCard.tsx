@@ -679,8 +679,8 @@ export default function LinkedBanksCard() {
           fromBank: `${bank.institution} ····${bank.lastFour}`,
           reference: data.reference,
           fields: [
-            { label: "Interac Autodeposit", value: data.loop_alias || LOOP_CAD_INTERAC_ALIAS },
             ...loopEftFields(data.loop_eft),
+            { label: "Optional Interac (Loop)", value: data.loop_alias || LOOP_CAD_INTERAC_ALIAS },
           ],
           note: data.message,
         });
@@ -715,8 +715,8 @@ export default function LinkedBanksCard() {
           description: `Send CAD from ${bank.institution} ····${bank.lastFour} to Loop Bank. Your CAD wallet credits when the deposit is matched.`,
           fromBank: `${bank.institution} ····${bank.lastFour}`,
           fields: [
-            { label: "Interac Autodeposit", value: LOOP_CAD_INTERAC_ALIAS },
             ...loopEftFields(LOOP_CAD_EFT),
+            { label: "Optional Interac (Loop)", value: LOOP_CAD_INTERAC_ALIAS },
           ],
           note: "Connect this bank with Plaid (Canada) to attach a unique payment reference automatically.",
         });

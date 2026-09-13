@@ -25,9 +25,10 @@ bank payouts (`WALLET_PAYOUT`).
 
 ## Fincra CAD Interac e-Transfer
 
-Send checkout and CAD wallet collections take Interac Autodeposit through Fincra.
+Send checkout: **Interac** takes Autodeposit through Fincra. **Bank** (including after Plaid link) stays on Canadian EFT to Loop Bank — Next does not switch the linked account to Interac.
 
 - Pay-with **Interac** on Send (CAD) and **Interac e-Transfer** on CAD top-up
+- Pay-with **Bank** on Send (CAD) after Plaid: Loop EFT (institution / transit / account). Plaid Auth does not pull CAD. Interac Autodeposit is only when the customer picks Interac.
 - Deposit email: `support.cad.live-015@fincra.ca` (`FINCRA_CAD_INTERAC_ALIAS`)
 - Payment code: unique `EFM-YYYYMMDD-…` reference from `next_interac_public_id` — paste it in the Interac message
 - After sending, the customer enters the bank Interac reference (e.g. `CAh9ECkx`) and taps **Complete** — checkout closes onto the transfer success report

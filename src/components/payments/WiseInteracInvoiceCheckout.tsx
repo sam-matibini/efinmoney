@@ -3,6 +3,7 @@ import { useAuth } from "@/hooks/useAuth";
 import CheckoutShell from "@/components/payments/CheckoutShell";
 import CheckoutMethodGrid, { type CheckoutMethod } from "@/components/payments/CheckoutMethodGrid";
 import InteracCheckout from "@/components/payments/InteracCheckout";
+import PlaidInvoicePayIn from "@/components/payments/PlaidInvoicePayIn";
 import LoopBillingPayPanel from "@/components/payments/LoopBillingPayPanel";
 import type { InteracIntent } from "@/components/payments/InteracCheckout";
 import { type Lang } from "@/components/payments/checkoutStrings";
@@ -27,6 +28,8 @@ interface Props {
   onComplete?: () => void;
   onIntentCreated?: (intent: InteracIntent) => void;
   className?: string;
+  /** Skip the Interac auto-pick. Bank / Plaid checkout should pass "eft" or "plaid". */
+  preferredMethod?: CheckoutMethod | null;
 }
 
 function formatInvoiceDate(d: Date, lang: Lang): string {
@@ -57,6 +60,7 @@ export default function WiseInteracInvoiceCheckout({
   onComplete,
   onIntentCreated,
   className,
+  preferredMethod,
 }: Props) {
   const { user } = useAuth();
   const [langState, setLangState] = useState<Lang>("en");
@@ -65,9 +69,14 @@ export default function WiseInteracInvoiceCheckout({
 
   const showLoopBilling = !productFeatures.fincraInterac && loopBillingLinkConfigured();
   const fincraOn = productFeatures.fincraInterac;
-  const [method, setMethod] = useState<CheckoutMethod | null>(
-    fincraOn || !loopBillingLinkConfigured() ? "interac" : null,
-  );
+  const [method, setMethod] = useState<CheckoutMethod | null>(() => {
+    if (preferredMethod === "eft" || preferredMethod === "plaid" || preferredMethod === "loop_billing") {
+      return preferredMethod;
+    }
+    if (preferredMethod === "interac") return "interac";
+    if (preferredMethod === null) return null;
+    return fincraOn || !loopBillingLinkConfigured() ? "interac" : null;
+  });
   const interacTitle = fincraOn ? "Interac e-Transfer" : undefined;
   const interacDescription = fincraOn
     ? lang === "fr"
@@ -140,6 +149,8 @@ export default function WiseInteracInvoiceCheckout({
       ) : method === null ? (
         <CheckoutMethodGrid
           interacAvailable
+          eftAvailable
+          plaidAvailable={productFeatures.plaid}
           loopBillingAvailable={showLoopBilling}
           cardAvailable={false}
           lang={lang}
@@ -152,6 +163,18 @@ export default function WiseInteracInvoiceCheckout({
           amount={amount}
           reference={resolvedInvoiceId}
           lang={lang}
+        />
+      ) : method === "eft" || method === "plaid" ? (
+        <PlaidInvoicePayIn
+          key={`${walletId}-${amount}-${transferId || "topup"}-eft`}
+          walletId={walletId}
+          purpose={purpose}
+          transferId={transferId}
+          amount={amount}
+          lang={lang}
+          rail="eft"
+          autoOpen={false}
+          onComplete={onComplete}
         />
       ) : (
         <InteracCheckout

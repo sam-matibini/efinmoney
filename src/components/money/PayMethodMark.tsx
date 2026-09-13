@@ -16,7 +16,7 @@ const CARD_IDS = new Set([
   "elicate",
 ]);
 
-const INTERAC_IDS = new Set(["interac", "plaid"]);
+const INTERAC_IDS = new Set(["interac"]);
 const WISE_IDS = new Set(["wise", "wise_link"]);
 
 function resolvePayMark(id?: string, tone?: PayTone): PayMarkKind {

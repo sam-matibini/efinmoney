@@ -54,6 +54,8 @@ import CreateWalletModal from "@/components/modals/CreateWalletModal";
 import { useFundingSources } from "@/hooks/useFundingSources";
 import { useCreateWallet } from "@/hooks/useCreateWallet";
 import WiseInteracInvoiceCheckout from "@/components/payments/WiseInteracInvoiceCheckout";
+import CadBankEftCheckout from "@/components/payments/CadBankEftCheckout";
+import { cadSendPayInCheckout } from "@/lib/cadCollectCheckout";
 import { productFeatures } from "@/lib/productFeatures";
 import { FINCRA_CAD_INTERAC_ALIAS } from "@/lib/fincraCad";
 import { isWisePayCurrency } from "@/lib/wisePayLink";
@@ -464,6 +466,8 @@ const CanadaSendFlow = () => {
     transferId: string;
     walletId: string;
     amount: number;
+    plaidAccountId?: string;
+    fromBankLabel?: string;
   } | null>(null);
   const [amount, setAmount] = useState("");
   const [walletId, setWalletId] = useState("");
@@ -1207,11 +1211,24 @@ const CanadaSendFlow = () => {
           exchange_rate: 1,
           fee_amount: totalFee,
         } as any);
+        const selectedBank =
+          bankSources.find((s) => s.id === selectedSourceId) || bankSources[0];
+        const plaidAccountId = (plaidAccounts as { id?: string }[]).some(
+          (a) => a.id === selectedBank?.id,
+        )
+          ? selectedBank?.id
+          : undefined;
         setCadPayIn({
           kind: funding,
           transferId: transfer.id,
           walletId: wallet.wallet_id,
           amount: totalCharged,
+          plaidAccountId,
+          fromBankLabel: selectedBank
+            ? `${selectedBank.institution || selectedBank.display_name}${
+                selectedBank.last_four ? ` ····${selectedBank.last_four}` : ""
+              }`
+            : undefined,
         });
         setLastTransferId(transfer.id);
         setStep(4);
@@ -1770,7 +1787,7 @@ const CanadaSendFlow = () => {
                 value={
                   funding === "card" ? "Card or bank (EFT) · Nomba"
                     : funding === "interac" ? "Interac e-Transfer"
-                    : funding === "bank" ? "Bank account"
+                    : funding === "bank" ? "Bank EFT"
                     : funding === "wise" ? "Wise"
                     : "CAD wallet"
                 }
@@ -1816,7 +1833,7 @@ const CanadaSendFlow = () => {
                       : funding === "interac"
                         ? "Continue to Interac"
                         : funding === "bank"
-                          ? "Continue to bank pay-in"
+                          ? "Continue to bank EFT"
                           : funding === "wise"
                             ? "Pay with Wise"
                             : `Send C$${parsedAmount.toFixed(2)}`}
@@ -1925,7 +1942,30 @@ const CanadaSendFlow = () => {
         </div>
       )}
 
-      {step === 4 && cadPayIn && cadPayIn.kind !== "wise" && method !== "paylink" && (
+      {step === 4 && cadPayIn && cadPayIn.kind === "bank" && cadSendPayInCheckout("bank") === "eft" && method !== "paylink" && (
+        <CadBankEftCheckout
+          walletId={cadPayIn.walletId}
+          purpose="transfer"
+          transferId={cadPayIn.transferId}
+          amount={cadPayIn.amount}
+          lineItem={`Send C$${parsedAmount.toFixed(2)} to ${recipientName || "recipient"}`}
+          invoiceId={cadPayIn.transferId}
+          payeeName={recipientName || "Recipient"}
+          payerName={profile?.full_name || user?.email || null}
+          plaidAccountId={cadPayIn.plaidAccountId}
+          fromBankLabel={cadPayIn.fromBankLabel}
+          onExit={() => {
+            setCadPayIn(null);
+            setStep(3);
+          }}
+          onComplete={() => {
+            setCadPayIn(null);
+            toast.success("Payment received — completing delivery");
+          }}
+        />
+      )}
+
+      {step === 4 && cadPayIn && cadPayIn.kind !== "wise" && cadPayIn.kind !== "bank" && method !== "paylink" && (
         <WiseInteracInvoiceCheckout
           walletId={cadPayIn.walletId}
           purpose="transfer"

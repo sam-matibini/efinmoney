@@ -1,6 +1,6 @@
 import { useCallback, useState } from "react";
 import InteracCheckout from "@/components/payments/InteracCheckout";
-import WiseInteracInvoiceCheckout from "@/components/payments/WiseInteracInvoiceCheckout";
+import CadBankEftCheckout from "@/components/payments/CadBankEftCheckout";
 import CheckoutShell from "@/components/payments/CheckoutShell";
 import type { InteracIntent } from "@/components/payments/InteracCheckout";
 import { type Lang } from "@/components/payments/checkoutStrings";
@@ -84,7 +84,7 @@ export default function CadCollectionPanel({ walletId, walletCurrency, initialAm
 
   if (plaidOn) {
     return (
-      <WiseInteracInvoiceCheckout
+      <CadBankEftCheckout
         walletId={walletId}
         purpose="topup"
         amount={seedAmount}
