@@ -25,10 +25,11 @@ bank payouts (`WALLET_PAYOUT`).
 
 ## Fincra CAD Interac e-Transfer
 
-Send checkout: **Interac** takes Autodeposit through Fincra. **Bank** (including after Plaid link) stays on Canadian EFT to Loop Bank — Next does not switch the linked account to Interac.
+Send checkout: **Card** is Nomba. **Interac** is Fincra Autodeposit. **Bank** shows **Nuvei EFT (Coming soon)** plus linked-bank / Loop EFT until Nuvei live keys exist.
 
-- Pay-with **Interac** on Send (CAD) and **Interac e-Transfer** on CAD top-up
-- Pay-with **Bank** on Send (CAD) after Plaid: Loop EFT (institution / transit / account). Plaid Auth does not pull CAD. Interac Autodeposit is only when the customer picks Interac.
+- Pay-with **Interac** on Send (CAD) and **Interac e-Transfer** on CAD top-up — Fincra Autodeposit, not Nomba
+- Pay-with **Card** on Send (CAD) — Nomba hosted checkout (card only)
+- Pay-with **Bank** on Send (CAD): Nuvei Payment Middleware EFT is Coming soon (sandbox, no live keys). Confirm still uses linked bank / Loop EFT. Plaid Auth does not pull CAD.
 - Deposit email: `support.cad.live-015@fincra.ca` (`FINCRA_CAD_INTERAC_ALIAS`)
 - Payment code: unique `EFM-YYYYMMDD-…` reference from `next_interac_public_id` — paste it in the Interac message
 - After sending, the customer enters the bank Interac reference (e.g. `CAh9ECkx`) and taps **Complete** — checkout closes onto the transfer success report
@@ -37,7 +38,18 @@ Send checkout: **Interac** takes Autodeposit through Fincra. **Bank** (including
 - Secrets: `FINCRA_SECRET_KEY`, `FINCRA_BUSINESS_ID`, `FINCRA_CAD_INTERAC_ALIAS`, optional `FINCRA_CAD_VIRTUAL_ACCOUNT_ID`
 - SQL: `supabase/migrations/20260911220000_fincra_interac_complete_status.sql`
 
-**CAD Interac payout (Canadian recipients):** email and mobile are each optional, but at least one is required. Autodeposit email may be personal or business and may match the profile login. The APIs refuse collection (card charge, wallet debit, Interac pay-in) until a valid destination is on the transfer. **Canadian profiles** store Interac Autodeposit email (`profiles.interac_email`) — it can be the same as the login email. Nomba Checkout never uses `@efin.money` as `customerEmail` (Nomba returns “The provided email is blocked”); it uses the payer’s login when that is a real mailbox, or `payer.{id}@efinsuite.com`. Apply `supabase/migrations/20260912124500_profile_interac_email_schema_cache.sql` in the Supabase SQL editor (or `supabase db push`) so PostgREST reloads the schema cache — without that, Profile Settings save fails with “Could not find the 'interac_email' column of 'profiles' in the schema cache”. The app still saves billing without that column and keeps Interac on auth `user_metadata` until the SQL is applied. Also in `supabase/production-sql.sql` section 7. Redeploy: `nomba-collection`, `nomba-payout`. **CAD rails:** Nomba Checkout for **card and bank (EFT)** (`allowedPaymentMethods`: Intl Card + Intl Transfer); Fincra Autodeposit for Interac pay-in (`fincra-cad-interac`); Wise / Bambora for Canadian EFT when those rails are live; Nomba Global Payout for Interac/EFT send. Paysafe and Flovide are not used for CAD collect or CAD payout. CAD top-up checkout lists every live method in **least-cost** order (Interac → Wise EFT → Nomba EFT → Nomba card → Dodo). If Nomba fails after the wallet is debited, the transfer stays `funded` / `pending_ops` and `execute-transfer` / `treasury-worker` can resume. Redeploy: `execute-transfer`, `treasury-worker`, `nomba-payout`, `nomba-collection`, `nomba-payment-callback`, `payment-link-claim`, `flovide-payout`, `paysafe-payout`. SQL: `supabase/migrations/20260913010000_cad_collect_least_cost.sql`. Check: `npm run test:cad-interac`, `npm run test:nomba-email`, `npm run test:cad-rails`, and `npm run test:cad-collect`.
+**CAD Interac payout (Canadian recipients):** email and mobile are each optional, but at least one is required. Autodeposit email may be personal or business and may match the profile login. The APIs refuse collection (card charge, wallet debit, Interac pay-in) until a valid destination is on the transfer. **Canadian profiles** store Interac Autodeposit email (`profiles.interac_email`) — it can be the same as the login email. Nomba Checkout never uses `@efin.money` as `customerEmail` (Nomba returns “The provided email is blocked”); it uses the payer’s login when that is a real mailbox, or `payer.{id}@efinsuite.com`. Apply `supabase/migrations/20260912124500_profile_interac_email_schema_cache.sql` in the Supabase SQL editor (or `supabase db push`) so PostgREST reloads the schema cache — without that, Profile Settings save fails with “Could not find the 'interac_email' column of 'profiles' in the schema cache”. The app still saves billing without that column and keeps Interac on auth `user_metadata` until the SQL is applied. Also in `supabase/production-sql.sql` section 7. Redeploy: `nomba-collection`, `nomba-payout`. **CAD rails:** Nomba Checkout for **card**; Nuvei Payment Middleware for **Bank EFT** (sandbox / Coming soon — no live keys yet); Fincra Autodeposit for Interac pay-in (`fincra-cad-interac`); linked-bank / Loop EFT until Nuvei goes live; Wise / Bambora for Canadian EFT when those rails are live; Nomba Global Payout for Interac/EFT send. Paysafe and Flovide are not used for CAD collect or CAD payout. CAD top-up checkout lists every live method in **least-cost** order (Interac → Wise EFT → Nomba EFT → Nomba card → Dodo). If Nomba fails after the wallet is debited, the transfer stays `funded` / `pending_ops` and `execute-transfer` / `treasury-worker` can resume. Redeploy: `execute-transfer`, `treasury-worker`, `nomba-payout`, `nomba-collection`, `nomba-payment-callback`, `payment-link-claim`, `flovide-payout`, `paysafe-payout`. SQL: `supabase/migrations/20260913010000_cad_collect_least_cost.sql`. Check: `npm run test:cad-interac`, `npm run test:nomba-email`, `npm run test:cad-rails`, `npm run test:cad-collect`, and `npm run test:nuvei`.
+
+## Nuvei Payment Middleware (sandbox)
+
+CAD **Bank** EFT will debit through [Nuvei Payment Middleware](https://www.nuveiplatforms.com/payment-middleware.html). Live keys are not available yet, so checkout shows **Coming soon**.
+
+- Sandbox host: `https://devapi.nuveiconnect.com` (`GET /api/gateway/list`)
+- Default EFT gateway: `CheckCommerce` (ACH). Override with `NUVEI_MW_GATEWAY`
+- Edge function: `nuvei-middleware` (`action: ping | list_gateways | settings | credentials | process_eft`)
+- `process_eft` returns `{ coming_soon: true }` until `NUVEI_CAD_EFT_LIVE=true` and sandbox settings exist
+- Secrets (optional until go-live): `NUVEI_MW_BASE_URL`, `NUVEI_MW_GATEWAY`, `NUVEI_MW_SETTINGS_JSON` (CheckCommerce: `baseUrl`, `login`, `password`), `NUVEI_MW_CREDENTIALS`
+- Redeploy: `nuvei-middleware`, `test-integration`
 
 ## Nomba / Fincra payout corridors (availability + least cost)
 

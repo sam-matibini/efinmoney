@@ -878,14 +878,14 @@ const CanadaSendFlow = () => {
     {
       id: "interac",
       label: "Interac",
-      sublabel: "e-Transfer Autodeposit",
+      sublabel: "e-Transfer · Fincra Autodeposit",
       icon: Banknote,
       tone: "bank",
     },
     {
       id: "bank",
       label: "Bank EFT",
-      sublabel: productFeatures.plaid ? "Link with Plaid or transfer from your bank" : "Transfer from your bank",
+      sublabel: "Nuvei EFT coming soon · Plaid / Loop",
       icon: Landmark,
       tone: "bank",
     },
@@ -893,7 +893,7 @@ const CanadaSendFlow = () => {
       ? [{ id: "wise" as const, label: "Wise", sublabel: "Bank EFT via Wise", icon: Wallet, tone: "wise" as const }]
       : []),
     ...(productFeatures.nombaNigeria
-      ? [{ id: "card" as const, label: "Card or bank (EFT)", sublabel: "Nomba checkout", icon: CreditCard, tone: "card" as const }]
+      ? [{ id: "card" as const, label: "Card", sublabel: "Nomba checkout", icon: CreditCard, tone: "card" as const }]
       : []),
   ];
 
@@ -959,12 +959,12 @@ const CanadaSendFlow = () => {
               total={totalCharged}
               currency="CAD"
               symbol="C$"
-              cardTitle="Card or bank (EFT) · Nomba"
+              cardTitle="Card · Nomba"
               cardProviderReady={productFeatures.nombaNigeria}
-              cardChargeNote="Pay with Visa, Mastercard, or bank (EFT) on Nomba’s secure checkout. We credit your CAD wallet, then pay out Interac or EFT."
+              cardChargeNote="Visa, Mastercard, or debit on Nomba’s secure checkout. We credit your CAD wallet, then pay the recipient."
               cardMinNote="Minimum Nomba collect is C$2.00."
-              interacTitle="Interac e-Transfer"
-              interacDescription={`Confirm to open Interac checkout for C$${totalCharged.toFixed(2)}. After you confirm, send CAD Autodeposit to ${FINCRA_CAD_INTERAC_ALIAS} with your payment code. When the deposit matches, Nomba pays ${recipientName || "your recipient"}.`}
+              interacTitle="Interac e-Transfer · Fincra"
+              interacDescription={`Confirm to open Fincra Interac Autodeposit for C$${totalCharged.toFixed(2)}. Send CAD to ${FINCRA_CAD_INTERAC_ALIAS} with your payment code. Fincra matches the deposit; Nomba then pays ${recipientName || "your recipient"}.`}
               insufficientBalance={insufficient}
               onTopUp={() => navigate("/wallet/topup")}
             />
@@ -1141,7 +1141,7 @@ const CanadaSendFlow = () => {
           email: user.email,
           corridor: "international",
           return_url: returnUrl,
-          payment_methods: ["card", "eft"],
+          payment_methods: ["card"],
         });
         if (!collection.payment_link) throw new Error("Checkout link was empty");
         saveCanadaCardSend({
@@ -1785,9 +1785,9 @@ const CanadaSendFlow = () => {
               <ReviewRow
                 label="You pay with"
                 value={
-                  funding === "card" ? "Card or bank (EFT) · Nomba"
-                    : funding === "interac" ? "Interac e-Transfer"
-                    : funding === "bank" ? "Bank EFT"
+                  funding === "card" ? "Card · Nomba"
+                    : funding === "interac" ? "Interac e-Transfer · Fincra"
+                    : funding === "bank" ? "Bank EFT · Nuvei coming soon"
                     : funding === "wise" ? "Wise"
                     : "CAD wallet"
                 }

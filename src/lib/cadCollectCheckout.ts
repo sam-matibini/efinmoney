@@ -3,8 +3,9 @@
  * Lower rank = cheaper / preferred when the rail is live.
  *
  * Interac Autodeposit and bank EFT cost less than card (Nomba charges USD + FX).
- * Nomba Checkout is the live CAD card rail and also requests bank/EFT on the
- * hosted page. Fincra hosted card is not a CAD collect rail.
+ * Nomba Checkout is the live CAD card rail (card only). Bank EFT will debit via
+ * Nuvei Payment Middleware once live keys exist (Coming soon). Fincra Autodeposit
+ * is the CAD Interac pay-in. Fincra hosted card is not a CAD collect rail.
  */
 
 export const CAD_COLLECT_COST_RANK: Record<string, number> = {

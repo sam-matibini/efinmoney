@@ -11,6 +11,7 @@ export interface CheckoutMethod {
   icon?: ReactNode;
   tone?: PayTone;
   content: ReactNode;
+  comingSoon?: boolean;
 }
 
 interface Props {
@@ -45,9 +46,10 @@ const CheckoutMethodList = ({
       onChange={onChange}
       items={methods.map((m) => ({
         id: m.id,
-        label: m.label,
-        description: m.description,
+        label: m.comingSoon ? `${m.label}` : m.label,
+        description: m.comingSoon ? "Coming soon" : m.description,
         icon: methodIcon(m),
+        disabled: !!m.comingSoon,
       }))}
     />
   );

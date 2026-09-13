@@ -94,6 +94,7 @@ import {
 import { quoteCadNombaTopup } from "@/lib/nombaTopupQuote";
 import { useFxRates } from "@/hooks/useFxRates";
 import ComingSoon from "@/components/common/ComingSoon";
+import NuveiEftComingSoon from "@/components/payments/NuveiEftComingSoon";
 import { isLiveTopupCurrency, productFeatures } from "@/lib/productFeatures";
 import { FINCRA_CAD_INTERAC_ALIAS } from "@/lib/fincraCad";
 import { CAD_COLLECT_METHOD_IDS, orderCadCollectMethods } from "@/lib/cadCollectCheckout";
@@ -1147,18 +1148,21 @@ const TopUpPage = () => {
         payMethods.push({
           id: "nomba_eft",
           tone: "bank",
-          label: "Bank (EFT)",
-          description: "Canadian bank transfer on Nomba checkout",
+          label: "Bank",
+          description: "Nuvei EFT coming soon · Nomba bank transfer",
           content: (
             <SectionBoundary name="NombaEftTopUp">
-              <NombaTopUpCard
-                walletId={walletId}
-                walletCurrency={currency}
-                initialAmount={amount}
-                embedded
-                collectRails={["eft"]}
-                onComplete={invalidateWallets}
-              />
+              <div className="space-y-3">
+                <NuveiEftComingSoon />
+                <NombaTopUpCard
+                  walletId={walletId}
+                  walletCurrency={currency}
+                  initialAmount={amount}
+                  embedded
+                  collectRails={["eft"]}
+                  onComplete={invalidateWallets}
+                />
+              </div>
             </SectionBoundary>
           ),
         });
@@ -1185,17 +1189,20 @@ const TopUpPage = () => {
       payMethods.push({
         id: "plaid",
         tone: "bank",
-        label: "Bank EFT (Plaid)",
-        description: "Send CAD by EFT from your linked bank to Loop Bank",
+        label: "Bank",
+        description: "Nuvei EFT coming soon · Plaid / Loop",
         content: (
           <SectionBoundary name="CadCollection">
-            <CadCollectionPanel
-              walletId={walletId}
-              walletCurrency={currency}
-              initialAmount={amount}
-              onComplete={invalidateWallets}
-              onExit={() => setSelectedMethodId("")}
-            />
+            <div className="space-y-3">
+              <NuveiEftComingSoon />
+              <CadCollectionPanel
+                walletId={walletId}
+                walletCurrency={currency}
+                initialAmount={amount}
+                onComplete={invalidateWallets}
+                onExit={() => setSelectedMethodId("")}
+              />
+            </div>
           </SectionBoundary>
         ),
       });
@@ -1221,6 +1228,21 @@ const TopUpPage = () => {
       });
     }
 
+    if (isCadWallet && productFeatures.nuvei && !payMethods.some((m) => m.id === "nomba_eft" || m.id === "plaid")) {
+      payMethods.push({
+        id: "nuvei_eft",
+        tone: "bank",
+        label: "Bank",
+        description: "Coming soon — Nuvei Payment Middleware sandbox",
+        comingSoon: true,
+        content: (
+          <SectionBoundary name="NuveiEftComingSoon">
+            <NuveiEftComingSoon />
+          </SectionBoundary>
+        ),
+      });
+    }
+
     if (showRail("interac") && isCadWallet && (rails.has("interac") || productFeatures.fincraInterac)) {
       // CAD Interac via Fincra Autodeposit (`fincra-cad-interac`)
       const interacAmount = Number(amount);
@@ -1230,7 +1252,7 @@ const TopUpPage = () => {
         tone: "bank",
         label: "Interac e-Transfer",
         description: productFeatures.fincraInterac
-          ? `Send CAD to ${FINCRA_CAD_INTERAC_ALIAS}`
+          ? `Fincra Autodeposit · ${FINCRA_CAD_INTERAC_ALIAS}`
           : "Use bank account to make instant payments",
         content: (
           <SectionBoundary name="CadInteracTopUp">

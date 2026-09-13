@@ -114,6 +114,18 @@ async function testPayPal(): Promise<TestResult> {
   return { ok: false, message: `PayPal OAuth error ${r.status}`, detail: (await r.text()).slice(0, 200) };
 }
 
+async function testNuvei(): Promise<TestResult> {
+  const host = (Deno.env.get("NUVEI_MW_BASE_URL") || "https://devapi.nuveiconnect.com").replace(/\/+$/, "");
+  const r = await fetch(`${host}/api/gateway/list`, { headers: { "X-Version": "3" } });
+  if (r.ok) {
+    return {
+      ok: true,
+      message: "Connected — Nuvei Payment Middleware sandbox reachable (CAD EFT coming soon)",
+    };
+  }
+  return { ok: false, message: `Nuvei middleware error ${r.status}`, detail: (await r.text()).slice(0, 200) };
+}
+
 async function testSquare(): Promise<TestResult> {
   const token = Deno.env.get("SQUARE_ACCESS_TOKEN")!;
   const sandbox = (Deno.env.get("SQUARE_ENVIRONMENT") || "production").trim().toLowerCase() === "sandbox";
@@ -190,6 +202,7 @@ const PROVIDERS: Record<string, { required: string[]; live?: () => Promise<TestR
   paysafe:     { required: ["PAYSAFE_API_KEY"], live: testPaysafe },
   paypal:      { required: ["PAYPAL_CLIENT_ID", "PAYPAL_CLIENT_SECRET"], live: testPayPal },
   square:      { required: ["SQUARE_ACCESS_TOKEN", "SQUARE_APPLICATION_ID", "SQUARE_LOCATION_ID"], live: testSquare },
+  nuvei:       { required: [], live: testNuvei },
   flovide:     { required: ["FLOVIDE_PUBLIC_KEY", "FLOVIDE_SECRET_KEY"], live: testFlovide },
   dodo:        { required: ["DODO_PAYMENTS_API_KEY"] },
   wise:        { required: ["WISE_API_TOKEN"] },

@@ -1359,7 +1359,7 @@ const SendPage = () => {
             email: user.email,
             corridor: sourceCurrency === "NGN" ? "nigeria" : "international",
             return_url: returnUrl,
-            payment_methods: sourceCurrency === "CAD" || sourceCurrency === "NGN" ? ["card", "eft"] : ["card"],
+            payment_methods: sourceCurrency === "CAD" ? ["card"] : sourceCurrency === "NGN" ? ["card", "eft"] : ["card"],
           });
           if (!collection.payment_link) {
             throw new Error("Checkout link was empty — try again or use wallet balance.");
@@ -2379,12 +2379,20 @@ const SendPage = () => {
     ...(cardFundingAvailable
       ? [{ id: "card" as const, label: "Card", sublabel: "Nomba · debit or credit", icon: CreditCard, tone: "card" as const }]
       : []),
-    { id: "bank" as const, label: "Bank", sublabel: "Link with Plaid or transfer from your bank", icon: Landmark, tone: "bank" as const },
+    {
+      id: "bank" as const,
+      label: "Bank",
+      sublabel: sourceCurrency === "CAD"
+        ? "Nuvei EFT coming soon · Plaid"
+        : "Link with Plaid or transfer from your bank",
+      icon: Landmark,
+      tone: "bank" as const,
+    },
     ...(interacFundingAvailable
       ? [{
           id: "interac" as const,
           label: "Interac",
-          sublabel: "e-Transfer · Nomba",
+          sublabel: "e-Transfer · Fincra",
           icon: Banknote,
           tone: "bank" as const,
         }]
@@ -3260,7 +3268,12 @@ const SendPage = () => {
                                         cardProviderReady={!!cardSendProvider}
                                         cardTitle={productFeatures.nombaNigeria ? "Card · Nomba" : undefined}
                                         cardChargeNote={productFeatures.nombaNigeria ? "Visa, Mastercard, Amex or Verve on Nomba’s secure checkout." : null}
-                                        interacTitle="Interac e-Transfer · Nomba"
+                                        interacTitle="Interac e-Transfer · Fincra"
+                                        interacDescription={
+                                          productFeatures.fincraInterac
+                                            ? `Confirm to open Fincra Interac Autodeposit for ${sourceSymbol}${totalCharge.toFixed(2)}. Send CAD to the Autodeposit email with your payment code.`
+                                            : undefined
+                                        }
                                         cardMinNote={
                                           cardSendProvider
                                             ? `Minimum card send is ${cardSendMinAmount(cardSendProvider, sourceCurrency)} ${sourceCurrency}.`

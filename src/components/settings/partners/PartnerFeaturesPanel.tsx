@@ -33,6 +33,7 @@ const TEST_KEYS: Record<string, string> = {
   elicate: "elicate",
   adyen: "adyen",
   lenhub: "lenhub",
+  nuvei: "nuvei",
 };
 
 function testKeyFor(code: string): string | null {

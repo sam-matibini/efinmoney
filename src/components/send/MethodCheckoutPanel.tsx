@@ -8,6 +8,7 @@ import { CardFieldsInputs, type CardFieldsValue } from "@/components/payments/ca
 import { productFeatures } from "@/lib/productFeatures";
 import { FINCRA_CAD_INTERAC_ALIAS } from "@/lib/fincraCad";
 import PayMethodMark, { CardBrandMark } from "@/components/money/PayMethodMark";
+import NuveiEftComingSoon from "@/components/payments/NuveiEftComingSoon";
 
 export interface PanelWallet {
   wallet_id: string;
@@ -205,8 +206,8 @@ const MethodCheckoutPanel = ({
           <p className="mt-1 text-xs text-muted-foreground">
             {interacDescription
               || (fincraOn
-                ? `Confirm to open Interac checkout for ${symbol}${money(total)} ${currency}. Send CAD Autodeposit to ${FINCRA_CAD_INTERAC_ALIAS} with your payment code. Nomba pays Interac or EFT once the deposit matches.`
-                : `Confirm to open checkout for ${symbol}${money(total)} ${currency}. Send Interac Autodeposit — Nomba pays out when the deposit matches.`)}
+                ? `Confirm to open Interac checkout for ${symbol}${money(total)} ${currency}. Send CAD Autodeposit to ${FINCRA_CAD_INTERAC_ALIAS} with your payment code. Fincra matches the deposit; Nomba then pays the recipient.`
+                : `Confirm to open checkout for ${symbol}${money(total)} ${currency}. Send Interac Autodeposit — payout releases when the deposit matches.`)}
           </p>
         </div>
         <ChargeSummary amount={amount} fee={fee} total={total} currency={currency} symbol={symbol} debitLabel="Interac from your bank" />
@@ -329,9 +330,10 @@ const MethodCheckoutPanel = ({
           <PayMethodMark kind="bank" className="h-8 w-8" />
           <p className="text-sm font-semibold">Bank transfer checkout</p>
         </div>
+        {currency.toUpperCase() === "CAD" && <NuveiEftComingSoon />}
         <p className="text-sm text-muted-foreground">
           {currency.toUpperCase() === "CAD"
-            ? "Confirm to open Canadian EFT checkout. Send the exact amount from your linked bank (institution, transit, account). Linking with Plaid attaches a matching reference. This is not Interac Autodeposit."
+            ? "Confirm to open Canadian EFT checkout. Send the exact amount from your linked bank (institution, transit, account). Linking with Plaid attaches a matching reference. This is not Interac Autodeposit. Nuvei EFT debit is coming soon."
             : "Confirm to open a bank-transfer checkout. Pay the exact amount from your bank app. We credit the matching wallet, then pay the recipient. Linking a bank is optional — it only helps you remember which account you will send from."}
         </p>
         {bankSources.length > 0 ? (

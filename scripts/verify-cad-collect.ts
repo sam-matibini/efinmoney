@@ -91,7 +91,7 @@ assert("auto-pick CAD falls back to Nomba when Interac off", defaultCadCollectRa
 
 assert("CAD bank Next is EFT not Interac", cadSendPayInCheckout("bank") === "eft");
 assert("CAD Interac Next stays Interac", cadSendPayInCheckout("interac") === "interac");
-assert("CAD Wise Next stays Wise", cadSendPayInCheckout("wise") === "wise");
+assert("CAD card Next stays card (Nomba)", cadSendPayInCheckout("card") === "card");
 
 if (process.exitCode) {
   console.error("CAD collect checks failed");

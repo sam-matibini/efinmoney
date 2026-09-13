@@ -60,6 +60,7 @@ const INTEGRATIONS: Array<{
   { key: "square", name: "Square", description: "Card checkout for USD/EUR/GBP wallet top-up", category: "Payments — Global & Cards", envHints: ["SQUARE_ACCESS_TOKEN", "SQUARE_APPLICATION_ID", "SQUARE_LOCATION_ID"] },
   { key: "paysafe", name: "Paysafe", description: "Retired for CAD Interac/EFT — Nomba is the CAD payout rail", category: "Payments — Global & Cards", envHints: ["PAYSAFE_API_KEY"] },
   { key: "bambora", name: "Bambora (Worldline)", description: "CAD/USD card collect, saved profiles, Canadian EFT debit", category: "Payments — Global & Cards", envHints: ["BAMBORA_MERCHANT_ID", "BAMBORA_API_PASSCODE", "BAMBORA_PAYMENTS_PASSCODE", "BAMBORA_BATCH_PASSCODE"] },
+  { key: "nuvei", name: "Nuvei", description: "Payment Middleware sandbox — CAD Bank EFT coming soon (no live keys yet)", category: "Payments — Global & Cards", envHints: ["NUVEI_MW_BASE_URL", "NUVEI_MW_GATEWAY", "NUVEI_MW_SETTINGS_JSON", "NUVEI_MW_CREDENTIALS", "NUVEI_CAD_EFT_LIVE"] },
   { key: "verto", name: "Verto", description: "Corporate FX, V-Pay and partner bank payouts", category: "Payments — Global & Cards", envHints: ["VERTO_CLIENT_ID", "VERTO_API_KEY"] },
   // Banking
   { key: "plaid", name: "Plaid", description: "Bank linking (CA/US) and live balances on the Bank tab", category: "Banking", envHints: ["PLAID_CLIENT_ID", "PLAID_SECRET", "PLAID_ENV"] },
@@ -172,6 +173,7 @@ const EDGE_FUNCTIONS: Array<{ name: string; description: string; jwt: boolean; c
   { name: "square-create-checkout", description: "Create Square Checkout payment link", jwt: true, category: "Square" },
   { name: "square-create-payment", description: "Charge a Square Web Payments token", jwt: true, category: "Square" },
   { name: "square-verify-checkout", description: "Verify Square Checkout and credit wallet", jwt: true, category: "Square" },
+  { name: "nuvei-middleware", description: "Nuvei Payment Middleware sandbox (CAD EFT coming soon)", jwt: true, category: "Nuvei" },
   // Yellowcard
   { name: "yellowcard-payout",         description: "Initiates Yellowcard Africa payouts",      jwt: false, category: "Yellowcard" },
   { name: "yellowcard-webhook",        description: "Receives Yellowcard events",               jwt: false, category: "Yellowcard" },

@@ -417,6 +417,10 @@ verify_jwt = false
 [functions.test-integration]
 verify_jwt = false
 
+# Nuvei Payment Middleware sandbox (CAD Bank EFT coming soon). JWT checked in-function.
+[functions.nuvei-middleware]
+verify_jwt = true
+
 [functions.persona-webhook]
 verify_jwt = false
 
