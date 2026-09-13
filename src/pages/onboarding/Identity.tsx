@@ -6,11 +6,10 @@ import { supabase } from "@/integrations/supabase/client";
 
 import { useKyc } from "@/hooks/useKyc";
 import PersonaVerification from "@/components/kyc/PersonaVerification";
-import InteracVerification from "@/components/kyc/InteracVerification";
 import ManualKycForm from "@/components/kyc/ManualKycForm";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ShieldCheck, ArrowLeft, Clock, Upload, Landmark } from "lucide-react";
+import { ShieldCheck, ArrowLeft, Clock, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { Logo, Wordmark } from "@/components/Logo";
 import { useBusinessAccount } from "@/hooks/useBusinessAccount";
@@ -142,7 +141,7 @@ const Identity = () => {
         <div className="text-center space-y-2">
           <h1 className="text-2xl font-bold text-foreground">Verify your identity</h1>
           <p className="text-sm text-muted-foreground">
-            Choose how you'd like to verify. Persona and Interac are instant; document upload is reviewed by our
+            Choose how you'd like to verify. Persona is usually instant; document upload is reviewed by our
             compliance team.
           </p>
         </div>
@@ -202,26 +201,6 @@ const Identity = () => {
               )}
             </Card>
 
-            <Card className="p-5 space-y-3 border-primary/30">
-              <div className="flex items-start gap-3">
-                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                  <Landmark className="w-5 h-5 text-primary" />
-                </div>
-                <div className="flex-1">
-                  <h3 className="font-semibold text-foreground text-sm">
-                    Verify with Interac
-                    <span className="ml-2 text-[10px] font-medium px-2 py-0.5 rounded-full bg-primary/10 text-primary uppercase tracking-wide">
-                      Canada
-                    </span>
-                  </h3>
-                  <p className="text-xs text-muted-foreground">
-                    Sign in with your Canadian bank to verify instantly.
-                  </p>
-                </div>
-              </div>
-              <InteracVerification className="w-full" />
-            </Card>
-
             <Card className="p-5 space-y-3">
               <div className="flex items-start gap-3">
                 <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
@@ -230,7 +209,7 @@ const Identity = () => {
                 <div className="flex-1">
                   <h3 className="font-semibold text-foreground text-sm">Upload documents for manual review</h3>
                   <p className="text-xs text-muted-foreground">
-                    Optional if Persona or Interac isn't available. A compliance officer reviews your ID and selfie
+                    Optional if Persona isn't available. A compliance officer reviews your ID and selfie
                     in 1–2 business days.
                   </p>
                 </div>

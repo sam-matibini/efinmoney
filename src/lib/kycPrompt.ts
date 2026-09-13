@@ -75,7 +75,7 @@ export function getKycPromptConfig(
     return {
       variant: "continue",
       title: "Continue verification",
-      message: "You're almost there — finish with Persona, Interac, or a document upload.",
+      message: "You're almost there — finish with Persona or a document upload.",
       cta: "Continue",
       href: upgradeRoute(current),
       dismissible: true,
@@ -89,7 +89,7 @@ export function getKycPromptConfig(
       title: current === "tier_1" ? "Verify your identity" : `Unlock ${tierLabel(upgradeTo)}`,
       message:
         current === "tier_1"
-          ? "Complete a quick ID check — Persona, Interac, or a document upload — to unlock sending, top-ups, and higher limits."
+          ? "Complete a quick ID check — Persona or a document upload — to unlock sending, top-ups, and higher limits."
           : `Upgrade to ${tierLabel(upgradeTo)} for virtual cards and international transfers.`,
       cta: current === "tier_1" ? "Verify now" : "Upgrade tier",
       href: upgradeRoute(current),

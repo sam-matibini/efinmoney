@@ -207,7 +207,7 @@ const Documents = () => {
     <KybShell
       step={3}
       title="Upload your documents"
-      subtitle="PDF or image, up to 15 MB each. These files go to our compliance team for a manual KYB review — they are not sent to Persona or Interac."
+      subtitle="PDF or image, up to 15 MB each. These files go to our compliance team for a manual KYB review — they are not sent to Persona."
     >
       <KybStatusGate page="documents" />
       <div className="space-y-4">

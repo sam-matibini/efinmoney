@@ -98,7 +98,7 @@ const KycQueuePage = () => {
         <div className="flex items-end justify-between flex-wrap gap-2">
           <div>
             <h1 className="font-display text-3xl font-bold tracking-tight">KYC Queue</h1>
-            <p className="text-sm text-muted-foreground">Review Persona, Interac, and manual document submissions</p>
+            <p className="text-sm text-muted-foreground">Review Persona and manual document submissions</p>
           </div>
         </div>
 

@@ -94,7 +94,7 @@ const BusinessPromptCard = () => {
   if (businessPrimary && !business) {
     title = "Verify your business";
     message =
-      "Company accounts use KYB — a staff document review — not personal KYC (Persona or Interac).";
+      "Company accounts use KYB — a staff document review — not personal KYC (Persona).";
     cta = "Start KYB";
     perks = ["Company details", "Ownership", "Documents"];
   }

@@ -5,7 +5,8 @@
  * Interac Autodeposit and bank EFT cost less than card (Nomba charges USD + FX).
  * Nomba Checkout is the live CAD card rail (card only). Bank EFT will debit via
  * Nuvei Payment Middleware once live keys exist (Coming soon). Fincra Autodeposit
- * is the CAD Interac pay-in. Fincra hosted card is not a CAD collect rail.
+ * CAD wallet top-up checkout hides Wise EFT, Bambora EFT, and Dodo card.
+ * Send pay-in does not offer Wise.
  */
 
 export const CAD_COLLECT_COST_RANK: Record<string, number> = {
@@ -51,12 +52,9 @@ export const CAD_COLLECT_UNSAFE_RAILS = [
 export const CAD_COLLECT_METHOD_IDS = [
   "interac",
   "plaid",
-  "wise",
-  "bambora_eft",
   "nomba_eft",
   "nomba",
-  "wise_link",
-  "dodo",
+  "nuvei_eft",
 ] as const;
 
 export function cadCollectCostRank(methodId: string): number {

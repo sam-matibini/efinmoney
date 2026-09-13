@@ -47,7 +47,6 @@ import DodoTopUpCard from "@/components/payments/DodoTopUpCard";
 import EpayTopUpCard from "@/components/payments/EpayTopUpCard";
 import SquareTopUpCard, { verifySquareCheckout } from "@/components/payments/SquareTopUpCard";
 import BamboraTopUpCard from "@/components/payments/BamboraTopUpCard";
-import BamboraEftTopUpCard from "@/components/payments/BamboraEftTopUpCard";
 import PayPalTopUpCard from "@/components/payments/PayPalTopUpCard";
 import SwychrTopUpCard from "@/components/payments/SwychrTopUpCard";
 import { validateMinAmount, minAmount, type FlwMethod } from "@/lib/flutterwave";
@@ -119,11 +118,11 @@ function availableIntlMethods(currency: string): IntlTopupMethod[] {
     if (productFeatures.nombaNigeria && isNombaTopupLive(c)) methods.push("nomba");
     if (productFeatures.fincra && ["EUR", "GBP"].includes(c)) methods.push("fincra");
     if (productFeatures.paytota) methods.push("paytota");
-    if (productFeatures.dodo) methods.push("dodo");
+    if (productFeatures.dodo && c !== "CAD") methods.push("dodo");
     if (productFeatures.square && c !== "CAD") methods.push("square");
     if (productFeatures.paypal && c !== "CAD") methods.push("paypal");
     if (c === "CAD" && productFeatures.fincraInterac) methods.push("interac");
-    if (productFeatures.wise) methods.push("wise");
+    if (productFeatures.wise && c !== "CAD") methods.push("wise");
     if (productFeatures.flutterwave && FLW_WESTERN_TOPUP_CURRENCIES.includes(c) && c !== "CAD") {
       methods.push("flutterwave");
     }
@@ -882,12 +881,12 @@ const TopUpPage = () => {
       if (id === "flw_momo" && ccyUpper === "CAD") return false;
       if (id === "bank_va" && (ccyUpper === "NGN" || ccyUpper === "GHS") && productFeatures.flutterwave) return true;
       if (id === "bank_checkout" && (supportsFincraBankCheckout(ccyUpper) || ccyUpper === "GHS")) return true;
-      // CAD pay-in: Interac, EFT, Nomba card/bank, Wise — show every live rail (least-cost order later).
+      // CAD pay-in: Interac (Fincra), Bank (Nuvei coming soon), Nomba card.
       if (ccyUpper === "CAD" && (CAD_COLLECT_METHOD_IDS as readonly string[]).includes(id)) {
         return true;
       }
-      // Always offer Wise as its own top-level rail when the feature is on.
-      if ((id === "wise" || id === "wise_link") && productFeatures.wise) return true;
+      // Wise is not a CAD wallet top-up rail.
+      if ((id === "wise" || id === "wise_link") && productFeatures.wise && ccyUpper !== "CAD") return true;
       if (africaBackupId) {
         return id === africaBackupId || id === "interac" || id === "plaid";
       }
@@ -1093,7 +1092,7 @@ const TopUpPage = () => {
       });
     }
 
-    if (showRail("dodo") && productFeatures.dodo && rails.has("dodo")) {
+    if (showRail("dodo") && productFeatures.dodo && rails.has("dodo") && ccyUpper !== "CAD") {
       payMethods.push({
         id: "dodo",
         tone: "card",
@@ -1208,26 +1207,6 @@ const TopUpPage = () => {
       });
     }
 
-    if (isCadWallet && productFeatures.bambora) {
-      payMethods.push({
-        id: "bambora_eft",
-        tone: "bank",
-        label: "Bank debit (EFT)",
-        description: "Canadian bank account · 3–5 business days",
-        content: (
-          <SectionBoundary name="BamboraEftTopUp">
-            <BamboraEftTopUpCard
-              walletId={walletId}
-              walletCurrency={currency}
-              initialAmount={amount}
-              embedded
-              onComplete={invalidateWallets}
-            />
-          </SectionBoundary>
-        ),
-      });
-    }
-
     if (isCadWallet && productFeatures.nuvei && !payMethods.some((m) => m.id === "nomba_eft" || m.id === "plaid")) {
       payMethods.push({
         id: "nuvei_eft",
@@ -1308,21 +1287,7 @@ const TopUpPage = () => {
       });
     }
 
-    // Wise — CAD bank EFT (account details) is cheaper than the hosted pay link.
-    if (showRail("wise") && productFeatures.wise && isCadWallet) {
-      payMethods.push({
-        id: "wise",
-        tone: "bank",
-        label: "Bank EFT (Wise)",
-        description: "Institution, transit and account — include your payment reference",
-        content: (
-          <SectionBoundary name="WiseCadEftTopUp">
-            <WiseTopUpCard walletId={walletId} walletCurrency={currency} initialAmount={amount} onComplete={invalidateWallets} />
-          </SectionBoundary>
-        ),
-      });
-    }
-    if (showRail("wise_link") && productFeatures.wise && isWisePayCurrency(currency)) {
+    if (showRail("wise_link") && productFeatures.wise && isWisePayCurrency(currency) && !isCadWallet) {
       payMethods.push({
         id: "wise_link",
         tone: "wise",

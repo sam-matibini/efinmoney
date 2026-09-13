@@ -212,7 +212,7 @@ const Details = () => {
     <KybShell
       step={1}
       title="Tell us about your business"
-      subtitle="This must match your registration documents exactly. Companies are verified by our compliance team — not Persona or Interac."
+      subtitle="This must match your registration documents exactly. Companies are verified by our compliance team — not Persona."
     >
       <KybStatusGate page="details" />
       <Card className="p-5 flex items-start gap-3">

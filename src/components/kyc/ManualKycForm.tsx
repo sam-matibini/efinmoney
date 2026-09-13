@@ -111,7 +111,7 @@ const ManualKycForm = ({ onBack, onSubmitted }: Props) => {
             <h3 className="font-semibold text-foreground text-sm">Manual document review</h3>
             <p className="text-xs text-muted-foreground mt-0.5">
               Upload a government ID and a live selfie. A compliance officer reviews them — typically within 1–2
-              business days. Use this if Persona or Interac isn't available for you.
+              business days. Use this if Persona isn't available for you.
             </p>
           </div>
         </div>

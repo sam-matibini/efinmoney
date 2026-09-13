@@ -2,7 +2,7 @@ import { Navigate } from "react-router-dom";
 import { useBusinessAccount } from "@/hooks/useBusinessAccount";
 import LoadingSpinner from "@/components/LoadingSpinner";
 
-/** Sends company accounts to KYB instead of personal KYC (Persona / Interac). */
+/** Sends company accounts to KYB instead of personal KYC (Persona). */
 const RedirectBusinessToKyb = () => {
   const { isBusiness, isLoading, resumePath } = useBusinessAccount();
 

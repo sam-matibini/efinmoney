@@ -106,7 +106,7 @@ const Review = () => {
         <Label htmlFor="attest" className="text-sm font-normal leading-relaxed">
           I confirm that I am authorised to act on behalf of this business, and that the information
           and documents provided are true, complete and accurate. I understand that eFinMoney will
-          verify this application through a manual compliance review (not Persona or Interac), and that
+          verify this application through a manual compliance review (not Persona), and that
           providing false information is an offence.
         </Label>
       </Card>

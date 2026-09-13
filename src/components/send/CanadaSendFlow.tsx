@@ -756,6 +756,10 @@ const CanadaSendFlow = () => {
     if (method === "paylink" && funding !== "wallet") setFunding("wallet");
   }, [method, funding]);
 
+  useEffect(() => {
+    if (funding === "wise") setFunding("wallet");
+  }, [funding]);
+
   // Interac and EFT pay out through Nomba. Stripe is not a Canada domestic rail.
 
   const applyCanadaBeneficiary = (b: Beneficiary) => {
@@ -889,9 +893,6 @@ const CanadaSendFlow = () => {
       icon: Landmark,
       tone: "bank",
     },
-    ...(productFeatures.wise && isWisePayCurrency("CAD")
-      ? [{ id: "wise" as const, label: "Wise", sublabel: "Bank EFT via Wise", icon: Wallet, tone: "wise" as const }]
-      : []),
     ...(productFeatures.nombaNigeria
       ? [{ id: "card" as const, label: "Card", sublabel: "Nomba checkout", icon: CreditCard, tone: "card" as const }]
       : []),
@@ -1490,7 +1491,7 @@ const CanadaSendFlow = () => {
               <div className="p-3 rounded-xl border border-amber-500/30 bg-amber-500/5 flex items-start gap-2">
                 <AlertCircle className="w-4 h-4 mt-0.5 text-amber-600 shrink-0" />
                 <p className="text-sm text-muted-foreground">
-                  No CAD wallet yet — pay by Nomba card, Interac, Wise, or a linked bank, or{" "}
+                  No CAD wallet yet — pay by Nomba card, Interac, or a linked bank, or{" "}
                   <button type="button" className="text-primary underline" onClick={handleQuickAddWallet}>
                     add a CAD wallet
                   </button>

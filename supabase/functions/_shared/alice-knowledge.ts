@@ -26,7 +26,7 @@ and other African markets. It operates under RPAA and FINTRAC compliance.
 
 # KYC / verification
 - Personal accounts: KYC tiers run from tier_0 (unverified) to tier_3 (fully verified); higher tiers
-  unlock higher limits and more features. Verification is Persona, Interac, or a manual document upload.
+  unlock higher limits and more features. Verification is Persona or a manual document upload.
 - **Business accounts do not complete personal KYC.** They complete KYB (company details, ownership, documents).
   Do not tell a business user to finish KYC. If their KYB is approved they can issue receive accounts and send.
 - KYC statuses a personal user may see: pending, submitted / pending_review, verified, rejected, expired.

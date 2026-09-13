@@ -342,7 +342,7 @@ const SECTIONS: Section[] = [
       <>
         <p>eFinMoney operates an integrated compliance stack:</p>
         <ul className="list-disc pl-6 space-y-1 mt-2">
-          <li>KYC provider integrations (Persona, Interac Verification Service)</li>
+          <li>KYC provider integrations (Persona)</li>
           <li>AML transaction-monitoring engine</li>
           <li>Sanctions and PEP screening engine</li>
           <li>Fraud-detection analytics</li>

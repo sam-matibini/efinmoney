@@ -2375,6 +2375,10 @@ const SendPage = () => {
     }
   }, [fundingSource, cadWallet, selectedWalletId]);
 
+  useEffect(() => {
+    if (fundingSource === "wise") setFundingSource("wallet");
+  }, [fundingSource]);
+
   const fundingMethodOptions: PaymentMethodOption<FundingSource>[] = [
     ...(cardFundingAvailable
       ? [{ id: "card" as const, label: "Card", sublabel: "Nomba · debit or credit", icon: CreditCard, tone: "card" as const }]
@@ -2396,9 +2400,6 @@ const SendPage = () => {
           icon: Banknote,
           tone: "bank" as const,
         }]
-      : []),
-    ...(wisePayWallet
-      ? [{ id: "wise" as const, label: "Wise", sublabel: "Bank or card via Wise", icon: Wallet, tone: "wise" as const }]
       : []),
     { id: "wallet" as const, label: "Wallet", sublabel: "eFinMoney balance", icon: Wallet, tone: "wallet" as const },
   ];

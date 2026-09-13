@@ -132,7 +132,7 @@ const Ownership = () => {
     <KybShell
       step={2}
       title="Who owns and controls the business?"
-      subtitle={`List every individual who owns ${UBO_THRESHOLD_PERCENT}% or more, plus all directors and signing officers. Identity is verified here as part of KYB — not through Persona or Interac.`}
+      subtitle={`List every individual who owns ${UBO_THRESHOLD_PERCENT}% or more, plus all directors and signing officers. Identity is verified here as part of KYB — not through Persona.`}
     >
       <KybStatusGate page="ownership" />
       <Card className="p-4 flex items-center justify-between">

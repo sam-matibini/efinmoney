@@ -80,14 +80,14 @@ const KYCPage = () => {
           value={kybLabel}
           meta={[
             { icon: KybIcon, text: business?.legal_name || "Company account" },
-            { icon: Lock, text: isApproved ? "Business payments unlocked" : "Staff document review — not Persona or Interac" },
+            { icon: Lock, text: isApproved ? "Business payments unlocked" : "Staff document review — not Persona" },
           ]}
           variant="cta"
         />
         <Card className="p-6 space-y-3">
           <p className="text-sm text-muted-foreground">
             Business accounts are verified through a manual KYB review: company details, ownership, and documents.
-            Personal KYC (Persona or Interac) is not used for company onboarding.
+            Personal KYC (Persona) is not used for company onboarding.
           </p>
           <Button onClick={() => navigate(kybResumePath(business))} className="gap-1.5">
             {isApproved ? "Open business account" : isPendingReview ? "View status" : "Continue KYB"}
