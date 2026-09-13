@@ -3,6 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 import { resolveEffectiveRate } from "../_shared/fxRatesCore.ts";
 import { quoteTransfer } from "../_shared/pricing/costRecoveryEngine.ts";
 import { hydrateEnginePricing } from "../_shared/pricing/hydrateEnginePricing.ts";
+import { loadCorridorFxBenchmark } from "../_shared/loadCorridorFxBenchmark.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -285,6 +286,21 @@ async function resolveFxRate(
   };
 }
 
+async function providerBenchmarkMid(
+  client: ReturnType<typeof createClient>,
+  from: string,
+  to: string,
+  resolved: ResolvedRate,
+): Promise<number> {
+  try {
+    const provider = await loadCorridorFxBenchmark(client, { from, to });
+    if (provider.rate > 0) return provider.rate;
+  } catch (err) {
+    console.error("corridor provider FX lookup failed", err);
+  }
+  return resolved.market_rate > 0 ? resolved.market_rate : resolved.effective_rate;
+}
+
 // Rate limiting helper
 async function checkRateLimit(
   supabase: any,
@@ -398,7 +414,7 @@ serve(async (req) => {
         );
       }
 
-      const mid = resolved.market_rate > 0 ? resolved.market_rate : resolved.effective_rate;
+      const mid = await providerBenchmarkMid(serviceClient, from_currency, to_currency, resolved);
       const priced = priceWalletSwap(from_currency, to_currency, amount, mid);
       const fee = priced.transferFee;
       const effectiveRate = priced.customerRate ?? resolved.effective_rate;
@@ -506,7 +522,7 @@ serve(async (req) => {
         );
       }
 
-      const mid = resolved.market_rate > 0 ? resolved.market_rate : resolved.effective_rate;
+      const mid = await providerBenchmarkMid(serviceClient, from_currency, to_currency, resolved);
       const priced = priceWalletSwap(from_currency, to_currency, from_amount, mid);
       const fee = priced.transferFee;
       const effectiveRate = priced.customerRate ?? resolved.effective_rate;

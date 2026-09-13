@@ -91,6 +91,7 @@ export interface QuoteInput {
   monthlyVolume?: number;
   partner?: string | null;
   channel?: PricingChannel;
+  /** Corridor provider FX when live; treasury mid only as fallback. */
   midMarketRate?: number | null;
   negotiatedFxSpread?: number | null;
 }

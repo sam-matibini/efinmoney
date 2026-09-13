@@ -16,14 +16,21 @@ FX hedge / volatility + compliance / risk + eFinMoney margin.
 
 Customer fee = max(minimum fee, variable fee, cost-recovery floor).
 
-Customer FX rate (applied once, to true mid-market `fx_rates.rate` — not to
-the already-marked `effective_rate`):
+Customer FX rate — **corridor provider FX plus eFinMoney internal margin**,
+applied once. Do not quote from CBN / Open Exchange mid when a live payout
+rail quote exists, and never stack `fx_rates.effective_rate` (already marked)
+on top of the corridor spread.
 
-`CUSTOMER_RATE = MID_MARKET_RATE × (1 − FX_SPREAD)`
+`CUSTOMER_RATE = PROVIDER_FX × (1 − FX_SPREAD)`
 
-CAD→NGN bank uses a **0.60%** spread so the customer rate stays **above CBN
-official** and close to remittance peers (Sendwave). Do not stack the 0.50%
-`refresh-fx-rates` markup on top of this spread.
+`PROVIDER_FX` is the live rate from the corridor payout partner (Nomba,
+Flutterwave, Fincra, Wise, …). If several rails quote the pair, we prefer the
+rate-card / routed partner, otherwise the best live quote. Treasury
+`fx_rates.rate` is the fallback only.
+
+CAD→NGN bank internal margin is **0.60%**. A Nomba/Sendwave-class provider
+rate of ₦971.89 becomes about ₦966.06 — above CBN official, with a single
+eFinMoney spread.
 
 ## Wallet vs external
 
@@ -56,9 +63,11 @@ tiers, and versioned `efinmoney_pricing` rows with minimum fees.
 
 Existing environments also need
 `supabase/migrations/20260913220000_cad_ngn_competitive_fx.sql` so published
-CAD→NGN cards drop from 1.50%–1.75% to 0.60%–0.70%. Checkout quotes from
-`fx_rates.rate` (mid) in the app; the SQL keeps the admin workbook and
-`price-quote` in sync.
+CAD→NGN cards drop from 1.50%–1.75% to 0.60%–0.70%, and
+`supabase/migrations/20260913233000_corridor_provider_fx_read.sql` so checkout
+can read live `partner_fx_rates`. Redeploy `corridor-provider-fx` and
+`fx-engine` after pull. Checkout quotes **provider FX + internal margin**;
+the SQL keeps the admin workbook and `price-quote` in sync.
 
 ## Verify
 

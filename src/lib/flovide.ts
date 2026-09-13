@@ -156,12 +156,10 @@ export async function resolveCorridorAccount(
 /**
  * Partner FX overlay for send / exchange UI.
  *
- * Customer mid-market rates come from `fx_rates` (OpenExchangeRates / er-api),
- * refreshed by `refresh-fx-rates`. Partner quotes only when they are the
- * settlement rail — Nomba for NGN pairs.
- *
- * Flovide FX is intentionally not used here: it was overriding correct
- * CAD↔Africa mid-market quotes on Send.
+ * Customer FX = corridor provider FX × (1 − eFinMoney internal margin).
+ * Nomba is the NGN settlement rail; its quote is a live provider benchmark,
+ * never a substitute after treasury mid. Flovide FX is not used — it was
+ * overriding CAD↔Africa quotes that were not Flovide's settlement rate.
  */
 export async function getFlovideOrNombaRate(
   from: string,

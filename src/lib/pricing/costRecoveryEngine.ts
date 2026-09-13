@@ -4,8 +4,9 @@
  * Customer Price = Partner Cost + Internal Cost + Risk Cost + FX Spread + Margin
  * Customer Fee    = MAX(Minimum Fee, Variable Fee + Fixed Cost Recovery, Cost Recovery Floor)
  *
- * Starting commercial rates live in the administrator-controlled rate card.
- * This module never hard-codes a 0.5% consumer fee.
+ * Customer FX = corridor provider FX × (1 − eFinMoney internal margin).
+ * `quoteTransfer.midMarketRate` is that provider benchmark (treasury mid only
+ * when no live rail quote exists). Never stack fx_rates.effective_rate.
  */
 import type {
   CorridorRateCard,
@@ -24,15 +25,13 @@ import {
   payoutMethodFromInput,
 } from "./rateCard.ts";
 import { getActiveRateCards, getPayoutMins, getVolumeTiers } from "./workbookStore.ts";
+import { customerRateFromProvider } from "../fxCorridorBenchmark.ts";
 
 const r2 = (n: number) => Math.round((Number(n) || 0) * 100) / 100;
-const r6 = (n: number) => Math.round((Number(n) || 0) * 1_000_000) / 1_000_000;
 
+/** FX benchmark × internal margin. Benchmark is the corridor provider rate when live. */
 export function customerRateFromMid(midMarketRate: number, fxSpread: number): number {
-  const mid = Number(midMarketRate);
-  const spread = Math.max(0, Number(fxSpread) || 0);
-  if (!Number.isFinite(mid) || mid <= 0) return 0;
-  return r6(mid * (1 - spread));
+  return customerRateFromProvider(midMarketRate, fxSpread);
 }
 
 export function resolveVolumeTier(monthlyVolume = 0) {
@@ -228,7 +227,7 @@ export function quoteTransfer(
   const minimumRevenue = r2(cost.totalCost + requiredMargin);
 
   const mid = input.midMarketRate != null && Number(input.midMarketRate) > 0 ? Number(input.midMarketRate) : null;
-  let customerRate = mid != null ? customerRateFromMid(mid, fxSpread) : null;
+  let customerRate = mid != null ? customerRateFromProvider(mid, fxSpread) : null;
   const fxMargin = r2(amount * fxSpread);
 
   let totalRevenue = r2(transferFee + fxMargin);

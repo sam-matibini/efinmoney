@@ -9,6 +9,8 @@ import { Label } from "@/components/ui/label";
 import { useWallets } from "@/hooks/useWallets";
 import { useFxRates } from "@/hooks/useFxRates";
 import { resolveMidMarketRate } from "@/lib/fx";
+import { useCorridorFxBenchmark } from "@/hooks/useCorridorFxBenchmark";
+import type { CorridorProviderQuote } from "@/lib/fxCorridorBenchmark";
 import { fxQuoteLabel, type QuoteConvention } from "@/lib/fxQuote";
 import { getFlovideOrNombaRate, isNgnPair } from "@/lib/flovide";
 import { executeWalletFxSwap } from "@/lib/walletTransfer";
@@ -86,11 +88,20 @@ const ExchangeModal = ({ children }: ExchangeModalProps) => {
   const dbRate = fromCode && toCode
     ? resolveMidMarketRate(fromCode, toCode, fxRates ?? [])
     : null;
-  const midMarketRate = dbRate && dbRate > 0
-    ? dbRate
-    : (nombaQuote?.effective_rate && nombaQuote.effective_rate > 0
-      ? nombaQuote.effective_rate
-      : (fromCode && toCode && fromCode === toCode ? 1 : null));
+  const liveProviderQuotes: CorridorProviderQuote[] =
+    nombaQuote?.source === "nomba" && nombaQuote.effective_rate && nombaQuote.effective_rate > 0
+      ? [{ partnerCode: "nomba", rate: nombaQuote.effective_rate, source: "live_api" }]
+      : [];
+  const fxBenchmark = useCorridorFxBenchmark({
+    from: fromCode,
+    to: toCode,
+    treasuryMid: dbRate,
+    liveQuotes: liveProviderQuotes,
+    enabled: !!fromCode && !!toCode && fromCode !== toCode,
+  });
+  const midMarketRate = fromCode && toCode && fromCode === toCode
+    ? 1
+    : (fxBenchmark.rate || dbRate || (nombaQuote?.source === "nomba" ? nombaQuote.effective_rate : null) || null);
   const pricedQuote = quoteTransfer({
     sourceCurrency: fromCode,
     destinationCurrency: toCode,
@@ -100,7 +111,7 @@ const ExchangeModal = ({ children }: ExchangeModalProps) => {
     midMarketRate: midMarketRate,
   });
   const effectiveRate = pricedQuote.customerRate ?? (midMarketRate ?? 1);
-  const rateFromNomba = !(dbRate && dbRate > 0) && !!nombaQuote?.effective_rate;
+  const rateFromNomba = fxBenchmark.source === "live_api" && fxBenchmark.partnerCode === "nomba";
   const rateQuote = useMemo(
     () => fxQuoteLabel(fromCode, toCode, pricedQuote.customerRate ?? effectiveRate, quoteConvention),
     [fromCode, toCode, pricedQuote.customerRate, effectiveRate, quoteConvention],

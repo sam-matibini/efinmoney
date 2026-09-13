@@ -12,6 +12,7 @@ import {
   type MarketResponse,
 } from "@/components/fx/liveFxUtils";
 import { resolveMidMarketRate } from "@/lib/fx";
+import { useCorridorFxBenchmark } from "@/hooks/useCorridorFxBenchmark";
 import { supabase } from "@/integrations/supabase/client";
 import { useWallets } from "@/hooks/useWallets";
 import { useFxRates } from "@/hooks/useFxRates";
@@ -59,7 +60,14 @@ const SendMoneyModal = ({ children }: SendMoneyModalProps) => {
     return midRateFromUsdMap(from, to, map);
   }, [marketData, from, to]);
 
-  const effectiveRate = dbRate ?? marketRate;
+  const treasuryMid = dbRate ?? marketRate;
+  const fxBenchmark = useCorridorFxBenchmark({
+    from,
+    to,
+    treasuryMid,
+    enabled: from !== to,
+  });
+  const effectiveRate = from === to ? 1 : fxBenchmark.rate || treasuryMid;
   const rateReady = effectiveRate != null && effectiveRate > 0;
 
   const african = AFRICAN_PAYOUT;

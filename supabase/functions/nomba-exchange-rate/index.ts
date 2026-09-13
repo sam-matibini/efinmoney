@@ -58,7 +58,7 @@ Deno.serve(async (req) => {
       .limit(1)
       .maybeSingle();
 
-    const fallbackRate = Number(fxRow?.effective_rate ?? fxRow?.rate ?? 0);
+    const fallbackRate = Number(fxRow?.rate ?? fxRow?.effective_rate ?? 0);
     if (fallbackRate > 0) {
       return new Response(JSON.stringify({
         from,
@@ -68,7 +68,7 @@ Deno.serve(async (req) => {
         ask_rate: String(fallbackRate),
         mid_rate: String(fallbackRate),
         effective_rate: fallbackRate,
-        source: fxRow?.source || "fx_rates",
+        source: "fx_rates",
         nomba_error: nombaError,
         rates: nombaRates,
       }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });

@@ -14,6 +14,8 @@ import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { RefreshCw, ArrowUpDown, TrendingUp, CheckCircle, Bitcoin, DollarSign, Sparkles } from "lucide-react";
 import { CryptoTradingPanel } from "@/components/crypto/CryptoTradingPanel";
 import { resolveMidMarketRate } from "@/lib/fx";
+import { useCorridorFxBenchmark } from "@/hooks/useCorridorFxBenchmark";
+import type { CorridorProviderQuote } from "@/lib/fxCorridorBenchmark";
 import { fxQuoteLabel, type QuoteConvention } from "@/lib/fxQuote";
 import { getFlovideOrNombaRate, isNgnPair } from "@/lib/flovide";
 import { CurrencyFlag } from "@/components/ui/FlagImage";
@@ -116,15 +118,27 @@ const FxTradingPanel = () => {
     staleTime: 60_000,
   });
 
-  const midMarketRate = useMemo(() => {
+  const treasuryMid = useMemo(() => {
     if (!fromCode || !toCode) return null;
-    const db = resolveMidMarketRate(fromCode, toCode, fxRates ?? []);
-    if (db && db > 0) return db;
-    if (nombaQuote?.effective_rate && nombaQuote.effective_rate > 0) {
-      return nombaQuote.effective_rate;
+    if (fromCode === toCode) return 1;
+    return resolveMidMarketRate(fromCode, toCode, fxRates ?? []);
+  }, [fromCode, toCode, fxRates]);
+  const liveProviderQuotes = useMemo<CorridorProviderQuote[]>(() => {
+    if (nombaQuote?.source === "nomba" && nombaQuote.effective_rate && nombaQuote.effective_rate > 0) {
+      return [{ partnerCode: "nomba", rate: nombaQuote.effective_rate, source: "live_api" }];
     }
-    return null;
-  }, [fromCode, toCode, fxRates, nombaQuote?.effective_rate]);
+    return [];
+  }, [nombaQuote?.source, nombaQuote?.effective_rate]);
+  const fxBenchmark = useCorridorFxBenchmark({
+    from: fromCode,
+    to: toCode,
+    treasuryMid,
+    liveQuotes: liveProviderQuotes,
+    enabled: !!fromCode && !!toCode && fromCode !== toCode,
+  });
+  const midMarketRate = fromCode && toCode && fromCode === toCode
+    ? 1
+    : fxBenchmark.rate || treasuryMid;
 
   const parsedSend = parseAmt(sendAmount);
   const parsedRecv = parseAmt(recvAmount);
@@ -141,11 +155,7 @@ const FxTradingPanel = () => {
     [fromCode, toCode, parsedSend, midMarketRate],
   );
   const effectiveRate = pricedQuote.customerRate;
-  const rateFromNomba = useMemo(() => {
-    if (!fromCode || !toCode) return false;
-    const db = resolveMidMarketRate(fromCode, toCode, fxRates ?? []);
-    return !(db && db > 0) && !!nombaQuote?.effective_rate;
-  }, [fromCode, toCode, fxRates, nombaQuote?.effective_rate]);
+  const rateFromNomba = fxBenchmark.source === "live_api" && fxBenchmark.partnerCode === "nomba";
   const recvDecimals = 2;
 
   const quoteReceive = useCallback(

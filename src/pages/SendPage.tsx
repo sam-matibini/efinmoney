@@ -33,7 +33,7 @@ import { useSavedCards } from "@/hooks/useSavedCards";
 import { usePricingConfig } from "@/hooks/usePricingConfig";
 import { supabase } from "@/integrations/supabase/client";
 import { usePriceQuote } from "@/hooks/usePriceQuote";
-import { quoteTransfer } from "@/lib/pricing/costRecoveryEngine";
+import { quoteTransfer, resolveCorridorRate } from "@/lib/pricing/costRecoveryEngine";
 import { fetchFxRate, cardChargeCurrency, initializeFlwPayment, verifyFlwPayment } from "@/lib/flutterwave";
 import { payoutMinAmount, validatePayoutMin } from "@/lib/payoutMins";
 import {
@@ -43,6 +43,8 @@ import {
   isNgnPair,
 } from "@/lib/flovide";
 import { resolveMidMarketRate } from "@/lib/fx";
+import { useCorridorFxBenchmark } from "@/hooks/useCorridorFxBenchmark";
+import type { CorridorProviderQuote } from "@/lib/fxCorridorBenchmark";
 import { currencySymbol, countryToCurrency } from "@/lib/currency";
 import { useProfile } from "@/hooks/useProfile";
 import { toast } from "sonner";
@@ -590,11 +592,33 @@ const SendPage = () => {
         ? Number(fxRate.effective_rate)
         : null;
   const derivedRate = derivedFxRate && Number(derivedFxRate) > 0 ? Number(derivedFxRate) : null;
-  // Mid-market (`fx_rates.rate`) first — never the pre-marked effective_rate.
-  // Nomba/Flovide payout quotes are last-resort fallbacks only.
-  const rawRate = isSameCurrency
-    ? 1
-    : resolvedDbRate ?? directDbRate ?? derivedRate ?? nombaRate ?? 0;
+  const preferredPartner = useMemo(
+    () =>
+      resolveCorridorRate({
+        sourceCurrency,
+        destinationCurrency: targetCountry.code,
+        payoutMethod: destPayoutMethod,
+        channel: "external",
+      })?.partner ?? null,
+    [sourceCurrency, targetCountry.code, destPayoutMethod],
+  );
+  const liveProviderQuotes = useMemo<CorridorProviderQuote[]>(() => {
+    if (nombaFxQuote?.source === "nomba" && nombaRate) {
+      return [{ partnerCode: "nomba", rate: nombaRate, source: "live_api" }];
+    }
+    return [];
+  }, [nombaFxQuote?.source, nombaRate]);
+  const treasuryMid = isSameCurrency ? 1 : resolvedDbRate ?? directDbRate ?? derivedRate ?? null;
+  const fxBenchmark = useCorridorFxBenchmark({
+    from: sourceCurrency,
+    to: targetCountry.code,
+    preferredPartner,
+    treasuryMid,
+    liveQuotes: liveProviderQuotes,
+    enabled: !isSameCurrency,
+  });
+  // Provider FX + internal margin. Never fx_rates.effective_rate, never Nomba treasury fallback.
+  const rawRate = isSameCurrency ? 1 : fxBenchmark.rate || Number(treasuryMid) || 0;
   const engineQuote = useMemo(
     () =>
       quoteTransfer({
