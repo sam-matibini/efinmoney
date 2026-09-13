@@ -1,7 +1,7 @@
 import { supabase } from "@/integrations/supabase/client";
 
 export type { RateRow } from "@/lib/fxRatesCore";
-export { buildUsdRateMap, resolveEffectiveRate } from "@/lib/fxRatesCore";
+export { buildUsdRateMap, resolveEffectiveRate, resolveMidMarketRate, asMidMarketRows, midMarketValue } from "@/lib/fxRatesCore";
 import { buildUsdRateMap, type RateRow } from "@/lib/fxRatesCore";
 
 /** Convert a (currency, amount) pair to USD. Returns null if no rate. */

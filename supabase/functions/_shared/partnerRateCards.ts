@@ -150,6 +150,8 @@ export const RETAIL_PRICE_BOOK: Record<string, RetailEntry> = {
   "CAD:eft": { fixed_fee: 1.49, percentage_fee: 0, fx_margin_bps: 0 },
   "CAD:debit_card": { fixed_fee: 2.49, percentage_fee: 0.5, fx_margin_bps: 0 },
   // Cross-border defaults by method
+  "NGN:bank": { fixed_fee: 3.49, percentage_fee: 0.5, fx_margin_bps: 60 },
+  "NGN:mobile_money": { fixed_fee: 3.49, percentage_fee: 0.5, fx_margin_bps: 70 },
   bank: { fixed_fee: 2.99, percentage_fee: 0.5, fx_margin_bps: 250 },
   mobile_money: { fixed_fee: 2.49, percentage_fee: 0.5, fx_margin_bps: 250 },
 };

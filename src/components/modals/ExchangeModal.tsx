@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useWallets } from "@/hooks/useWallets";
 import { useFxRates } from "@/hooks/useFxRates";
-import { resolveEffectiveRate } from "@/lib/fx";
+import { resolveMidMarketRate } from "@/lib/fx";
 import { fxQuoteLabel, type QuoteConvention } from "@/lib/fxQuote";
 import { getFlovideOrNombaRate, isNgnPair } from "@/lib/flovide";
 import { executeWalletFxSwap } from "@/lib/walletTransfer";
@@ -84,7 +84,7 @@ const ExchangeModal = ({ children }: ExchangeModalProps) => {
   });
 
   const dbRate = fromCode && toCode
-    ? resolveEffectiveRate(fromCode, toCode, fxRates ?? [])
+    ? resolveMidMarketRate(fromCode, toCode, fxRates ?? [])
     : null;
   const midMarketRate = dbRate && dbRate > 0
     ? dbRate

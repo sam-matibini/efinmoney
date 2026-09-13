@@ -16,12 +16,14 @@ FX hedge / volatility + compliance / risk + eFinMoney margin.
 
 Customer fee = max(minimum fee, variable fee, cost-recovery floor).
 
-Customer FX rate:
+Customer FX rate (applied once, to true mid-market `fx_rates.rate` — not to
+the already-marked `effective_rate`):
 
 `CUSTOMER_RATE = MID_MARKET_RATE × (1 − FX_SPREAD)`
 
-Example: 1 CAD = 0.7213 USDC mid with a 0.60% spread → `0.7213 × 0.994` =
-0.71697 USDC.
+CAD→NGN bank uses a **0.60%** spread so the customer rate stays **above CBN
+official** and close to remittance peers (Sendwave). Do not stack the 0.50%
+`refresh-fx-rates` markup on top of this spread.
 
 ## Wallet vs external
 
@@ -51,6 +53,12 @@ Apply `supabase/migrations/20260911010000_cost_recovery_rate_cards.sql`
 (or run `supabase/scripts/seed-cost-recovery-rate-cards.sql` in the production
 SQL Editor). That seeds `corridor_rate_cards`, payout-method minimums, volume
 tiers, and versioned `efinmoney_pricing` rows with minimum fees.
+
+Existing environments also need
+`supabase/migrations/20260913220000_cad_ngn_competitive_fx.sql` so published
+CAD→NGN cards drop from 1.50%–1.75% to 0.60%–0.70%. Checkout quotes from
+`fx_rates.rate` (mid) in the app; the SQL keeps the admin workbook and
+`price-quote` in sync.
 
 ## Verify
 

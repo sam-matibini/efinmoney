@@ -23,7 +23,7 @@ const FxTicker = () => {
       key: `${r.from_currency}-${r.to_currency}-${r.id}`,
       from: r.from_currency,
       to: r.to_currency,
-      rate: Number(r.effective_rate || r.rate),
+      rate: Number(r.rate) > 0 ? Number(r.rate) : Number(r.effective_rate),
     }));
   }, [rates]);
 

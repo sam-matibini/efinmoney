@@ -1,5 +1,6 @@
 import { customerRateFromMid, quoteTransfer } from "../src/lib/pricing/costRecoveryEngine.ts";
 import { assembleDynamicWorkbook, applyCorrections } from "../src/lib/pricing/assembleDynamicWorkbook.ts";
+import { resolveMidMarketRate } from "../src/lib/fxRatesCore.ts";
 
 function assert(name: string, ok: boolean, detail?: unknown) {
   if (!ok) {
@@ -148,6 +149,63 @@ const zarCorridor = zarLive.corridors.find((c) => c.destination_currency === "ZA
 assert("live CAD→ZAR overwrites the template corridor", !!zarCorridor);
 assert("wallet CAD→ZAR updates from the live remittance corridor", !!zarWallet && zarWallet.origin === "live");
 assert("new GHS wallet row appears from active currencies", zarLive.wallets.some((c) => c.destination_currency === "GHS"));
+
+const midCadNgn = 972.16;
+const cbnOfficial = 963.98;
+const stackedMarkup = midCadNgn * 0.995 * 0.985;
+const cadNgnBank = quoteTransfer({
+  sourceCurrency: "CAD",
+  destinationCurrency: "NGN",
+  amount: 300,
+  channel: "external",
+  payoutMethod: "BANK",
+  midMarketRate: midCadNgn,
+});
+assert("CAD→NGN quotes mid, not the 0.50% treasury effective_rate", close(cadNgnBank.customerRate ?? 0, midCadNgn * 0.994, 0.01));
+assert("CAD→NGN bank customer rate is above CBN official", (cadNgnBank.customerRate ?? 0) > cbnOfficial);
+assert("CAD→NGN no longer stacks 0.50% + 1.50% (~952)", (cadNgnBank.customerRate ?? 0) > stackedMarkup + 10);
+
+const midPreferred = resolveMidMarketRate("CAD", "NGN", [
+  { from_currency: "CAD", to_currency: "NGN", rate: 972.16, effective_rate: 967.3 },
+]);
+assert("resolveMidMarketRate prefers fx_rates.rate over effective_rate", close(midPreferred ?? 0, 972.16, 0.0001));
+
+const ngnLive = assembleDynamicWorkbook({
+  partners: [{ id: "nomba", name: "Nomba", status: "active" }],
+  corridors: [
+    {
+      partner_id: "nomba",
+      enabled: true,
+      direction: "payout",
+      source_currency: "CAD",
+      dest_currency: "NGN",
+      payment_method: "bank",
+      est_minutes: 30,
+    },
+  ],
+  partnerPricing: [
+    {
+      partner_id: "nomba",
+      source_currency: "CAD",
+      dest_currency: "NGN",
+      payment_method: "bank",
+      percentage_fee: 0.9,
+      fixed_fee: 0.3,
+      fx_markup_bps: 190,
+    },
+  ],
+  partnerFx: [
+    {
+      partner_id: "nomba",
+      base_currency: "CAD",
+      quote_currency: "NGN",
+      fx_spread_bps: 190,
+    },
+  ],
+  currencies: [{ code: "CAD" }, { code: "NGN" }],
+});
+const ngnCorridor = ngnLive.corridors.find((c) => c.destination_currency === "NGN" && c.payout_method === "BANK");
+assert("live CAD→NGN does not inflate customer spread from partner FX", !!ngnCorridor && ngnCorridor.efin_fx_spread === 0.006);
 
 if (process.exitCode) {
   console.error("cost-recovery checks failed");

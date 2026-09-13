@@ -11,7 +11,7 @@ import {
   parseAmount,
   type MarketResponse,
 } from "@/components/fx/liveFxUtils";
-import { resolveEffectiveRate } from "@/lib/fx";
+import { resolveMidMarketRate } from "@/lib/fx";
 import { supabase } from "@/integrations/supabase/client";
 import { useWallets } from "@/hooks/useWallets";
 import { useFxRates } from "@/hooks/useFxRates";
@@ -51,7 +51,7 @@ const SendMoneyModal = ({ children }: SendMoneyModalProps) => {
 
   const dbRate = useMemo(() => {
     if (!fxRates?.length) return null;
-    return resolveEffectiveRate(from, to, fxRates);
+    return resolveMidMarketRate(from, to, fxRates);
   }, [fxRates, from, to]);
 
   const marketRate = useMemo(() => {

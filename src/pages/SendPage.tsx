@@ -42,7 +42,7 @@ import {
   getFlovideOrNombaRate,
   isNgnPair,
 } from "@/lib/flovide";
-import { resolveEffectiveRate } from "@/lib/fx";
+import { resolveMidMarketRate } from "@/lib/fx";
 import { currencySymbol, countryToCurrency } from "@/lib/currency";
 import { useProfile } from "@/hooks/useProfile";
 import { toast } from "sonner";
@@ -536,7 +536,7 @@ const SendPage = () => {
     r => r.from_currency === sourceCurrency && r.to_currency === targetCountry.code
   );
   const resolvedDbRate = useMemo(
-    () => (fxRates?.length ? resolveEffectiveRate(sourceCurrency, targetCountry.code, fxRates) : null),
+    () => (fxRates?.length ? resolveMidMarketRate(sourceCurrency, targetCountry.code, fxRates) : null),
     [fxRates, sourceCurrency, targetCountry.code],
   );
   const { data: derivedFxRate } = useQuery({
@@ -584,9 +584,14 @@ const SendPage = () => {
     : 0;
 
   const directDbRate =
-    fxRate && Number(fxRate.effective_rate) > 0 ? Number(fxRate.effective_rate) : null;
+    fxRate && Number(fxRate.rate) > 0
+      ? Number(fxRate.rate)
+      : fxRate && Number(fxRate.effective_rate) > 0
+        ? Number(fxRate.effective_rate)
+        : null;
   const derivedRate = derivedFxRate && Number(derivedFxRate) > 0 ? Number(derivedFxRate) : null;
-  // Mid-market fx_rates first; Nomba only as NGN fallback.
+  // Mid-market (`fx_rates.rate`) first — never the pre-marked effective_rate.
+  // Nomba/Flovide payout quotes are last-resort fallbacks only.
   const rawRate = isSameCurrency
     ? 1
     : resolvedDbRate ?? directDbRate ?? derivedRate ?? nombaRate ?? 0;

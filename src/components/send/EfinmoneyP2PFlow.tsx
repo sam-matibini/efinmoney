@@ -90,7 +90,7 @@ const RecipientCard: React.FC<RecipientCardProps> = ({
   const effectiveRate = isSameCurrency
     ? 1
     : fxRow
-      ? Number(fxRow.effective_rate)
+      ? (Number(fxRow.rate) > 0 ? Number(fxRow.rate) : Number(fxRow.effective_rate))
       : Number(derivedRate || 0);
   const rateOk = isSameCurrency || effectiveRate > 0;
   const targetDisplay = amountPerUser * (rateOk ? effectiveRate : 0);

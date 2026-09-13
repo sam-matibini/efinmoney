@@ -66,7 +66,9 @@ Deno.serve(async (req) => {
         const fromRate = rates[from];
         const toRate = rates[to];
         if (!fromRate || !toRate) continue;
-        // cross rate via USD
+        // `rate` is mid-market. `effective_rate` applies a small treasury spread.
+        // Checkout quotes from `rate` via resolveMidMarketRate — do not feed
+        // effective_rate into quoteTransfer or the customer is marked twice.
         const market = toRate / fromRate;
         const effective = market * (1 - MARKUP);
         rows.push({

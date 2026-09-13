@@ -2,6 +2,8 @@ export interface RateRow {
   from_currency: string;
   to_currency: string;
   effective_rate: number;
+  /** True mid-market (`fx_rates.rate`). Prefer this when quoting customers. */
+  rate?: number | null;
 }
 
 /** USD-pegged stables. Quote 1:1 with USD when a direct pair is missing. */
@@ -83,6 +85,23 @@ function resolvePair(
   return null;
 }
 
+/** Mid-market units of `to` per 1 `from`. Prefers `rate`, then `effective_rate`. */
+export function midMarketValue(row: RateRow): number {
+  const mid = Number(row.rate);
+  if (Number.isFinite(mid) && mid > 0) return mid;
+  const fallback = Number(row.effective_rate);
+  return Number.isFinite(fallback) && fallback > 0 ? fallback : 0;
+}
+
+export function asMidMarketRows(rates: RateRow[]): RateRow[] {
+  return rates.map((r) => ({
+    from_currency: r.from_currency,
+    to_currency: r.to_currency,
+    rate: r.rate,
+    effective_rate: midMarketValue(r),
+  }));
+}
+
 /** Resolve from→to effective rate from fx_rates rows (direct, inverse, USD-stable peg, or USD cross). */
 export const resolveEffectiveRate = (
   from: string,
@@ -103,3 +122,10 @@ export const resolveEffectiveRate = (
   if (fromKey === fromC && toKey === toC) return null;
   return resolvePair(fromKey, toKey, rates);
 };
+
+/** Mid-market from→to. Use this as `quoteTransfer.midMarketRate` — never the pre-marked `effective_rate`. */
+export const resolveMidMarketRate = (
+  from: string,
+  to: string,
+  rates: RateRow[],
+): number | null => resolveEffectiveRate(from, to, asMidMarketRows(rates));

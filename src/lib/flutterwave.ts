@@ -93,7 +93,7 @@ const directRate = async (from: string, to: string): Promise<number | null> => {
     .limit(1)
     .maybeSingle();
   if (error || !data) return null;
-  return Number(data.effective_rate || data.rate) || null;
+  return Number(data.rate || data.effective_rate) || null;
 };
 
 export const fetchFxRate = async (from: string, to: string): Promise<number | null> => {

@@ -56,7 +56,7 @@ const ExchangeRates = () => {
   const list = (rates || []).slice(0, 12).map((r) => ({
     from: r.from_currency,
     to: r.to_currency,
-    rate: Number(r.effective_rate),
+    rate: Number(r.rate) > 0 ? Number(r.rate) : Number(r.effective_rate),
     change: Number(r.markup_rate) > 0 ? Math.random() * 0.6 : -Math.random() * 0.4,
   }));
 

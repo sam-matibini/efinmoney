@@ -13,7 +13,7 @@ import { toast } from "sonner";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { RefreshCw, ArrowUpDown, TrendingUp, CheckCircle, Bitcoin, DollarSign, Sparkles } from "lucide-react";
 import { CryptoTradingPanel } from "@/components/crypto/CryptoTradingPanel";
-import { resolveEffectiveRate } from "@/lib/fx";
+import { resolveMidMarketRate } from "@/lib/fx";
 import { fxQuoteLabel, type QuoteConvention } from "@/lib/fxQuote";
 import { getFlovideOrNombaRate, isNgnPair } from "@/lib/flovide";
 import { CurrencyFlag } from "@/components/ui/FlagImage";
@@ -118,7 +118,7 @@ const FxTradingPanel = () => {
 
   const midMarketRate = useMemo(() => {
     if (!fromCode || !toCode) return null;
-    const db = resolveEffectiveRate(fromCode, toCode, fxRates ?? []);
+    const db = resolveMidMarketRate(fromCode, toCode, fxRates ?? []);
     if (db && db > 0) return db;
     if (nombaQuote?.effective_rate && nombaQuote.effective_rate > 0) {
       return nombaQuote.effective_rate;
@@ -143,7 +143,7 @@ const FxTradingPanel = () => {
   const effectiveRate = pricedQuote.customerRate;
   const rateFromNomba = useMemo(() => {
     if (!fromCode || !toCode) return false;
-    const db = resolveEffectiveRate(fromCode, toCode, fxRates ?? []);
+    const db = resolveMidMarketRate(fromCode, toCode, fxRates ?? []);
     return !(db && db > 0) && !!nombaQuote?.effective_rate;
   }, [fromCode, toCode, fxRates, nombaQuote?.effective_rate]);
   const recvDecimals = 2;
@@ -543,7 +543,7 @@ const LiveFxRatesCard = () => {
           {fxRates?.slice(0, 4).map((rate) => (
               <div key={rate.id} className="flex justify-between items-center text-sm">
                 <span className="inline-flex items-center gap-1"><CurrencyFlag code={rate.from_currency} size="xs" />{rate.from_currency} → <CurrencyFlag code={rate.to_currency} size="xs" />{rate.to_currency}</span>
-                <span className="font-mono">{Number(rate.effective_rate).toFixed(4)}</span>
+                <span className="font-mono">{Number(rate.rate || rate.effective_rate).toFixed(4)}</span>
               </div>
             ))}
             {(!fxRates || fxRates.length === 0) && (

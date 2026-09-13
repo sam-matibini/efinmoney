@@ -179,6 +179,19 @@ export function corridorKey(source: string, dest: string, method: PayoutMethod, 
   return `${prefix}${source}_${dest}_${method}`;
 }
 
+/** Customer FX vs mid-market. NGN must stay at/above CBN and near remittance peers. */
+export const CUSTOMER_FX_SPREAD_CAP: Record<string, number> = {
+  NGN: 0.008,
+};
+
+function customerFxSpread(dest: string, listed: number, partnerSpread: number): number {
+  const cap = CUSTOMER_FX_SPREAD_CAP[dest.toUpperCase()];
+  // Capped corridors (NGN) quote the listed retail spread from mid-market.
+  // Partner FX cost stays in `costs` — do not max() it into the customer rate.
+  if (cap != null) return Math.min(Math.max(listed, 0), cap);
+  return Math.max(listed, partnerSpread + 0.0025);
+}
+
 function fromLiveCorridor(
   corridor: AssembleCorridor,
   partner: AssemblePartner,
@@ -191,7 +204,7 @@ function fromLiveCorridor(
   const template = templateFor(source, dest, method, "external");
   const partnerSpread = Math.max(0, Number(fx?.fx_spread_bps ?? pricing?.fx_markup_bps ?? 0) / 10000);
   const listed = template?.efin_fx_spread ?? Math.min(0.025, partnerSpread + 0.005);
-  const efin_fx_spread = Math.max(listed, partnerSpread + 0.0025);
+  const efin_fx_spread = customerFxSpread(dest, listed, partnerSpread);
   const minFloor = Math.max(template?.minimum_fee ?? 0, payoutMin(method), Number(pricing?.min_fee) || 0);
   return {
     corridor_id: template?.corridor_id ?? corridorKey(source, dest, method, "external"),
