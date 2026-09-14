@@ -25,6 +25,9 @@ export const CAD_COLLECT_UNSAFE_RAILS = [
   "flovide",
   "paysafe",
   "flovide_interac",
+  "wise",
+  "wise_link",
+  "dodo",
 ] as const;
 
 export function cadCollectRailCostRank(railId: string): number {
@@ -54,4 +57,4 @@ export function orderCadCollectRails(rails: string[]): string[] {
 }
 
 /** Default CAD collect chain when no policy row exists. Nomba first (instant). */
-export const DEFAULT_CAD_COLLECT_RAILS = ["nomba", "interac", "wise", "dodo"] as const;
+export const DEFAULT_CAD_COLLECT_RAILS = ["nomba", "interac"] as const;

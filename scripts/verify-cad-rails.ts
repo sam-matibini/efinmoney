@@ -65,17 +65,21 @@ assert("CAD default rails are Nomba then Fincra", cadRails.join(",") === "nomba,
 assert("CAD default rails exclude flutterwave", !cadRails.includes("flutterwave"));
 assert("CAD default rails exclude flovide", !cadRails.includes("flovide"));
 assert("CAD default rails exclude paysafe", !cadRails.includes("paysafe"));
+assert("CAD default rails exclude Wise", !cadRails.includes("wise"));
+assert("CAD default rails exclude Dodo", !cadRails.includes("dodo"));
 assert(
   "CAD default rails are Canada chain",
   CANADA_CAD_PAYOUT_RAILS.every((r) => cadRails.includes(r)),
 );
 
-const cleaned = sanitizeCanadaPayoutRails(["flutterwave", "fincra", "nomba", "flovide", "paysafe"]);
+const cleaned = sanitizeCanadaPayoutRails(["flutterwave", "fincra", "nomba", "flovide", "paysafe", "wise", "dodo"]);
 assert("sanitize drops flutterwave", !cleaned.includes("flutterwave"));
 assert("sanitize keeps Fincra payout", cleaned.includes("fincra"));
 assert("sanitize keeps nomba", cleaned.includes("nomba"));
 assert("sanitize drops flovide", !cleaned.includes("flovide"));
 assert("sanitize drops paysafe", !cleaned.includes("paysafe"));
+assert("sanitize drops Wise", !cleaned.includes("wise"));
+assert("sanitize drops Dodo", !cleaned.includes("dodo"));
 
 assert("CAD currency maps to Canada", findCountryByCode("CAD")?.id === "Canada");
 assert("CA ISO2 maps to Canada", findCountryByCode("CA")?.id === "Canada");

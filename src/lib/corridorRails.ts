@@ -374,9 +374,7 @@ export async function resolveCollectMethodPreference(
       const merged = [
         ...rails,
         ...(keepActive("interac") ? ["interac"] : []),
-        ...(keepActive("wise") ? ["wise"] : []),
         ...(keepActive("nomba") ? ["nomba"] : []),
-        ...(keepActive("dodo") ? ["dodo"] : []),
       ];
       const cadCollect = orderCadCollectRails(merged);
       if (cadCollect.length) {
@@ -390,14 +388,12 @@ export async function resolveCollectMethodPreference(
     }
   }
   const fallback = defaultCollectPartner(ccy);
-  if (fallback && (keepActive(fallback) || (ccy === "NGN" && fallback === "nomba") || (ccy === "CAD" && fallback === "interac"))) {
+  if (fallback && (keepActive(fallback) || (ccy === "NGN" && fallback === "nomba") || (ccy === "CAD" && (fallback === "nomba" || fallback === "interac")))) {
     if (ccy === "CAD") {
       const rails = orderCadCollectRails([
         fallback,
         ...(keepActive("interac") ? ["interac"] : []),
-        ...(keepActive("wise") ? ["wise"] : []),
         ...(keepActive("nomba") ? ["nomba"] : []),
-        ...(keepActive("dodo") ? ["dodo"] : []),
       ]);
       return {
         method: collectMethodForPartner(rails[0] || fallback) || rails[0] || fallback,

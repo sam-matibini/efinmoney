@@ -13,7 +13,7 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-const SUPPORTED = new Set(["USD", "CAD", "EUR", "GBP"]);
+const SUPPORTED = new Set(["USD", "EUR", "GBP"]);
 
 function jr(status: number, body: unknown) {
   return new Response(JSON.stringify(body), {
@@ -46,8 +46,10 @@ Deno.serve(async (req) => {
     const amount = Number(body?.amount);
     const redirectUrl = String(body?.redirectUrl || "").trim();
 
-    if (!SUPPORTED.has(currency)) {
-      return jr(400, { error: `Dodo top-up supports: ${[...SUPPORTED].join(", ")}` });
+    if (currency === "CAD" || !SUPPORTED.has(currency)) {
+      return jr(400, { error: currency === "CAD"
+        ? "CAD pay-in is not available via this checkout. Use card or Interac e-Transfer."
+        : `Dodo top-up supports: ${[...SUPPORTED].join(", ")}` });
     }
     if (!Number.isFinite(amount) || amount < 1) {
       return jr(400, { error: "Minimum top-up is 1.00" });

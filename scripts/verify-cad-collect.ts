@@ -66,15 +66,19 @@ assert("payment method error detected", isNombaPaymentMethodError("Invalid allow
 assert("unrelated error not method error", !isNombaPaymentMethodError("The provided email is blocked"));
 
 assert("Nomba ranks before Fincra Autodeposit", cadCollectCostRank("nomba") < cadCollectCostRank("interac"));
-assert("Nomba ranks before Wise", cadCollectCostRank("nomba") < cadCollectCostRank("wise"));
 assert("Nomba Checkout ranks before Nomba EFT alias", cadCollectCostRank("nomba") < cadCollectCostRank("nomba_eft"));
 assert("Flutterwave is unsafe CAD collect", isCadUnsafeCollectRail("flutterwave"));
 assert("Paysafe is unsafe CAD collect", isCadUnsafeCollectRail("paysafe"));
+assert("Wise is not a CAD collect rail", isCadUnsafeCollectRail("wise"));
+assert("Dodo is not a CAD collect rail", isCadUnsafeCollectRail("dodo"));
 
-const ranked = orderCadCollectRails(["nomba", "flutterwave", "interac", "wise", "flovide"]);
+const ranked = orderCadCollectRails(["nomba", "flutterwave", "interac", "wise", "dodo", "flovide"]);
 assert("CAD rails start with Nomba (instant settlement)", ranked[0] === "nomba");
 assert("Nomba before Interac Autodeposit", ranked.indexOf("nomba") < ranked.indexOf("interac"));
-assert("unsafe rails dropped", !ranked.includes("flutterwave") && !ranked.includes("flovide"));
+assert(
+  "unsafe rails dropped",
+  !ranked.includes("flutterwave") && !ranked.includes("flovide") && !ranked.includes("wise") && !ranked.includes("dodo"),
+);
 assert("edge ranking matches client", orderCadCollectRailsEdge(["nomba", "interac", "wise"])[0] === "nomba");
 assert("default CAD collect rail is Nomba", defaultCadCollectRail(["nomba", "interac", "wise"]) === "nomba");
 
@@ -86,12 +90,13 @@ const methods = orderCadCollectMethods([
   { id: "wise" },
 ]);
 assert(
-  "checkout methods instant-settlement order",
-  methods.map((m) => m.id).join(",") === "nomba,nomba_eft,interac,wise,dodo",
+  "checkout methods drop Wise and Dodo",
+  methods.map((m) => m.id).join(",") === "nomba,nomba_eft,interac",
 );
 
 assert("auto-pick CAD prefers Nomba", defaultCadCollectRail(["nomba", "interac", "wise", "dodo"]) === "nomba");
 assert("auto-pick CAD falls back to Interac when Nomba off", defaultCadCollectRail(["interac", "dodo"]) === "interac");
+assert("auto-pick CAD ignores Wise/Dodo-only lists", defaultCadCollectRail(["wise", "dodo"]) === null);
 
 assert("CAD bank Next is EFT not Interac", cadSendPayInCheckout("bank") === "eft");
 assert("CAD Interac Next stays Interac", cadSendPayInCheckout("interac") === "interac");

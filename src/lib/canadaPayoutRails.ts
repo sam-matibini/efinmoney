@@ -1,7 +1,7 @@
 // Canada domestic payout rail toggles.
 // Interac + EFT pay out through Nomba and Fincra (availability + least cost).
 // Interac pay-in is Fincra Autodeposit. Card pay-in is Nomba Checkout.
-// Paysafe and Flovide are not CAD rails.
+// Paysafe, Flovide, Wise, and Dodo are not CAD rails.
 
 /** @deprecated Paysafe is retired for CAD. Always false. */
 export const PAYSAFE_PAYOUTS_ENABLED = false;

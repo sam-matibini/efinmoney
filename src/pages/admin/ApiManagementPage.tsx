@@ -55,7 +55,7 @@ const INTEGRATIONS: Array<{
   // Payments — Global & Cards
   { key: "stripe", name: "Stripe", description: "Card charges, Connect, Issuing & Treasury", category: "Payments — Global & Cards", envHints: ["STRIPE_SECRET_KEY"] },
   { key: "adyen", name: "Adyen", description: "Global card drop-in & payment links", category: "Payments — Global & Cards", envHints: ["ADYEN_API_KEY", "ADYEN_MERCHANT_ACCOUNT"] },
-  { key: "dodo", name: "Dodo Payments", description: "MoR global card checkout for USD/CAD/EUR/GBP wallet top-up", category: "Payments — Global & Cards", envHints: ["DODO_PAYMENTS_API_KEY", "DODO_PAYMENTS_WEBHOOK_KEY"] },
+  { key: "dodo", name: "Dodo Payments", description: "MoR global card checkout for USD/EUR/GBP wallet top-up (not CAD)", category: "Payments — Global & Cards", envHints: ["DODO_PAYMENTS_API_KEY", "DODO_PAYMENTS_WEBHOOK_KEY"] },
   { key: "paypal", name: "PayPal", description: "Orders API wallet top-up for USD/CAD/EUR/GBP", category: "Payments — Global & Cards", envHints: ["PAYPAL_CLIENT_ID", "PAYPAL_CLIENT_SECRET"] },
   { key: "square", name: "Square", description: "Card checkout for USD/EUR/GBP wallet top-up", category: "Payments — Global & Cards", envHints: ["SQUARE_ACCESS_TOKEN", "SQUARE_APPLICATION_ID", "SQUARE_LOCATION_ID"] },
   { key: "paysafe", name: "Paysafe", description: "Retired for CAD Interac/EFT — Nomba and Fincra are the CAD payout rails", category: "Payments — Global & Cards", envHints: ["PAYSAFE_API_KEY"] },

@@ -166,6 +166,8 @@ const CANADA_BLOCKED_PAYOUT_RAILS = new Set([
   "flovide",
   "paysafe",
   "paysafe_payout",
+  "wise",
+  "dodo",
 ]);
 
 const AFRICA_MOMO_NETWORKS = new Set([

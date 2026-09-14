@@ -49,7 +49,7 @@ export const PAYTOTA_TOPUP_CURRENCIES = [
   ...PAYTOTA_AFRICA_TOPUP_CURRENCIES,
 ];
 /** Dodo Payments MoR checkout — western wallet top-up. */
-export const DODO_TOPUP_CURRENCIES = ["USD", "CAD", "EUR", "GBP"];
+export const DODO_TOPUP_CURRENCIES = ["USD", "EUR", "GBP"];
 /** Square Checkout (hosted Payment Link) — western wallet top-up. */
 export const SQUARE_TOPUP_CURRENCIES = ["USD", "EUR", "GBP"];
 /** PayPal Orders API — western wallet top-up. */
@@ -177,8 +177,8 @@ export function routeWalletTopupGateway(
   preferPaypal = false,
 ): WalletTopupGateway {
   const c = currency.toUpperCase();
-  // Explicit Wise bank-deposit rail
-  if (preferWise) return "wise_pay";
+  // Explicit Wise bank-deposit rail — not CAD
+  if (preferWise && c !== "CAD") return "wise_pay";
   // Explicit Square hosted checkout (CAD uses Nomba)
   if (preferSquare && c !== "CAD" && SQUARE_TOPUP_CURRENCIES.includes(c)) return "square_pay";
   // Explicit PayPal
@@ -362,7 +362,7 @@ export function pickBestIntlTopupMethod(
 
   let priority: IntlTopupMethod[];
   if (c === "CAD") {
-    priority = ["interac", "wise", "nomba", "dodo", "paypal", "paytota", "fincra", "flutterwave", "square"];
+    priority = ["nomba", "interac", "paypal", "paytota", "fincra", "flutterwave", "square"];
   } else if (c === "NGN") {
     priority = ["nomba", "fincra", "flutterwave", "wise", "paytota", "dodo"];
   } else if (c === "USD" || c === "GBP" || c === "EUR") {

@@ -1,6 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 
-export const DODO_TOPUP_CURRENCIES = ["USD", "CAD", "EUR", "GBP"] as const;
+export const DODO_TOPUP_CURRENCIES = ["USD", "EUR", "GBP"] as const;
 
 export function isDodoTopupCurrency(currency: string): boolean {
   return DODO_TOPUP_CURRENCIES.includes(currency.toUpperCase() as typeof DODO_TOPUP_CURRENCIES[number]);

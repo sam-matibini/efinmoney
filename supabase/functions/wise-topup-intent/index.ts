@@ -313,6 +313,12 @@ Deno.serve(async (req) => {
     }
 
     const currency = String(wallet.currency_code).toUpperCase();
+    if (currency === "CAD") {
+      return json({
+        error: "CAD pay-in is not available via Wise. Use card, Interac e-Transfer, or Autodeposit.",
+        code: "currency_unsupported",
+      }, 400);
+    }
     let receive: Awaited<ReturnType<typeof fetchActiveAccountDetails>>;
     try {
       receive = await fetchActiveAccountDetails(currency);

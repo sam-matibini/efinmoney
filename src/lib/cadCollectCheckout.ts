@@ -2,8 +2,8 @@
  * CAD pay-in checkout ranking.
  * Lower rank = preferred. Nomba Checkout settles instantly (card + Interac
  * e-Transfer on hosted checkout), so it ranks first. Fincra Autodeposit is
- * the slower backup. Bank EFT via Nuvei is Coming soon. CAD top-up hides
- * Wise EFT, Bambora EFT, and Dodo card. Send pay-in does not offer Wise.
+ * the slower backup. Bank EFT via Nuvei is Coming soon. Wise and Dodo are
+ * not CAD pay-in or payout rails.
  */
 
 export const CAD_COLLECT_COST_RANK: Record<string, number> = {
@@ -44,6 +44,9 @@ export const CAD_COLLECT_UNSAFE_RAILS = [
   "flovide",
   "paysafe",
   "flovide_interac",
+  "wise",
+  "wise_link",
+  "dodo",
 ] as const;
 
 /** Top-up method ids that are live CAD collect (when the feature flag is on). */
@@ -89,11 +92,13 @@ export function orderCadCollectRails(rails: string[]): string[] {
 }
 
 export function orderCadCollectMethods<T extends { id: string }>(methods: T[]): T[] {
-  return [...methods].sort((a, b) => {
-    const d = cadCollectCostRank(a.id) - cadCollectCostRank(b.id);
-    if (d !== 0) return d;
-    return 0;
-  });
+  return [...methods]
+    .filter((m) => !isCadUnsafeCollectRail(m.id))
+    .sort((a, b) => {
+      const d = cadCollectCostRank(a.id) - cadCollectCostRank(b.id);
+      if (d !== 0) return d;
+      return 0;
+    });
 }
 
 export function defaultCadCollectRail(available: string[]): string | null {

@@ -69,10 +69,10 @@ const PARTNERS: PartnerMeta[] = [
   { id: "swychr", name: "Swychr", blurb: "Select Africa MoMo corridors", collect: ["XAF", "KES", "XOF", "UGX"], payout: ["XAF", "KES", "XOF", "UGX"] },
   { id: "ghana_pay", name: "Ghana Pay", blurb: "Ghana cedi top-up and payout", collect: ["GHS"], payout: ["GHS"] },
   { id: "elicate", name: "Elicate", blurb: "Zambia kwacha MoMo", collect: ["ZMW"], payout: ["ZMW"] },
-  { id: "dodo", name: "Dodo", blurb: "Card checkout to top up western wallets", collect: ["CAD", "USD", "EUR", "GBP"], payout: [] },
+  { id: "dodo", name: "Dodo", blurb: "Card checkout to top up western wallets — not CAD", collect: ["USD", "EUR", "GBP"], payout: [] },
   { id: "square", name: "Square", blurb: "Card checkout for western wallets", collect: ["USD", "EUR", "GBP"], payout: [] },
   { id: "paypal", name: "PayPal", blurb: "PayPal checkout for western wallets", collect: ["CAD", "USD", "EUR", "GBP"], payout: [] },
-  { id: "wise", name: "Wise", blurb: "Bank deposit top-up with a payment reference", collect: ["CAD", "USD", "EUR", "GBP"], payout: [] },
+  { id: "wise", name: "Wise", blurb: "Bank deposit top-up with a payment reference — not CAD", collect: ["USD", "EUR", "GBP"], payout: [] },
   { id: "interac", name: "Interac (Fincra Autodeposit)", blurb: "CAD collect failover — Autodeposit after Nomba Checkout; slower than instant hosted checkout", collect: ["CAD"], payout: [] },
 ];
 
