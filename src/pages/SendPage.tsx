@@ -44,6 +44,7 @@ import {
 } from "@/lib/flovide";
 import { resolveMidMarketRate } from "@/lib/fx";
 import { freezeFxSnapshot } from "@/lib/efrr/freezeSnapshot";
+import { useCorridorFxBenchmark } from "@/hooks/useCorridorFxBenchmark";
 import type { CorridorProviderQuote } from "@/lib/fxCorridorBenchmark";
 import { currencySymbol, countryToCurrency } from "@/lib/currency";
 import { useProfile } from "@/hooks/useProfile";
