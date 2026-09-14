@@ -110,7 +110,7 @@ export const useInsertFxRate = () => {
       if (!from || !to || !Number.isFinite(rate) || rate <= 0) {
         throw new Error("Valid from/to currencies and a positive rate are required");
       }
-      const effective = rate * (1 + markup);
+      const effective = rate;
       const { error } = await supabase.from("fx_rates").insert({
         from_currency: from,
         to_currency: to,
@@ -122,11 +122,22 @@ export const useInsertFxRate = () => {
         valid_until: null,
       });
       if (error) throw error;
+      const efrr = await (supabase as unknown as { from: (t: string) => any }).from("efrr_rates").insert({
+        from_currency: from,
+        to_currency: to,
+        reference_rate: rate,
+        primary_source: "manual",
+        primary_rate: rate,
+        primary_observed_at: new Date().toISOString(),
+        validation_status: "unchecked",
+        status: "published",
+      });
+      if (efrr?.error) console.warn("efrr_rates manual insert", efrr.error);
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["fx_rates"] });
       qc.invalidateQueries({ queryKey: ["fx_rates_last_updated"] });
-      toast.success("FX rate saved");
+      toast.success("EFRR saved");
     },
     onError: (e: Error) => toast.error(e.message),
   });

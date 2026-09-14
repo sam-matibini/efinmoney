@@ -575,6 +575,22 @@ serve(async (req) => {
 
       if (txError) {
         console.error('FX transaction recording error:', txError);
+      } else if (fxTransaction?.id) {
+        await serviceClient.rpc("freeze_fx_snapshot", {
+          p_transfer_id: null,
+          p_fx_transaction_id: fxTransaction.id,
+          p_from_currency: from_currency,
+          p_to_currency: to_currency,
+          p_customer_rate: effectiveRate,
+          p_efin_spread: priced.fxSpread,
+          p_provider_execution_rate: mid,
+          p_partner: null,
+          p_source_amount: from_amount,
+          p_customer_amount: toAmount,
+          p_fee_amount: fee,
+          p_transaction_status: "executed",
+          p_transaction_ref: null,
+        }).catch((snapErr: unknown) => console.warn("freeze_fx_snapshot", snapErr));
       }
 
       return new Response(

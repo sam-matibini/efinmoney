@@ -16,21 +16,33 @@ FX hedge / volatility + compliance / risk + eFinMoney margin.
 
 Customer fee = max(minimum fee, variable fee, cost-recovery floor).
 
-Customer FX rate — **corridor provider FX plus eFinMoney internal margin**,
-applied once. Do not quote from CBN / Open Exchange mid when a live payout
-rail quote exists, and never stack `fx_rates.effective_rate` (already marked)
-on top of the corridor spread.
+Customer FX rate uses the eFinMoney EFX Reference Rate (EFRR) plus the
+corridor EX spread, with partner liquidity as the execution floor:
 
-`CUSTOMER_RATE = PROVIDER_FX × (1 − FX_SPREAD)`
+```
+Bank of Canada (primary)
+        ↓
+eFinMoney FX Reference Rate Service  →  OXR fallback  →  ECB validation
+        ↓
+EFRR (accounting / reporting / compliance)
+        ↓
+Partner execution rate (payout / liquidity / banking partner)
+        ↓
+Pricing engine: EX spread + fees + margin
+        ↓
+Customer quote
+```
 
-`PROVIDER_FX` is the live rate from the corridor payout partner (Nomba,
-Flutterwave, Fincra, Wise, …). If several rails quote the pair, we prefer the
-rate-card / routed partner, otherwise the best live quote. Treasury
-`fx_rates.rate` is the fallback only.
+`CUSTOMER_RATE = (EXECUTION_RATE || EFRR) × (1 − FX_SPREAD)`
 
-CAD→NGN bank internal margin is **0.60%**. A Nomba/Sendwave-class provider
-rate of ₦971.89 becomes about ₦966.06 — above CBN official, with a single
-eFinMoney spread.
+BoC is the Tier 1 reference (CAD pairs and CAD crosses). Open Exchange Rates
+is Tier 2 when BoC does not publish the currency (NGN, KES, ZMW, XOF, …) or
+the Valet API is down. ECB eurofxref is Tier 3 validation only. The live
+payout-rail rate is Tier 4 execution — Africa corridors must not be priced
+as if the published mid were obtainable liquidity.
+
+CAD→NGN bank internal EX spread is **0.60%**. Each executed send or FX swap
+freezes an immutable `fx_execution_snapshots` row (FINTRAC / RPAA).
 
 ## Wallet vs external
 
@@ -62,12 +74,14 @@ SQL Editor). That seeds `corridor_rate_cards`, payout-method minimums, volume
 tiers, and versioned `efinmoney_pricing` rows with minimum fees.
 
 Existing environments also need
-`supabase/migrations/20260913220000_cad_ngn_competitive_fx.sql` so published
-CAD→NGN cards drop from 1.50%–1.75% to 0.60%–0.70%, and
-`supabase/migrations/20260913233000_corridor_provider_fx_read.sql` so checkout
-can read live `partner_fx_rates`. Redeploy `corridor-provider-fx` and
-`fx-engine` after pull. Checkout quotes **provider FX + internal margin**;
-the SQL keeps the admin workbook and `price-quote` in sync.
+`supabase/migrations/20260913220000_cad_ngn_competitive_fx.sql`,
+`supabase/migrations/20260913233000_corridor_provider_fx_read.sql`, and
+`supabase/migrations/20260914010000_efrr_reference_rate_service.sql`.
+Redeploy `refresh-fx-rates`, `corridor-provider-fx`, and `fx-engine`.
+`refresh-fx-rates` now publishes EFRR (BoC → OXR → ECB validate) into
+`efrr_rates` / `fx_rates.rate` with **no baked-in 0.50% markup**. Customer
+EX spread lives on the corridor card. Apply freeze_fx_snapshot after each
+FX execution.
 
 ## Verify
 

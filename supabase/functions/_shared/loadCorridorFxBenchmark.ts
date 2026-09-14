@@ -1,5 +1,5 @@
 /**
- * Load live corridor-provider FX quotes from partner_fx_rates + fx_rates.
+ * Load EFRR (BoC/OXR) plus live corridor-provider execution FX.
  * Used by corridor-provider-fx and fx-engine.
  */
 import {
@@ -55,7 +55,7 @@ export async function loadCorridorFxBenchmark(
     return { rate: 1, source: "treasury_mid", partnerCode: null, quotes: [], treasuryMid: 1 };
   }
 
-  const [{ data: corridors }, { data: treasuryRows }] = await Promise.all([
+  const [{ data: corridors }, { data: treasuryRows }, efrrRes] = await Promise.all([
     client
       .from("partner_corridors")
       .select("partner_id,enabled,source_currency,dest_currency")
@@ -65,6 +65,13 @@ export async function loadCorridorFxBenchmark(
     client
       .from("fx_rates")
       .select("from_currency,to_currency,rate,effective_rate")
+      .or("valid_until.is.null,valid_until.gt." + new Date().toISOString())
+      .order("valid_from", { ascending: false })
+      .limit(500),
+    client
+      .from("efrr_rates")
+      .select("from_currency,to_currency,reference_rate")
+      .eq("status", "published")
       .or("valid_until.is.null,valid_until.gt." + new Date().toISOString())
       .order("valid_from", { ascending: false })
       .limit(500),
@@ -90,7 +97,14 @@ export async function loadCorridorFxBenchmark(
   }
 
   const treasury = (treasuryRows ?? []) as TreasuryRow[];
-  const treasuryMid = resolveMidMarketRate(from, to, treasury);
+  const efrrBook = (((efrrRes as { data?: { from_currency: string; to_currency: string; reference_rate: number }[] } | null)?.data) ?? []).map((r) => ({
+    from_currency: r.from_currency,
+    to_currency: r.to_currency,
+    rate: Number(r.reference_rate),
+    effective_rate: Number(r.reference_rate),
+  }));
+  const efrrMid = efrrBook.length ? resolveMidMarketRate(from, to, efrrBook) : null;
+  const treasuryMid = (efrrMid && efrrMid > 0 ? efrrMid : null) ?? resolveMidMarketRate(from, to, treasury);
   const cadUsd = from !== "USD" && to !== "USD" ? resolveMidMarketRate(from, "USD", treasury) : null;
 
   const quotes: CorridorProviderQuote[] = [];

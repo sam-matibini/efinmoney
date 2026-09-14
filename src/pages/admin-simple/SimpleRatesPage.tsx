@@ -311,10 +311,10 @@ function FxPanel() {
       <Card className="rounded-2xl border-[hsl(var(--brand-900)/0.08)] shadow-sm overflow-hidden">
         <CardHeader className="bg-gradient-to-r from-amber-50/80 to-transparent">
           <CardTitle className="flex items-center gap-2 text-lg font-display text-[hsl(var(--brand-900))]">
-            <TrendingUp className="h-5 w-5 text-amber-600" /> Mid-market FX
+            <TrendingUp className="h-5 w-5 text-amber-600" /> EFRR reference FX
           </CardTitle>
           <CardDescription>
-            Override customer mid rates in fx_rates (latest wins). Example: set USD→NGN to 1400 today.
+            eFinMoney EFX Reference Rate: Bank of Canada primary, Open Exchange Rates fallback, ECB validation. Latest <code>fx_rates.rate</code> is the EFRR, not a customer quote. Customer rates add the corridor EX spread on top of partner execution (or EFRR if no live rail quote).
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">

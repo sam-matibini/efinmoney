@@ -2,8 +2,10 @@
 
 ## eFinMoney pricing
 
-Cost-recovery pricing and the competitive CAD rate card live in
-[docs/pricing-cost-recovery.md](docs/pricing-cost-recovery.md).
+Cost-recovery pricing, the eFinMoney EFX Reference Rate (EFRR: Bank of Canada
+primary, Open Exchange Rates fallback), and the CAD rate card live in
+[docs/pricing-cost-recovery.md](docs/pricing-cost-recovery.md) and
+[docs/efrr-reference-rate.md](docs/efrr-reference-rate.md).
 
 - Admin: **Settings → Pricing & Fees** (`/admin/pricing?tab=pricing-rates`)
 - Rates rebuild from integrated partners, corridors, FX and currencies

@@ -51,7 +51,8 @@ Deno.serve(async (req) => {
       partner_code: result.partnerCode,
       treasury_mid: result.treasuryMid,
       quotes: result.quotes,
-      rule: "Customer FX = corridor provider FX × (1 − eFinMoney internal margin)",
+      efrr: result.treasuryMid,
+      rule: "Customer FX = (partner execution || EFRR) × (1 − eFinMoney EX spread)",
     });
   } catch (err) {
     return json({ error: err instanceof Error ? err.message : "Quote failed" }, 500);

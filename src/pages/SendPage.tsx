@@ -43,7 +43,7 @@ import {
   isNgnPair,
 } from "@/lib/flovide";
 import { resolveMidMarketRate } from "@/lib/fx";
-import { useCorridorFxBenchmark } from "@/hooks/useCorridorFxBenchmark";
+import { freezeFxSnapshot } from "@/lib/efrr/freezeSnapshot";
 import type { CorridorProviderQuote } from "@/lib/fxCorridorBenchmark";
 import { currencySymbol, countryToCurrency } from "@/lib/currency";
 import { useProfile } from "@/hooks/useProfile";
@@ -927,6 +927,22 @@ const SendPage = () => {
           : funding,
     });
     setLastTransferId(transfer.id);
+    void freezeFxSnapshot({
+      transferId: transfer.id,
+      fromCurrency: overrides?.source_currency ?? sourceCurrency,
+      toCurrency: destCurrency,
+      customerRate: Number(overrides?.exchange_rate ?? effectiveRate),
+      efinSpread: engineQuote.fxSpread,
+      providerExecutionRate:
+        fxBenchmark.source === "treasury_mid" || fxBenchmark.source === "unavailable"
+          ? null
+          : fxBenchmark.rate,
+      partner: fxBenchmark.partnerCode,
+      sourceAmount: overrides?.source_amount ?? parsedAmount,
+      customerAmount: overrides?.target_amount ?? receivedAmount,
+      feeAmount: overrides?.fee_amount ?? fee,
+      transactionStatus: "initiated",
+    });
     if (user) {
       try {
         const tType = overrides?.transfer_type ?? (isCanadaIntlPayout ? "domestic_canada" : isBankPayout ? "bank" : "mobile_money");

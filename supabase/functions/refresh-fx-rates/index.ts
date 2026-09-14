@@ -1,48 +1,13 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { corePairs, publishEfrrBook, EFRR_CORE } from "../_shared/efrr/engine.ts";
+import { fetchBankOfCanada, fetchEcb, fetchOpenExchangeRates, oxrObservations } from "../_shared/efrr/fetchSources.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// CORE currencies get the full NxN cross-product so server-side lookups
-// (fx_convert, transfer limits) always find a direct row for a transacting
-// corridor. Everything the provider AND the currencies table both know about
-// additionally gets a USD->X row so the Live FX Calculator can derive any
-// cross-rate client-side (buildUsdMap). Keeping CORE small bounds table growth;
-// the broad USD->X set is one row per currency.
-const CORE = ["USD", "CAD", "EUR", "GBP", "NGN", "KES", "UGX", "TZS", "ZMW", "BIF", "MZN", "GHS", "RWF", "XAF", "XOF", "MWK", "ZAR", "BWP"];
-const MARKUP = 0.005; // 0.5% spread
-
-// Try OpenExchangeRates (paid, accurate). On any failure fall back to
-// open.er-api.com (free, no key, covers every currency we list).
-async function fetchUsdRates(): Promise<{ source: string; rates: Record<string, number> }> {
-  const appId = Deno.env.get("OPENEXCHANGERATES_APP_ID");
-  if (appId) {
-    try {
-      // No symbols filter: pull every currency the provider offers so the broad
-      // USD->X coverage below is as wide as the currencies table allows.
-      const url = `https://openexchangerates.org/api/latest.json?app_id=${appId}&base=USD`;
-      const res = await fetch(url);
-      if (res.ok) {
-        const data = await res.json();
-        return { source: "openexchangerates", rates: { USD: 1, ...(data.rates || {}) } };
-      }
-      console.warn("OpenExchangeRates failed:", res.status, await res.text());
-    } catch (e) {
-      console.warn("OpenExchangeRates threw:", e);
-    }
-  }
-
-  // Fallback: free, no key, base=USD
-  const fbRes = await fetch("https://open.er-api.com/v6/latest/USD");
-  if (!fbRes.ok) {
-    throw new Error(`Fallback FX provider failed [${fbRes.status}]: ${await fbRes.text()}`);
-  }
-  const fbData = await fbRes.json();
-  if (!fbData?.rates) throw new Error("Fallback FX provider returned no rates");
-  return { source: "open.er-api.com", rates: { USD: 1, ...fbData.rates } };
-}
+const STABLES = ["USDC", "USDT"];
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
@@ -53,147 +18,167 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     );
 
-    const { source, rates } = await fetchUsdRates();
-
     const now = new Date();
     const validUntil = new Date(now.getTime() + 2 * 60 * 60 * 1000).toISOString();
-    const rows: any[] = [];
+    const nowIso = now.toISOString();
 
-    // CORE NxN: direct rows for every transacting corridor (server-side lookups).
-    for (const from of CORE) {
-      for (const to of CORE) {
-        if (from === to) continue;
-        const fromRate = rates[from];
-        const toRate = rates[to];
-        if (!fromRate || !toRate) continue;
-        // `rate` is mid-market. `effective_rate` applies a small treasury spread.
-        // Checkout quotes from `rate` via resolveMidMarketRate — do not feed
-        // effective_rate into quoteTransfer or the customer is marked twice.
-        const market = toRate / fromRate;
-        const effective = market * (1 - MARKUP);
-        rows.push({
-          from_currency: from,
-          to_currency: to,
-          rate: market,
-          markup_rate: MARKUP,
-          effective_rate: effective,
-          source,
-          valid_from: now.toISOString(),
-          valid_until: validUntil,
-        });
-      }
+    const [bocSettled, oxrSettled, ecbSettled] = await Promise.allSettled([
+      fetchBankOfCanada(),
+      fetchOpenExchangeRates(),
+      fetchEcb(),
+    ]);
+    const bocResult = bocSettled.status === "fulfilled"
+      ? { ok: true as const, rows: bocSettled.value, error: null as string | null }
+      : { ok: false as const, error: String(bocSettled.reason?.message ?? bocSettled.reason), rows: [] as Awaited<ReturnType<typeof fetchBankOfCanada>> };
+    const oxrResult = oxrSettled.status === "fulfilled"
+      ? { ok: true as const, book: oxrSettled.value, error: null as string | null }
+      : { ok: false as const, error: String(oxrSettled.reason?.message ?? oxrSettled.reason), book: null };
+    const ecbResult = ecbSettled.status === "fulfilled"
+      ? { ok: true as const, rows: ecbSettled.value, error: null as string | null }
+      : { ok: false as const, error: String(ecbSettled.reason?.message ?? ecbSettled.reason), rows: [] as Awaited<ReturnType<typeof fetchEcb>> };
+
+    if (!bocResult.ok && !oxrResult.ok) {
+      throw new Error(`EFRR sources unavailable: BoC ${bocResult.error}; OXR ${oxrResult.error}`);
     }
 
-    // BROAD USD->X: one row per currency the provider AND the currencies table
-    // both know, so the calculator can quote any pickable currency via a
-    // client-side cross-rate. fx_rates.{from,to}_currency FK -> currencies(code),
-    // so restricting to existing codes keeps the whole batch insert FK-safe.
-    const { data: ccyRows, error: ccyErr } = await supabase
-      .from("currencies")
-      .select("code")
-      .eq("is_active", true);
+    const oxrBook = oxrResult.ok ? oxrResult.book : null;
+    const published = publishEfrrBook(corePairs(), bocResult.rows, oxrBook, ecbResult.rows);
+
+    const observations = [
+      ...bocResult.rows,
+      ...(oxrBook ? oxrObservations(oxrBook) : []),
+      ...ecbResult.rows,
+    ].map((o) => ({
+      source: o.source,
+      source_series: o.sourceSeries ?? null,
+      base_currency: o.baseCurrency,
+      quote_currency: o.quoteCurrency,
+      rate: o.rate,
+      observed_at: o.observedAt,
+      published_at: o.publishedAt ?? null,
+      raw: o.raw ?? {},
+    }));
+
+    if (observations.length) {
+      const { error: obsErr } = await supabase.from("efrr_observations").insert(observations);
+      if (obsErr) console.warn("efrr_observations insert:", obsErr);
+    }
+
+    const efrrRows = published.map((row) => ({
+      from_currency: row.fromCurrency,
+      to_currency: row.toCurrency,
+      reference_rate: row.referenceRate,
+      primary_source: row.primarySource,
+      primary_rate: row.primaryRate,
+      primary_observed_at: row.primaryObservedAt,
+      fallback_source: row.fallbackSource,
+      fallback_rate: row.fallbackRate,
+      validation_source: row.validationSource,
+      validation_rate: row.validationRate,
+      validation_delta_bps: row.validationDeltaBps,
+      validation_status: row.validationStatus,
+      status: "published",
+      valid_from: nowIso,
+      valid_until: validUntil,
+    }));
+
+    if (efrrRows.length) {
+      const { error: efrrErr } = await supabase.from("efrr_rates").insert(efrrRows);
+      if (efrrErr) console.warn("efrr_rates insert:", efrrErr);
+    }
+
+    const { data: ccyRows, error: ccyErr } = await supabase.from("currencies").select("code").eq("is_active", true);
     if (ccyErr) throw ccyErr;
     const tableCodes = new Set((ccyRows ?? []).map((r: { code: string }) => r.code));
-    const coreSet = new Set(CORE);
+    const coreSet = new Set(EFRR_CORE);
 
-    for (const [code, rateVal] of Object.entries(rates)) {
-      if (code === "USD" || coreSet.has(code)) continue; // USD->core already emitted above
-      if (!tableCodes.has(code)) continue; // FK: must exist in currencies
-      const market = Number(rateVal);
-      if (!market || market <= 0) continue;
-      rows.push({
-        from_currency: "USD",
-        to_currency: code,
-        rate: market,
-        markup_rate: MARKUP,
-        effective_rate: market * (1 - MARKUP),
-        source,
-        valid_from: now.toISOString(),
-        valid_until: validUntil,
-      });
-    }
-
-    // USD stables (USDC/USDT) are not in OpenExchangeRates ISO lists. Peg them to
-    // USD and emit CORE×stable corridors so CAD↔USDC wallet transfers have a row.
-    const STABLES = ["USDC", "USDT"];
-    const nowIso = now.toISOString();
-    for (const stable of STABLES) {
-      if (!tableCodes.has(stable)) continue;
-      rows.push({
-        from_currency: "USD",
-        to_currency: stable,
-        rate: 1,
+    const fxRows: Record<string, unknown>[] = published
+      .filter((r) => tableCodes.has(r.fromCurrency) && tableCodes.has(r.toCurrency))
+      .map((r) => ({
+        from_currency: r.fromCurrency,
+        to_currency: r.toCurrency,
+        rate: r.referenceRate,
         markup_rate: 0,
-        effective_rate: 1,
-        source: `${source}+usd-peg`,
+        effective_rate: r.referenceRate,
+        source: `efrr:${r.primarySource}`,
         valid_from: nowIso,
         valid_until: validUntil,
-      });
-      rows.push({
-        from_currency: stable,
-        to_currency: "USD",
-        rate: 1,
-        markup_rate: 0,
-        effective_rate: 1,
-        source: `${source}+usd-peg`,
-        valid_from: nowIso,
-        valid_until: validUntil,
-      });
-      for (const fiat of CORE) {
-        if (fiat === "USD") continue;
-        const fiatPerUsd = Number(rates[fiat]);
-        if (!fiatPerUsd || fiatPerUsd <= 0) continue;
-        const fiatToStable = 1 / fiatPerUsd;
-        const stableToFiat = fiatPerUsd;
-        rows.push({
-          from_currency: fiat,
-          to_currency: stable,
-          rate: fiatToStable,
-          markup_rate: MARKUP,
-          effective_rate: fiatToStable * (1 - MARKUP),
-          source: `${source}+usd-peg`,
-          valid_from: nowIso,
-          valid_until: validUntil,
-        });
-        rows.push({
-          from_currency: stable,
-          to_currency: fiat,
-          rate: stableToFiat,
-          markup_rate: MARKUP,
-          effective_rate: stableToFiat * (1 - MARKUP),
-          source: `${source}+usd-peg`,
+      }));
+
+    if (oxrBook) {
+      for (const [code, rateVal] of Object.entries(oxrBook.rates)) {
+        if (code === "USD" || coreSet.has(code) || !tableCodes.has(code)) continue;
+        const market = Number(rateVal);
+        if (!(market > 0)) continue;
+        fxRows.push({
+          from_currency: "USD",
+          to_currency: code,
+          rate: market,
+          markup_rate: 0,
+          effective_rate: market,
+          source: `efrr:${oxrBook.source}`,
           valid_from: nowIso,
           valid_until: validUntil,
         });
       }
     }
 
-    // fx_rates is UNIQUE (from_currency, to_currency, valid_from) and every row
-    // in a run shares valid_from, so the same pair must not appear twice. The
-    // batch. Deduplicate by pair, keeping the last writer.
-    const byPair = new Map<string, any>();
-    for (const row of rows) {
+    for (const stable of STABLES) {
+      if (!tableCodes.has(stable)) continue;
+      fxRows.push({
+        from_currency: "USD", to_currency: stable, rate: 1, markup_rate: 0, effective_rate: 1,
+        source: "efrr:usd-peg", valid_from: nowIso, valid_until: validUntil,
+      });
+      fxRows.push({
+        from_currency: stable, to_currency: "USD", rate: 1, markup_rate: 0, effective_rate: 1,
+        source: "efrr:usd-peg", valid_from: nowIso, valid_until: validUntil,
+      });
+      for (const fiat of EFRR_CORE) {
+        if (fiat === "USD") continue;
+        const publishedPair = published.find((r) => r.fromCurrency === "USD" && r.toCurrency === fiat);
+        const fiatPerUsd = publishedPair?.referenceRate ?? Number(oxrBook?.rates[fiat] ?? 0);
+        if (!(fiatPerUsd > 0)) continue;
+        fxRows.push({
+          from_currency: fiat, to_currency: stable, rate: 1 / fiatPerUsd, markup_rate: 0,
+          effective_rate: 1 / fiatPerUsd, source: "efrr:usd-peg", valid_from: nowIso, valid_until: validUntil,
+        });
+        fxRows.push({
+          from_currency: stable, to_currency: fiat, rate: fiatPerUsd, markup_rate: 0,
+          effective_rate: fiatPerUsd, source: "efrr:usd-peg", valid_from: nowIso, valid_until: validUntil,
+        });
+      }
+    }
+
+    const byPair = new Map<string, Record<string, unknown>>();
+    for (const row of fxRows) {
       byPair.set(`${row.from_currency}|${row.to_currency}`, row);
     }
     const deduped = Array.from(byPair.values());
-
     const { error } = await supabase.from("fx_rates").insert(deduped);
     if (error) throw error;
 
     return new Response(
       JSON.stringify({
         success: true,
-        source,
+        efrr: {
+          primary: bocResult.ok ? "bank_of_canada" : (oxrBook?.source ?? null),
+          boc_ok: bocResult.ok,
+          boc_error: bocResult.ok ? null : bocResult.error,
+          oxr_ok: oxrResult.ok,
+          oxr_source: oxrBook?.source ?? null,
+          oxr_error: oxrResult.ok ? null : oxrResult.error,
+          ecb_ok: ecbResult.ok,
+          ecb_error: ecbResult.ok ? null : ecbResult.error,
+          published: published.length,
+          observations: observations.length,
+        },
         inserted: deduped.length,
-        deduplicated: rows.length - deduped.length,
-        fetched_at: now.toISOString(),
+        fetched_at: nowIso,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   } catch (err) {
-    console.error("refresh-fx-rates error:", err);
-    // Supabase returns PostgrestError as a plain object, not an Error, so
-    // instanceof alone reports "Unknown error" and hides the real cause.
+    console.error("refresh-fx-rates / EFRR error:", err);
     const msg =
       err instanceof Error
         ? err.message

@@ -1,21 +1,17 @@
 /**
- * Corridor FX rule:
+ * Corridor FX quoting:
  *
- *   customer rate = corridor provider FX × (1 − eFinMoney internal margin)
+ *   EFRR (BoC / OXR)  →  partner execution rate  →  eFinMoney cost
+ *     →  customer rate = benchmark × (1 − internal EX spread)
  *
- * The benchmark is the payout rail's own rate (Nomba, Flutterwave, Fincra,
- * Wise, …), not CBN / Open Exchange treasury mid and not `fx_rates.effective_rate`
- * (which already has a treasury markup). Internal margin is the corridor card
- * `efin_fx_spread`. Apply it once.
- *
- * When several providers quote the corridor, prefer the rate-card / routed
- * partner; otherwise use the best (highest) live quote so we stay competitive
- * with rails we can actually settle. Seeded/stale partner-book estimates are
- * ignored. Treasury mid is the fallback only when no live provider quote exists.
+ * EFRR is the compliance/accounting reference. Live payout-rail FX is the
+ * execution/settlement source and is preferred for customer quotes so Africa
+ * corridors are not priced off a published mid we cannot actually obtain.
+ * Never stack `fx_rates.effective_rate`.
  */
 
 export const FX_CORRIDOR_RULE =
-  "Customer FX = corridor provider FX × (1 − eFinMoney internal margin)";
+  "Customer FX = (partner execution rate || EFRR) × (1 − eFinMoney internal EX spread)";
 
 /** Live partner-rates-refresh rows expire ~15 minutes after they were pulled. */
 export const LIVE_PROVIDER_TTL_MS = 20 * 60 * 1000;
