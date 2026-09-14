@@ -11,6 +11,7 @@ import {
   isCadUnsafeCollectRail,
   cadSendPayInCheckout,
 } from "../src/lib/cadCollectCheckout.ts";
+import { toDbFundingSource } from "../src/lib/transferFundingSource.ts";
 import { orderCadCollectRails as orderCadCollectRailsEdge } from "../supabase/functions/_shared/cad-collect-rails.ts";
 
 function assert(name: string, ok: boolean, detail?: unknown) {
@@ -92,6 +93,18 @@ assert("auto-pick CAD falls back to Nomba when Interac off", defaultCadCollectRa
 assert("CAD bank Next is EFT not Interac", cadSendPayInCheckout("bank") === "eft");
 assert("CAD Interac Next stays Interac", cadSendPayInCheckout("interac") === "interac");
 assert("CAD card Next stays card (Nomba)", cadSendPayInCheckout("card") === "card");
+
+assert("DB funding Interac Autodeposit parks as bank", toDbFundingSource("interac") === "bank");
+assert("DB funding Wise parks as bank", toDbFundingSource("wise") === "bank");
+assert("DB funding EFT parks as bank", toDbFundingSource("eft") === "bank");
+assert("DB funding card stays card", toDbFundingSource("card") === "card");
+assert("DB funding prepaid card maps to wallet", toDbFundingSource("card", { prepaidCardAsWallet: true }) === "wallet");
+assert("DB funding wallet stays wallet", toDbFundingSource("wallet") === "wallet");
+assert("DB funding unknown falls back to wallet", toDbFundingSource("flutterwave") === "wallet");
+assert(
+  "DB funding never persists Interac",
+  ["wallet", "card", "bank"].includes(toDbFundingSource("interac")),
+);
 
 if (process.exitCode) {
   console.error("CAD collect checks failed");

@@ -63,6 +63,7 @@ import { isWisePayCurrency } from "@/lib/wisePayLink";
 import WiseInteracInvoiceCheckout from "@/components/payments/WiseInteracInvoiceCheckout";
 import CadBankEftCheckout from "@/components/payments/CadBankEftCheckout";
 import { cadSendPayInCheckout } from "@/lib/cadCollectCheckout";
+import { toDbFundingSource } from "@/lib/transferFundingSource";
 import SendHeaderCountry from "@/components/send/SendHeaderCountry";
 import RecipientQuickBox from "@/components/send/RecipientQuickBox";
 import FlutterwaveCardForm from "@/components/payments/FlutterwaveCardForm";
@@ -918,13 +919,8 @@ const SendPage = () => {
       exchange_rate: overrides?.exchange_rate ?? effectiveRate,
       fee_amount: overrides?.fee_amount ?? fee,
       // Card: prepaid into wallet, then paid out as wallet.
-      // Interac/Wise: park as bank-funded until Fincra Autodeposit credits the CAD wallet.
-      funding_source:
-        funding === "card"
-          ? "wallet"
-          : funding === "interac" || funding === "wise"
-          ? "bank"
-          : funding,
+      // Interac/Wise: park as bank-funded until Autodeposit / Wise credits the wallet.
+      funding_source: toDbFundingSource(funding, { prepaidCardAsWallet: true }),
     });
     setLastTransferId(transfer.id);
     void freezeFxSnapshot({
@@ -1077,7 +1073,7 @@ const SendPage = () => {
       }
       try {
         const tid = await createTransferRecord({
-          funding_source: 'interac',
+          funding_source: "bank",
           sender_wallet_id: cadWallet.wallet_id,
         });
         setInteracFunding({ transferId: tid, walletId: cadWallet.wallet_id, amount: totalCharge });
@@ -1102,7 +1098,7 @@ const SendPage = () => {
       }
       try {
         const tid = await createTransferRecord({
-          funding_source: "wise",
+          funding_source: "bank",
           sender_wallet_id: wallet.wallet_id,
           source_currency: wallet.currency_code,
         });

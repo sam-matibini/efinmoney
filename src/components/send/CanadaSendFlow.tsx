@@ -56,6 +56,7 @@ import { useCreateWallet } from "@/hooks/useCreateWallet";
 import WiseInteracInvoiceCheckout from "@/components/payments/WiseInteracInvoiceCheckout";
 import CadBankEftCheckout from "@/components/payments/CadBankEftCheckout";
 import { cadSendPayInCheckout } from "@/lib/cadCollectCheckout";
+import { toDbFundingSource } from "@/lib/transferFundingSource";
 import { productFeatures } from "@/lib/productFeatures";
 import { isWisePayCurrency } from "@/lib/wisePayLink";
 import { CAD_INTERAC_MISSING_CONTACT, resolveCadInteracDestination } from "@/lib/cadInteracPayout";
@@ -1203,7 +1204,7 @@ const CanadaSendFlow = () => {
           recipient_country: "CA",
           transfer_type: "domestic_canada",
           payout_method: method === "eft" ? "eft" : method === "interac" ? "interac" : method,
-          funding_source: funding,
+          funding_source: toDbFundingSource(funding),
           source_currency: "CAD",
           target_currency: "CAD",
           source_amount: parsedAmount,
@@ -1322,7 +1323,7 @@ const CanadaSendFlow = () => {
         recipient_country: "CA",
         transfer_type: "domestic_canada",
         payout_method: method,
-        funding_source: funding,
+        funding_source: toDbFundingSource(funding),
         source_currency: "CAD",
         target_currency: "CAD",
         source_amount: parsedAmount,

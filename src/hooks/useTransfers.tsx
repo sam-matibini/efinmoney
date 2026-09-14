@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
 import { track } from '@/lib/analytics';
 import { invalidateFinancialBooks } from '@/lib/finance/invalidateFinancialBooks';
+import { toDbFundingSource } from '@/lib/transferFundingSource';
 
 export interface Transfer {
   id: string;
@@ -46,6 +47,7 @@ export interface CreateTransferInput {
   target_amount: number;
   exchange_rate: number;
   fee_amount: number;
+  /** UI rails like Interac Autodeposit are remapped to bank on insert. */
   funding_source?: 'wallet' | 'card' | 'bank' | 'interac' | 'wise';
 }
 
@@ -107,6 +109,7 @@ export const useCreateTransfer = () => {
         .insert({
           sender_id: user.id,
           ...input,
+          funding_source: toDbFundingSource(input.funding_source),
         })
         .select()
         .single();
