@@ -10,7 +10,7 @@ import { validatePayoutMin } from "../_shared/payoutMins.ts";
 import { nombaApiConfigured } from "../_shared/nomba-api.ts";
 import { requireCadInteracDestination } from "../_shared/cadInteracPayout.ts";
 import { canResumeExecuteTransfer } from "../_shared/executeTransferResume.ts";
-import { isCanadaCadPayout, resolvePayoutNetwork } from "../_shared/nomba-payout-corridors.ts";
+import { isCanadaCadPayout, resolvePayoutNetwork, availableCanadaCadPayoutRails } from "../_shared/nomba-payout-corridors.ts";
 import { orderRailsByLeastCost } from "../_shared/routingEngine.ts";
 
 const corsHeaders = {
@@ -487,7 +487,7 @@ Deno.serve(async (req) => {
     // Mark funded
     await supabase.from("transfers").update({ status: "funded" }).eq("id", transfer_id);
 
-    // Smart Route: Nomba Interac/EFT for Canada; Stellar SEP-31 anchor for opt-in
+    // Smart Route: Nomba/Fincra Interac/EFT for Canada; Stellar SEP-31 for opt-in
     // African corridors (NG/KE/ZM); Flutterwave for the rest.
     const STELLAR_COUNTRIES = new Set(["NG", "KE", "ZM"]);
     const MTN_COUNTRIES = new Set(["GH", "UG", "ZM"]);
@@ -586,8 +586,8 @@ Deno.serve(async (req) => {
       recipientCountry || transfer.recipient_country,
       transfer.payout_method,
     );
-    // Canada CAD: never follow an admin policy that lists Flutterwave/Fincra MoMo
-    // (that produces "Unsupported network mpesa for CAD"). Dedicated Interac/EFT chain below.
+    // Canada CAD: skip the generic policy loop (it can include Flutterwave).
+    // Dedicated Interac/EFT chain below ranks Nomba + Fincra by least cost.
     let policyRails = isCanada ? [] : [...resolvedPolicyRails];
     let policyRouted = false;
 
@@ -616,7 +616,7 @@ Deno.serve(async (req) => {
 
     let engineRouted = false;
     // Zambia MoMo and ops force_rail skip the routing engine — Fincra-only for ZMW.
-    // Canada CAD skips it — Interac/EFT only, never Kenya M-Pesa scoring.
+    // Canada CAD uses the dedicated Nomba/Fincra chain below (never Kenya M-Pesa).
     // Admin / code-default payout rails also skip the scoring engine (explicit ops choice).
     if (
       !forceFincraOnly && !fincraExclusiveCorridor && !zambiaMomo
@@ -886,19 +886,76 @@ Deno.serve(async (req) => {
           }
         };
 
-        // Nomba Interac / EFT only. Flovide and Paysafe are not CAD payout rails.
-        if (nombaApiConfigured()) {
-          await tryCanadaRail("nomba", async () => {
-            const nombaRes = await fetch(
-              `${Deno.env.get("SUPABASE_URL")}/functions/v1/nomba-payout`,
-              { method: "POST", headers: internalHeaders, body: JSON.stringify({ transfer_id }) },
-            );
-            return nombaRes.json().catch(() => ({
-              success: false,
-              error: `nomba-payout HTTP ${nombaRes.status}`,
-              rail: "nomba",
-            }));
-          });
+        // Nomba + Fincra Interac/EFT by availability and least cost.
+        // Never Flutterwave, Flovide, Paysafe, or Kenya M-Pesa.
+        let canadaRails = availableCanadaCadPayoutRails({
+          nombaConfigured: nombaApiConfigured(),
+          fincraConfigured,
+          policyRails: resolvedPolicyRails,
+        });
+        if (canadaRails.length > 1) {
+          try {
+            const ranked = await resolveRoute(supabase, routeRequest);
+            if (ranked.candidates.length) {
+              canadaRails = orderRailsByLeastCost(canadaRails, ranked.candidates);
+            }
+          } catch (e) {
+            console.error("Canada least-cost ranking failed, using Nomba then Fincra", e);
+          }
+        }
+        for (const rail of canadaRails) {
+          if (rail === "nomba") {
+            await tryCanadaRail("nomba", async () => {
+              const nombaRes = await fetch(
+                `${Deno.env.get("SUPABASE_URL")}/functions/v1/nomba-payout`,
+                { method: "POST", headers: internalHeaders, body: JSON.stringify({ transfer_id }) },
+              );
+              return nombaRes.json().catch(() => ({
+                success: false,
+                error: `nomba-payout HTTP ${nombaRes.status}`,
+                rail: "nomba",
+              }));
+            });
+          } else if (rail === "fincra") {
+            await tryCanadaRail("fincra", async () => {
+              await supabase.from("transfers").update({
+                provider_reference: `FINCRA-PENDING-${String(transfer_id).slice(0, 8)}`,
+                provider_charge_id: "rail:fincra",
+              }).eq("id", transfer_id);
+              const fincraRes = await fetch(
+                `${Deno.env.get("SUPABASE_URL")}/functions/v1/fincra-payout`,
+                {
+                  method: "POST",
+                  headers: internalHeaders,
+                  body: JSON.stringify({
+                    ...flwBody(),
+                    skip_reversal: true,
+                  }),
+                },
+              );
+              const json = await fincraRes.json().catch(() => ({
+                success: false,
+                error: `fincra-payout HTTP ${fincraRes.status}`,
+                rail: "fincra",
+              }));
+              if (!payoutOk(json)) {
+                await supabase.from("transfers").update({
+                  provider_charge_id: null,
+                  provider_reference: null,
+                }).eq("id", transfer_id);
+              }
+              return { ...json, rail: "fincra" };
+            });
+          }
+        }
+
+        if (!payoutOk(payoutResult) && !canadaHardDecline && canadaRails.length === 0) {
+          payoutResult = {
+            success: false,
+            error: "No CAD Interac/EFT payout rail is configured (Nomba or Fincra)",
+            rail: "canada",
+            retryable: true,
+          };
         }
 
         if (!payoutOk(payoutResult) && !canadaHardDecline && transfer.payout_method === "stripe_connect") {
@@ -1133,6 +1190,14 @@ Deno.serve(async (req) => {
           error: `fincra-payout HTTP ${res.status}`,
           rail: "fincra",
         }));
+      } else if (targetCurrency === "CAD" || isCanada) {
+        payoutResult = {
+          success: false,
+          error: "CAD payouts use Nomba or Fincra Interac/EFT — not Flutterwave",
+          rail: "canada",
+          retryable: true,
+          error_class: "misroute",
+        };
       } else {
         // Other corridors → Flutterwave default
         const res = await fetch(

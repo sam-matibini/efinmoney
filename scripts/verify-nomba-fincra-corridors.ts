@@ -36,15 +36,16 @@ assert("MWK is not a Nomba/Fincra payout", !isLivePayoutCurrency("MWK"));
 
 assert("Nomba pays UGX", nombaPayoutSupported({ currency: "UGX", country: "UG", method: "mtn_mobile" }));
 assert("Fincra pays UGX", fincraPayoutSupported("UGX", "UG"));
-assert("Fincra does not pay CAD", !fincraPayoutSupported("CAD", "CA"));
 assert("Nomba pays CAD Interac", nombaPayoutSupported({ currency: "CAD", country: "CA", method: "interac" }));
+assert("Fincra pays CAD Interac", fincraPayoutSupported("CAD", "CA"));
 
 const ugRails = defaultPayoutRails({ currency: "UGX", country: "UG", method: "mtn_mobile" });
 assert("UGX rails include Nomba", ugRails.includes("nomba"));
 assert("UGX rails include Fincra", ugRails.includes("fincra"));
 
 const cad = sanitizeCanadaPayoutRails(["nomba", "fincra", "flutterwave"]);
-assert("CAD sanitize keeps Nomba only", cad.length === 1 && cad[0] === "nomba");
+assert("CAD sanitize keeps Nomba and Fincra", cad.includes("nomba") && cad.includes("fincra"));
+assert("CAD sanitize drops Flutterwave", !cad.includes("flutterwave"));
 
 const cheapFincra = orderRailsByLeastCost(
   ["nomba", "fincra", "flutterwave"],

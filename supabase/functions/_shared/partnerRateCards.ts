@@ -90,12 +90,19 @@ export const PARTNER_RATE_CARDS: Record<string, PartnerRateCard> = {
     reference: "Fincra payout pricing",
     fx_spread_bps: 180,
     default: { fixed_fee: 0.6, percentage_fee: 1.3, fx_markup_bps: 180, fee_currency: CAD },
-    overrides: { "CAD:interac": { fixed_fee: 1.75, percentage_fee: 0, fx_markup_bps: 0 } },
+    overrides: {
+      "CAD:interac": { fixed_fee: 1.75, percentage_fee: 0, fx_markup_bps: 0 },
+      "CAD:eft": { fixed_fee: 1.25, percentage_fee: 0, fx_markup_bps: 0 },
+    },
   },
   nomba: {
-    reference: "Nomba NGN bank payout pricing",
+    reference: "Nomba NGN bank + CAD Interac/EFT payout pricing",
     fx_spread_bps: 190,
     default: { fixed_fee: 0.3, percentage_fee: 0.9, fx_markup_bps: 190, fee_currency: CAD },
+    overrides: {
+      "CAD:interac": { fixed_fee: 0.75, percentage_fee: 0, fx_markup_bps: 0 },
+      "CAD:eft": { fixed_fee: 0.55, percentage_fee: 0, fx_markup_bps: 0 },
+    },
   },
   paytota: {
     reference: "Paytota payout pricing",

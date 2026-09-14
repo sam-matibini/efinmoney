@@ -153,7 +153,7 @@ export async function resolveCorridorRails(
 
   // Make Nomba and Fincra available on every corridor they support. Do not
   // force Nomba first — execute-transfer reorders by least cost. Canada CAD
-  // is sanitized to Nomba-only below.
+  // is sanitized to Nomba + Fincra (no Flutterwave / M-Pesa) below.
   if (direction === "payout") {
     if (nombaApiConfigured() && nombaPayoutSupported({ currency: ccy, country: cc || country, method })) {
       if (!rails.includes("nomba")) rails = ["nomba", ...rails];

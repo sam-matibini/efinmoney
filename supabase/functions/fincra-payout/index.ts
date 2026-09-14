@@ -1,6 +1,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { fincraFetch, getFincraConfig } from "../_shared/fincra.ts";
 import { ngBankCodeCandidates } from "../_shared/ng-bank-codes.ts";
+import { resolveCadInteracDestination } from "../_shared/cadInteracPayout.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -480,6 +481,225 @@ async function reverseTransferLedger(supabase: ReturnType<typeof createClient>, 
   return { reversed: true };
 }
 
+function parseCadEftAccount(raw: string): { institution: string; transit: string; account: string } | null {
+  const parts = String(raw || "").split("-").map((p) => p.replace(/\D/g, ""));
+  if (parts.length >= 3 && parts[0] && parts[1] && parts[2]) {
+    return {
+      institution: parts[0].padStart(3, "0"),
+      transit: parts[1].padStart(5, "0"),
+      account: parts.slice(2).join(""),
+    };
+  }
+  return null;
+}
+
+/** CAD Interac e-Transfer or EFT via Fincra disbursements. Failover-safe (no refund when skip_reversal). */
+async function payoutCanadaCadViaFincra(opts: {
+  supabase: ReturnType<typeof createClient>;
+  transfer: Record<string, unknown>;
+  transfer_id: string;
+  senderId: string;
+  amount: number;
+  network: string;
+  recipient_name: string;
+  skip_reversal: boolean;
+}): Promise<Response> {
+  const cfg = getFincraConfig();
+  if (!cfg.secretKey || !cfg.businessId) {
+    return new Response(JSON.stringify({
+      success: false,
+      error: "Fincra is not configured",
+      retryable: true,
+      error_class: "unavailable",
+      rail: "fincra",
+    }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+  }
+
+  const method = String(opts.transfer.payout_method || opts.network || "").toLowerCase();
+  const isEft = method === "eft" || method === "bank" || method.includes("eft");
+  const { firstName, lastName } = splitName(opts.recipient_name);
+  const destAmount = Math.round(Number(opts.amount) * 100) / 100;
+  const attemptErrors: string[] = [];
+
+  const jsonFail = (error: string, errorClass: string, hard = false, extra: Record<string, unknown> = {}) =>
+    new Response(JSON.stringify({
+      success: false,
+      error,
+      error_class: errorClass,
+      retryable: !hard,
+      refunded: false,
+      rail: "fincra",
+      attempts: attemptErrors,
+      ...extra,
+    }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+
+  let beneficiary: Record<string, unknown>;
+  let paymentScheme: string | undefined;
+
+  if (isEft) {
+    const parsed = parseCadEftAccount(String(opts.transfer.recipient_account || ""));
+    const account = parsed?.account || String(opts.transfer.recipient_account || "").replace(/\D/g, "");
+    const institution = parsed?.institution || String(opts.transfer.recipient_bank_code || "").replace(/\D/g, "");
+    const transit = parsed?.transit || String((opts.transfer as Record<string, unknown>).transit_number || "").replace(/\D/g, "");
+    if (!account || !institution) {
+      return jsonFail("CAD EFT payout requires institution and account number", "hard", true);
+    }
+    paymentScheme = "eft";
+    beneficiary = {
+      firstName,
+      lastName,
+      type: "individual",
+      accountHolderName: opts.recipient_name,
+      accountNumber: account,
+      bankCode: institution,
+      country: "CA",
+      ...(transit ? { transitNumber: transit } : {}),
+    };
+  } else {
+    const dest = resolveCadInteracDestination({
+      recipient_account: opts.transfer.recipient_account as string | null,
+      recipient_phone: opts.transfer.recipient_phone as string | null,
+      interac_email: (opts.transfer.recipient_interac_email || opts.transfer.interac_email) as string | null,
+      recipient_email: opts.transfer.recipient_email as string | null,
+    });
+    if (!dest.ok) {
+      return jsonFail(dest.error, "hard", true, { code: "missing_interac_contact" });
+    }
+    paymentScheme = "interac";
+    beneficiary = {
+      firstName,
+      lastName,
+      type: "individual",
+      accountHolderName: opts.recipient_name,
+      country: "CA",
+      ...(dest.dest.email
+        ? { email: dest.dest.email, accountNumber: dest.dest.email }
+        : {}),
+      ...(dest.dest.phone
+        ? { phone: dest.dest.phone.replace(/\D/g, ""), accountNumber: dest.dest.phone.replace(/\D/g, "") }
+        : {}),
+    };
+  }
+
+  const schemes = isEft
+    ? ["eft", "EFT", undefined]
+    : ["interac", "INTERAC", "INTERAC_ETRANSFER", undefined];
+  const funding = ["CAD", "NGN", "USD"];
+
+  let successJson: Record<string, unknown> | null = null;
+  let usedSource = "CAD";
+  let usedCustomerReference = opts.transfer_id;
+  let usedQuote: QuoteResult | null = null;
+
+  for (const sourceCurrency of funding) {
+    if (successJson) break;
+    const cross = sourceCurrency !== "CAD";
+    let quoted: QuoteResult | null = null;
+    if (cross) {
+      const q = await generateDisbursementQuote({
+        businessId: cfg.businessId,
+        sourceCurrency,
+        destinationCurrency: "CAD",
+        receiveAmount: destAmount,
+        paymentDestination: "bank_account",
+      });
+      if (!q.ok) {
+        attemptErrors.push(`${sourceCurrency}->CAD quote: ${q.error}`);
+        continue;
+      }
+      quoted = q.quote;
+    }
+
+    for (const scheme of schemes) {
+      if (successJson) break;
+      const customerReference = `${opts.transfer_id}__cad_${sourceCurrency}_${scheme || "none"}_${Date.now().toString(36)}`;
+      const payload: Record<string, unknown> = {
+        business: cfg.businessId,
+        sourceCurrency,
+        destinationCurrency: "CAD",
+        description: `eFinMoney CAD ${isEft ? "EFT" : "Interac"} to ${opts.recipient_name}`,
+        paymentDestination: "bank_account",
+        customerReference,
+        beneficiary,
+        amount: cross && quoted
+          ? String(Math.round(quoted.sourceAmount * 100) / 100)
+          : String(destAmount),
+      };
+      if (scheme) payload.paymentScheme = scheme;
+      if (cross && quoted) payload.quoteReference = quoted.reference;
+
+      const { ok, status, json } = await fincraFetch("/disbursements/payouts", {
+        method: "POST",
+        body: JSON.stringify(payload),
+      });
+      const outcome = fincraPayoutAccepted(json as Record<string, unknown>);
+      if (ok && outcome.accepted) {
+        successJson = json as Record<string, unknown>;
+        usedSource = sourceCurrency;
+        usedCustomerReference = customerReference;
+        usedQuote = quoted;
+        break;
+      }
+      const reason = outcome.message
+        || String((json as { error?: string; message?: string })?.error
+          || (json as { message?: string })?.message
+          || `HTTP ${status}`);
+      attemptErrors.push(`${sourceCurrency} scheme=${scheme || "none"}: ${reason}`);
+      const lower = reason.toLowerCase();
+      if (lower.includes("destination currency") && lower.includes("not supported")) {
+        return jsonFail(
+          "Fincra CAD Interac/EFT payout is not enabled on this merchant — trying the next rail",
+          "unavailable",
+        );
+      }
+      if (isFincraBalanceError(reason) || isUnsupportedFundingError(reason)) break;
+    }
+  }
+
+  if (!successJson) {
+    const reason = attemptErrors[attemptErrors.length - 1] || "Fincra CAD payout failed";
+    if (opts.skip_reversal) {
+      return jsonFail(reason, classifyFincraError(reason) === "hard" ? "hard" : "unavailable");
+    }
+    const rev = await reverseTransferLedger(opts.supabase, opts.transfer_id);
+    await opts.supabase.from("transfers").update({
+      status: "failed",
+      failure_reason: reason.slice(0, 500),
+    }).eq("id", opts.transfer_id);
+    return new Response(JSON.stringify({
+      success: false,
+      error: reason,
+      error_class: "unavailable",
+      retryable: true,
+      refunded: rev.reversed,
+      rail: "fincra",
+      attempts: attemptErrors,
+    }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+  }
+
+  const pdata = (successJson.data ?? {}) as Record<string, unknown>;
+  const providerRef = String(pdata.reference || pdata.id || usedCustomerReference);
+  await opts.supabase.from("transfers").update({
+    status: "processing",
+    provider_reference: providerRef,
+    provider_charge_id: usedQuote
+      ? `rail:fincra|src:${usedSource}|dst:CAD|cref:${usedCustomerReference}|q:${usedQuote.reference}`
+      : `rail:fincra|src:${usedSource}|dst:CAD|cref:${usedCustomerReference}`,
+  }).eq("id", opts.transfer_id);
+  await opts.supabase.from("notifications").insert({
+    user_id: opts.senderId,
+    title: "Transfer initiated",
+    message: `Your CAD ${destAmount} transfer to ${opts.recipient_name} is being processed via Fincra.`,
+    type: "info",
+  });
+  return new Response(JSON.stringify({
+    success: true,
+    reference: providerRef,
+    rail: "fincra",
+    source_currency: usedSource,
+  }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
   const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
@@ -518,14 +738,16 @@ Deno.serve(async (req) => {
 
     const destCcy = String(currency || transfer.target_currency || "").toUpperCase();
     if (destCcy === "CAD") {
-      const reason = "CAD payouts use Interac e-Transfer or EFT in Canada, not Fincra mobile money";
-      return new Response(JSON.stringify({
-        success: false,
-        error: reason,
-        retryable: true,
-        error_class: "misroute",
-        rail: "fincra",
-      }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      return await payoutCanadaCadViaFincra({
+        supabase,
+        transfer,
+        transfer_id,
+        senderId,
+        amount: Number(amount || transfer.target_amount || transfer.source_amount),
+        network: String(network || transfer.payout_method || ""),
+        recipient_name: String(recipient_name || transfer.recipient_name || ""),
+        skip_reversal: skip_reversal === true,
+      });
     }
 
     const cfg = getFincraConfig();

@@ -157,7 +157,7 @@ export const POPULAR_COUNTRY_IDS = [
 
 /**
  * Live send destinations: everywhere Nomba or Fincra can pay out.
- * Canada CAD stays Nomba Interac/EFT (not Fincra, not M-Pesa).
+ * Canada CAD Interac/EFT uses Nomba and Fincra (availability + least cost).
  * Zambia stays Fincra (Nomba has no ZMW).
  */
 export const LIVE_SEND_COUNTRY_IDS = [

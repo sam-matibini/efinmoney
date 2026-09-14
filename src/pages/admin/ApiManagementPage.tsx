@@ -41,7 +41,7 @@ const INTEGRATIONS: Array<{
   // Payments — Africa
   { key: "nomba", name: "Nomba", description: "NGN bank + Global Payout (Africa MoMo, CAD/GBP/EUR/USD) & collection", category: "Payments — Africa", envHints: ["NOMBA_CLIENT_ID", "NOMBA_CLIENT_SECRET", "NOMBA_ACCOUNT_ID", "NOMBA_PAYOUT_SOURCE_CURRENCY"] },
   { key: "ghana", name: "Ghana Pay", description: "Ghana GHS collection & mobile-money payouts", category: "Payments — Africa", envHints: ["GHANA_PAY_API_URL", "GHANA_PAY_USER"] },
-  { key: "fincra", name: "Fincra", description: "Africa collect + NGN/GHS/KES payouts & CAD Interac", category: "Payments — Africa", envHints: ["FINCRA_SECRET_KEY", "FINCRA_BUSINESS_ID"] },
+  { key: "fincra", name: "Fincra", description: "Africa collect + payout; CAD Interac Autodeposit collect; CAD Interac/EFT payout", category: "Payments — Africa", envHints: ["FINCRA_SECRET_KEY", "FINCRA_BUSINESS_ID"] },
   { key: "flovide", name: "Flovide", description: "Africa NGN/KES/GHS/UGX payouts (OhentPay) — not CAD Interac", category: "Payments — Global & Cards", envHints: ["FLOVIDE_PUBLIC_KEY", "FLOVIDE_SECRET_KEY"] },
   { key: "flutterwave", name: "Flutterwave", description: "African payouts, top-ups & bills (TZS primary)", category: "Payments — Africa", envHints: ["FLW_SECRET_KEY", "FLW_PUBLIC_KEY"] },
   { key: "swychr", name: "Swychr", description: "International pay-in/out, virtual cards & airtime", category: "Payments — Africa", envHints: ["SWYCHR_EMAIL", "SWYCHR_PASSWORD"] },
@@ -58,7 +58,7 @@ const INTEGRATIONS: Array<{
   { key: "dodo", name: "Dodo Payments", description: "MoR global card checkout for USD/CAD/EUR/GBP wallet top-up", category: "Payments — Global & Cards", envHints: ["DODO_PAYMENTS_API_KEY", "DODO_PAYMENTS_WEBHOOK_KEY"] },
   { key: "paypal", name: "PayPal", description: "Orders API wallet top-up for USD/CAD/EUR/GBP", category: "Payments — Global & Cards", envHints: ["PAYPAL_CLIENT_ID", "PAYPAL_CLIENT_SECRET"] },
   { key: "square", name: "Square", description: "Card checkout for USD/EUR/GBP wallet top-up", category: "Payments — Global & Cards", envHints: ["SQUARE_ACCESS_TOKEN", "SQUARE_APPLICATION_ID", "SQUARE_LOCATION_ID"] },
-  { key: "paysafe", name: "Paysafe", description: "Retired for CAD Interac/EFT — Nomba is the CAD payout rail", category: "Payments — Global & Cards", envHints: ["PAYSAFE_API_KEY"] },
+  { key: "paysafe", name: "Paysafe", description: "Retired for CAD Interac/EFT — Nomba and Fincra are the CAD payout rails", category: "Payments — Global & Cards", envHints: ["PAYSAFE_API_KEY"] },
   { key: "bambora", name: "Bambora (Worldline)", description: "CAD/USD card collect, saved profiles, Canadian EFT debit", category: "Payments — Global & Cards", envHints: ["BAMBORA_MERCHANT_ID", "BAMBORA_API_PASSCODE", "BAMBORA_PAYMENTS_PASSCODE", "BAMBORA_BATCH_PASSCODE"] },
   { key: "nuvei", name: "Nuvei", description: "Payment Middleware sandbox — CAD Bank EFT coming soon (no live keys yet)", category: "Payments — Global & Cards", envHints: ["NUVEI_MW_BASE_URL", "NUVEI_MW_GATEWAY", "NUVEI_MW_SETTINGS_JSON", "NUVEI_MW_CREDENTIALS", "NUVEI_CAD_EFT_LIVE"] },
   { key: "verto", name: "Verto", description: "Corporate FX, V-Pay and partner bank payouts", category: "Payments — Global & Cards", envHints: ["VERTO_CLIENT_ID", "VERTO_API_KEY"] },

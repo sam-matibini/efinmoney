@@ -146,7 +146,6 @@ function isEftMethod(method?: string | null): boolean {
 export const AFRICA_MOMO_PAYOUT_RAILS = new Set([
   "flutterwave",
   "flw",
-  "fincra",
   "paytota",
   "pawapay",
   "mtn_momo",
@@ -158,10 +157,10 @@ export const AFRICA_MOMO_PAYOUT_RAILS = new Set([
   "lenhub",
 ]);
 
-/** Canada CAD payout: Nomba Interac/EFT only. No Flovide or Paysafe. */
-export const CANADA_CAD_PAYOUT_RAILS = ["nomba"];
+/** Canada CAD payout: Nomba + Fincra Interac/EFT, ranked by least cost at send time. */
+export const CANADA_CAD_PAYOUT_RAILS = ["nomba", "fincra"];
 
-/** Partners that must never pay CAD (Africa MoMo, retired CA rails). */
+/** Partners that must never pay CAD (Africa MoMo, retired CA rails). Fincra CAD Interac/EFT is allowed. */
 const CANADA_BLOCKED_PAYOUT_RAILS = new Set([
   ...AFRICA_MOMO_PAYOUT_RAILS,
   "flovide",
@@ -252,7 +251,7 @@ export function resolvePayoutNetwork(
 export function sanitizeCanadaPayoutRails(rails: string[]): string[] {
   const kept = rails
     .map((r) => r.trim().toLowerCase())
-    .filter((r) => r && !CANADA_BLOCKED_PAYOUT_RAILS.has(r));
+    .filter((r) => r && !CANADA_BLOCKED_PAYOUT_RAILS.has(r) && (r === "nomba" || r === "fincra"));
   if (!kept.length) return [...CANADA_CAD_PAYOUT_RAILS];
   const out: string[] = [];
   for (const r of kept) {
@@ -262,6 +261,22 @@ export function sanitizeCanadaPayoutRails(rails: string[]): string[] {
     if (!out.includes(r)) out.push(r);
   }
   return out;
+}
+
+/** CAD Interac/EFT rails that are actually configured to send. */
+export function availableCanadaCadPayoutRails(opts: {
+  nombaConfigured: boolean;
+  fincraConfigured: boolean;
+  policyRails?: string[] | null;
+}): string[] {
+  const ordered = sanitizeCanadaPayoutRails(
+    opts.policyRails?.length ? opts.policyRails : [...CANADA_CAD_PAYOUT_RAILS],
+  );
+  return ordered.filter((r) => {
+    if (r === "nomba") return opts.nombaConfigured;
+    if (r === "fincra") return opts.fincraConfigured;
+    return false;
+  });
 }
 
 /** Classify how we should pay out on Nomba for this transfer. */
@@ -421,16 +436,16 @@ export function nombaBankPaymentMethod(currency: string, country: string, method
   return "BANK";
 }
 
-/** Currencies Fincra can pay out (CAD is Interac collect only — never CAD payout). */
+/** Currencies Fincra can pay out, including CAD Interac/EFT. */
 export const FINCRA_PAYOUT_CURRENCIES = new Set([
-  "NGN", "GHS", "KES", "UGX", "TZS", "ZMW", "ZAR", "XOF", "XAF", "RWF",
+  "NGN", "GHS", "KES", "UGX", "TZS", "ZMW", "ZAR", "XOF", "XAF", "RWF", "CAD",
 ]);
 
 export function fincraPayoutSupported(currency?: string | null, country?: string | null): boolean {
   const ccy = String(currency || "").trim().toUpperCase();
-  if (isCanadaCadPayout({ currency: ccy, country, method: "interac" })) return false;
-  if (ccy === "CAD") return false;
+  if (isCanadaCadPayout({ currency: ccy, country, method: "interac" })) return true;
+  if (ccy === "CAD") return true;
   const cc = String(country || "").trim().toUpperCase();
-  if (cc === "CA" && (ccy === "CAD" || !ccy)) return false;
+  if (cc === "CA" && (ccy === "CAD" || !ccy)) return true;
   return FINCRA_PAYOUT_CURRENCIES.has(ccy);
 }
