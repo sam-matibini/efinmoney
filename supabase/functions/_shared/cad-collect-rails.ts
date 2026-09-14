@@ -1,13 +1,15 @@
 /**
  * CAD collect rail ranking (edge). Keep in sync with src/lib/cadCollectCheckout.ts.
+ * Nomba Checkout ranks first (instant settlement: card + Interac e-Transfer).
  */
 
 export const CAD_COLLECT_RAIL_COST_RANK: Record<string, number> = {
-  interac: 10,
-  fincra: 12,
-  wise: 20,
-  bambora: 25,
-  nomba: 40,
+  nomba: 1,
+  nomba_eft: 2,
+  interac: 20,
+  fincra: 22,
+  wise: 25,
+  bambora: 28,
   dodo: 50,
   paypal: 55,
   paytota: 60,
@@ -51,5 +53,5 @@ export function orderCadCollectRails(rails: string[]): string[] {
   return [...known, ...unknown];
 }
 
-/** Default CAD collect chain when no policy row exists. */
-export const DEFAULT_CAD_COLLECT_RAILS = ["interac", "wise", "nomba", "dodo"] as const;
+/** Default CAD collect chain when no policy row exists. Nomba first (instant). */
+export const DEFAULT_CAD_COLLECT_RAILS = ["nomba", "interac", "wise", "dodo"] as const;

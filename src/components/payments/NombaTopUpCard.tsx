@@ -29,7 +29,7 @@ interface Props {
   initialAmount?: string;
   /** Hide card chrome when nested in MoneyFlowShell */
   embedded?: boolean;
-  /** Nomba Checkout rails. CAD defaults to card + EFT. */
+  /** Nomba Checkout rails. CAD uses card + Interac e-Transfer (Intl Transfer). */
   collectRails?: Array<"card" | "eft">;
 }
 
@@ -123,7 +123,7 @@ export default function NombaTopUpCard({
       return;
     }
     if (isCadViaUsd && !quote) {
-      toast.error("Checkout is temporarily unavailable — try Interac, Wise, or try again shortly");
+      toast.error("Checkout is temporarily unavailable — try Autodeposit, or try again shortly");
       return;
     }
     if (!email.trim() || !email.includes("@")) {
@@ -153,18 +153,24 @@ export default function NombaTopUpCard({
     }
   };
 
-  const title = wantsCard && wantsEft
-    ? "Card or bank (EFT)"
-    : wantsEft
-      ? "Bank transfer (EFT)"
-      : "Secure checkout";
+  const title = isCadViaUsd
+    ? wantsCard && wantsEft
+      ? "Card or Interac e-Transfer"
+      : wantsEft
+        ? "Interac e-Transfer"
+        : "Card"
+    : wantsCard && wantsEft
+      ? "Card or bank (EFT)"
+      : wantsEft
+        ? "Bank transfer (EFT)"
+        : "Secure checkout";
 
   const subtitle = isCadViaUsd
     ? wantsCard && wantsEft
-      ? "Enter how much CAD you want in your wallet. Pay by card or bank (EFT) on the secure checkout page."
+      ? "Enter how much CAD you want in your wallet. Pay by card or Interac e-Transfer — your wallet credits as soon as payment succeeds."
       : wantsEft
-        ? "Pay from your Canadian bank on Nomba checkout. Your CAD wallet credits after the transfer matches."
-        : "Enter how much CAD you want in your wallet. Pay securely by card."
+        ? "Pay with Interac e-Transfer on the secure checkout page. Your CAD wallet credits as soon as payment succeeds."
+        : "Enter how much CAD you want in your wallet. Pay securely by card — credits instantly."
     : isInternational
       ? wantsEft
         ? `Card or bank payment for your ${currency} wallet on a secure page.`

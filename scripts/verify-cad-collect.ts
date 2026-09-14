@@ -58,22 +58,25 @@ assert("NGN checkout includes Card + Transfer", ngn.includes("Card") && ngn.incl
 
 assert("parse empty defaults to card+eft", parseNombaCollectRails(undefined).join(",") === "card,eft");
 assert("parse bank maps to eft", parseNombaCollectRails(["bank"]).join(",") === "eft");
+assert("parse interac maps to eft", parseNombaCollectRails(["interac"]).join(",") === "eft");
+assert("parse etransfer maps to eft", parseNombaCollectRails(["etransfer"]).join(",") === "eft");
+assert("parse e-transfer maps to eft", parseNombaCollectRails(["e-transfer"]).join(",") === "eft");
 assert("parse card,transfer maps both", parseNombaCollectRails(["card", "transfer"]).join(",") === "card,eft");
 assert("payment method error detected", isNombaPaymentMethodError("Invalid allowedPaymentMethods"));
 assert("unrelated error not method error", !isNombaPaymentMethodError("The provided email is blocked"));
 
-assert("Interac cheaper than Nomba card", cadCollectCostRank("interac") < cadCollectCostRank("nomba"));
-assert("Wise EFT cheaper than Nomba card", cadCollectCostRank("wise") < cadCollectCostRank("nomba"));
-assert("Nomba EFT cheaper than Nomba card", cadCollectCostRank("nomba_eft") < cadCollectCostRank("nomba"));
+assert("Nomba ranks before Fincra Autodeposit", cadCollectCostRank("nomba") < cadCollectCostRank("interac"));
+assert("Nomba ranks before Wise", cadCollectCostRank("nomba") < cadCollectCostRank("wise"));
+assert("Nomba Checkout ranks before Nomba EFT alias", cadCollectCostRank("nomba") < cadCollectCostRank("nomba_eft"));
 assert("Flutterwave is unsafe CAD collect", isCadUnsafeCollectRail("flutterwave"));
 assert("Paysafe is unsafe CAD collect", isCadUnsafeCollectRail("paysafe"));
 
 const ranked = orderCadCollectRails(["nomba", "flutterwave", "interac", "wise", "flovide"]);
-assert("least-cost CAD rails start with Interac", ranked[0] === "interac");
-assert("Wise before Nomba", ranked.indexOf("wise") < ranked.indexOf("nomba"));
+assert("CAD rails start with Nomba (instant settlement)", ranked[0] === "nomba");
+assert("Nomba before Interac Autodeposit", ranked.indexOf("nomba") < ranked.indexOf("interac"));
 assert("unsafe rails dropped", !ranked.includes("flutterwave") && !ranked.includes("flovide"));
-assert("edge ranking matches client", orderCadCollectRailsEdge(["nomba", "interac", "wise"])[0] === "interac");
-assert("default CAD collect rail is Interac", defaultCadCollectRail(["nomba", "interac", "wise"]) === "interac");
+assert("edge ranking matches client", orderCadCollectRailsEdge(["nomba", "interac", "wise"])[0] === "nomba");
+assert("default CAD collect rail is Nomba", defaultCadCollectRail(["nomba", "interac", "wise"]) === "nomba");
 
 const methods = orderCadCollectMethods([
   { id: "nomba" },
@@ -83,12 +86,12 @@ const methods = orderCadCollectMethods([
   { id: "wise" },
 ]);
 assert(
-  "checkout methods least-cost order",
-  methods.map((m) => m.id).join(",") === "interac,wise,nomba_eft,nomba,dodo",
+  "checkout methods instant-settlement order",
+  methods.map((m) => m.id).join(",") === "nomba,nomba_eft,interac,wise,dodo",
 );
 
-assert("auto-pick CAD prefers Interac", defaultCadCollectRail(["nomba", "interac", "wise", "dodo"]) === "interac");
-assert("auto-pick CAD falls back to Nomba when Interac off", defaultCadCollectRail(["nomba", "dodo"]) === "nomba");
+assert("auto-pick CAD prefers Nomba", defaultCadCollectRail(["nomba", "interac", "wise", "dodo"]) === "nomba");
+assert("auto-pick CAD falls back to Interac when Nomba off", defaultCadCollectRail(["interac", "dodo"]) === "interac");
 
 assert("CAD bank Next is EFT not Interac", cadSendPayInCheckout("bank") === "eft");
 assert("CAD Interac Next stays Interac", cadSendPayInCheckout("interac") === "interac");

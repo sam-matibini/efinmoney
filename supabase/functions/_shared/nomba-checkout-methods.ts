@@ -35,7 +35,18 @@ export function parseNombaCollectRails(raw: unknown): NombaCollectRail[] {
       out.push("card");
     }
     if (
-      (v === "eft" || v === "bank" || v === "transfer" || v === "bank_transfer" || v === "intl_transfer")
+      (
+        v === "eft"
+        || v === "bank"
+        || v === "transfer"
+        || v === "bank_transfer"
+        || v === "intl_transfer"
+        || v === "interac"
+        || v === "etransfer"
+        || v === "e-transfer"
+        || v === "e_transfer"
+        || v === "interac_etransfer"
+      )
       && !out.includes("eft")
     ) {
       out.push("eft");

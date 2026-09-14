@@ -62,7 +62,7 @@ type PartnerMeta = {
 const PARTNERS: PartnerMeta[] = [
   { id: "flovide", name: "Flovide", blurb: "Africa bank send to NG/KE/GH/UG — not used for CAD Interac or CAD payout", collect: ["NGN", "KES", "GHS", "UGX"], payout: ["NGN", "KES", "GHS", "UGX"] },
   { id: "fincra", name: "Fincra", blurb: "Africa collect + payout; CAD Interac Autodeposit collect; CAD Interac/EFT payout (with Nomba, least cost)", collect: ["CAD", "USD", "EUR", "GBP", "NGN", "GHS", "KES", "UGX", "TZS", "ZMW", "ZAR", "XOF", "XAF", "MWK"], payout: ["NGN", "GHS", "KES", "UGX", "TZS", "ZMW", "ZAR", "XOF", "XAF", "CAD"] },
-  { id: "nomba", name: "Nomba", blurb: "CAD card + bank/EFT collect (USD checkout); CAD Interac/EFT payout; NGN bank + Global Payout", collect: ["NGN", "CAD"], payout: ["NGN", "GHS", "KES", "UGX", "TZS", "RWF", "XOF", "XAF", "ZAR", "CAD", "GBP", "EUR", "USD"] },
+  { id: "nomba", name: "Nomba", blurb: "First-rank CAD collect (instant: card + Interac e-Transfer); CAD Interac/EFT payout; NGN bank + Global Payout", collect: ["NGN", "CAD"], payout: ["NGN", "GHS", "KES", "UGX", "TZS", "RWF", "XOF", "XAF", "ZAR", "CAD", "GBP", "EUR", "USD"] },
   { id: "flutterwave", name: "Flutterwave", blurb: "Africa MoMo payout + western card collect. CAD collect is card/bank — never Kenya M-Pesa.", collect: ["CAD", "USD", "NGN", "GHS", "KES", "UGX", "RWF", "TZS", "ZMW"], payout: ["NGN", "GHS", "KES", "UGX", "RWF", "TZS", "ZMW"] },
   { id: "lenhub_flutter", name: "Lenhub", blurb: "Card collect + FX bank/MoMo payouts", collect: ["CAD", "USD", "EUR", "GBP", "NGN", "GHS", "KES", "UGX", "RWF", "TZS"], payout: ["NGN", "GHS", "KES", "UGX", "TZS", "RWF", "ZMW"] },
   { id: "paytota", name: "Paytota", blurb: "Western invoices + East Africa MoMo", collect: ["CAD", "USD", "EUR", "GBP", "UGX", "KES", "RWF"], payout: ["UGX", "KES", "RWF"] },
@@ -73,7 +73,7 @@ const PARTNERS: PartnerMeta[] = [
   { id: "square", name: "Square", blurb: "Card checkout for western wallets", collect: ["USD", "EUR", "GBP"], payout: [] },
   { id: "paypal", name: "PayPal", blurb: "PayPal checkout for western wallets", collect: ["CAD", "USD", "EUR", "GBP"], payout: [] },
   { id: "wise", name: "Wise", blurb: "Bank deposit top-up with a payment reference", collect: ["CAD", "USD", "EUR", "GBP"], payout: [] },
-  { id: "interac", name: "Interac (Fincra Autodeposit)", blurb: "Cheapest CAD collect — Autodeposit to support.cad.live-015@fincra.ca", collect: ["CAD"], payout: [] },
+  { id: "interac", name: "Interac (Fincra Autodeposit)", blurb: "CAD collect failover — Autodeposit after Nomba Checkout; slower than instant hosted checkout", collect: ["CAD"], payout: [] },
 ];
 
 function partnersFor(direction: RailDirection, currency: string): PartnerMeta[] {

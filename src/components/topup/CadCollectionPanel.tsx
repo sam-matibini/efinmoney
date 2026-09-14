@@ -17,7 +17,8 @@ interface Props {
 
 /**
  * CAD Interac Autodeposit collect (Fincra).
- * Bank EFT and Nomba card/EFT are separate Top up methods, ranked by least cost.
+ * Bank EFT and Nomba card + Interac e-Transfer are separate Top up methods.
+ * Nomba Checkout ranks first (instant settlement).
  */
 export default function CadCollectionPanel({ walletId, walletCurrency, initialAmount, onComplete, onExit }: Props) {
   const isCad = walletCurrency.toUpperCase() === "CAD";

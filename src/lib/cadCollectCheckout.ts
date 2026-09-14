@@ -1,21 +1,18 @@
 /**
- * CAD pay-in checkout: availability + least cost.
- * Lower rank = cheaper / preferred when the rail is live.
- *
- * Interac Autodeposit and bank EFT cost less than card (Nomba charges USD + FX).
- * Nomba Checkout is the live CAD card rail (card only). Bank EFT will debit via
- * Nuvei Payment Middleware once live keys exist (Coming soon). Fincra Autodeposit
- * CAD wallet top-up checkout hides Wise EFT, Bambora EFT, and Dodo card.
- * Send pay-in does not offer Wise.
+ * CAD pay-in checkout ranking.
+ * Lower rank = preferred. Nomba Checkout settles instantly (card + Interac
+ * e-Transfer on hosted checkout), so it ranks first. Fincra Autodeposit is
+ * the slower backup. Bank EFT via Nuvei is Coming soon. CAD top-up hides
+ * Wise EFT, Bambora EFT, and Dodo card. Send pay-in does not offer Wise.
  */
 
 export const CAD_COLLECT_COST_RANK: Record<string, number> = {
-  interac: 10,
-  plaid: 12,
-  wise: 20,
-  bambora_eft: 25,
-  nomba_eft: 30,
-  nomba: 40,
+  nomba: 1,
+  nomba_eft: 2,
+  interac: 20,
+  plaid: 22,
+  wise: 25,
+  bambora_eft: 28,
   wise_link: 45,
   dodo: 50,
   paypal: 55,
@@ -26,11 +23,12 @@ export const CAD_COLLECT_COST_RANK: Record<string, number> = {
 
 /** Partner / corridor rail ids used in collect policy (not TopUp method ids). */
 export const CAD_COLLECT_RAIL_COST_RANK: Record<string, number> = {
-  interac: 10,
-  fincra: 12,
-  wise: 20,
-  bambora: 25,
-  nomba: 40,
+  nomba: 1,
+  nomba_eft: 2,
+  interac: 20,
+  fincra: 22,
+  wise: 25,
+  bambora: 28,
   dodo: 50,
   paypal: 55,
   paytota: 60,
@@ -50,10 +48,10 @@ export const CAD_COLLECT_UNSAFE_RAILS = [
 
 /** Top-up method ids that are live CAD collect (when the feature flag is on). */
 export const CAD_COLLECT_METHOD_IDS = [
+  "nomba",
+  "nomba_eft",
   "interac",
   "plaid",
-  "nomba_eft",
-  "nomba",
   "nuvei_eft",
 ] as const;
 
@@ -74,7 +72,7 @@ export function isCadUnsafeCollectRail(railId: string): boolean {
   return (CAD_COLLECT_UNSAFE_RAILS as readonly string[]).includes(railId.trim().toLowerCase());
 }
 
-/** Least-cost among available CAD collect rails. Unknown rails keep relative order at the end. */
+/** Instant-settlement first among available CAD collect rails. Unknown rails keep relative order at the end. */
 export function orderCadCollectRails(rails: string[]): string[] {
   const seen = new Set<string>();
   const known: string[] = [];
@@ -110,8 +108,9 @@ export type CadSendFunding = "wallet" | "card" | "bank" | "interac" | "wise";
  * Checkout rail for CAD Send pay-in.
  *
  * Linked bank / Plaid stays on EFT. Fincra Autodeposit is only when they
- * picked Interac. Plaid Auth does not pull CAD — the customer still pushes
- * EFT (or optional Interac) to Loop after the bank is linked.
+ * picked Interac. Nomba hosted checkout (card + e-Transfer) is the Card row.
+ * Plaid Auth does not pull CAD — the customer still pushes EFT (or optional
+ * Interac) to Loop after the bank is linked.
  */
 export function cadSendPayInCheckout(
   funding: CadSendFunding,

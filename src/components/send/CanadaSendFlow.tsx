@@ -879,10 +879,19 @@ const CanadaSendFlow = () => {
       icon: Wallet,
       tone: "wallet",
     },
+    ...(productFeatures.nombaNigeria
+      ? [{
+          id: "card" as const,
+          label: "Card or Interac e-Transfer",
+          sublabel: "Instant · Visa, Mastercard, or e-Transfer",
+          icon: CreditCard,
+          tone: "card" as const,
+        }]
+      : []),
     {
       id: "interac",
-      label: "Interac",
-      sublabel: "e-Transfer · Auto-deposit",
+      label: "Interac Autodeposit",
+      sublabel: "Send from your bank · credits after match",
       icon: Banknote,
       tone: "bank",
     },
@@ -893,9 +902,6 @@ const CanadaSendFlow = () => {
       icon: Landmark,
       tone: "bank",
     },
-    ...(productFeatures.nombaNigeria
-      ? [{ id: "card" as const, label: "Card", sublabel: "Debit or Credit · Visa/Mastercard", icon: CreditCard, tone: "card" as const }]
-      : []),
   ];
 
   const totalFee = deliveryFee + cardFee;
@@ -960,12 +966,12 @@ const CanadaSendFlow = () => {
               total={totalCharged}
               currency="CAD"
               symbol="C$"
-              cardTitle="Debit or Credit"
+              cardTitle="Card or Interac e-Transfer"
               cardProviderReady={productFeatures.nombaNigeria}
-              cardChargeNote="Visa, Mastercard, or debit on a secure checkout. We credit your CAD wallet, then pay the recipient."
+              cardChargeNote="Visa, Mastercard, or Interac e-Transfer on a secure checkout. We credit your CAD wallet instantly, then pay the recipient."
               cardMinNote="Minimum card collect is C$2.00."
-              interacTitle="Interac e-Transfer"
-              interacDescription={`Confirm to open Interac Auto-deposit for C$${totalCharged.toFixed(2)}. Send CAD with your payment code. The deposit is matched, then we pay ${recipientName || "your recipient"}.`}
+              interacTitle="Interac Autodeposit"
+              interacDescription={`Confirm to open Autodeposit for C$${totalCharged.toFixed(2)}. Send CAD with your payment code. The deposit is matched, then we pay ${recipientName || "your recipient"}.`}
               insufficientBalance={insufficient}
               onTopUp={() => navigate("/wallet/topup")}
             />
@@ -1142,7 +1148,7 @@ const CanadaSendFlow = () => {
           email: user.email,
           corridor: "international",
           return_url: returnUrl,
-          payment_methods: ["card"],
+          payment_methods: ["card", "eft"],
         });
         if (!collection.payment_link) throw new Error("Checkout link was empty");
         saveCanadaCardSend({
@@ -1491,7 +1497,7 @@ const CanadaSendFlow = () => {
               <div className="p-3 rounded-xl border border-amber-500/30 bg-amber-500/5 flex items-start gap-2">
                 <AlertCircle className="w-4 h-4 mt-0.5 text-amber-600 shrink-0" />
                 <p className="text-sm text-muted-foreground">
-                  No CAD wallet yet — pay by Nomba card, Interac, or a linked bank, or{" "}
+                  No CAD wallet yet — pay by card, Interac e-Transfer, or a linked bank, or{" "}
                   <button type="button" className="text-primary underline" onClick={handleQuickAddWallet}>
                     add a CAD wallet
                   </button>
@@ -1786,8 +1792,8 @@ const CanadaSendFlow = () => {
               <ReviewRow
                 label="You pay with"
                 value={
-                  funding === "card" ? "Debit or Credit · Visa/Mastercard"
-                    : funding === "interac" ? "Interac e-Transfer · Auto-deposit"
+                  funding === "card" ? "Card or Interac e-Transfer · Instant"
+                    : funding === "interac" ? "Interac Autodeposit"
                     : funding === "bank" ? "Bank EFT · Nuvei coming soon"
                     : funding === "wise" ? "Wise"
                     : "CAD wallet"

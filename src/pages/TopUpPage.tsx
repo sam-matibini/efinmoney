@@ -880,7 +880,7 @@ const TopUpPage = () => {
       if (id === "flw_momo" && ccyUpper === "CAD") return false;
       if (id === "bank_va" && (ccyUpper === "NGN" || ccyUpper === "GHS") && productFeatures.flutterwave) return true;
       if (id === "bank_checkout" && (supportsFincraBankCheckout(ccyUpper) || ccyUpper === "GHS")) return true;
-      // CAD pay-in: Interac (Fincra), Bank (Nuvei coming soon), Nomba card.
+      // CAD pay-in: Nomba (card + Interac e-Transfer, instant), Fincra Autodeposit, Bank (Nuvei coming soon).
       if (ccyUpper === "CAD" && (CAD_COLLECT_METHOD_IDS as readonly string[]).includes(id)) {
         return true;
       }
@@ -946,7 +946,7 @@ const TopUpPage = () => {
       westernCardRail === "paypal"
       || (!productFeatures.square && productFeatures.paypal && rails.has("paypal"));
 
-    // Nomba Card first for NGN. CAD Nomba card + EFT are listed below and sorted by cost.
+    // Nomba Card first for NGN. CAD Nomba (card + e-Transfer) is listed below and ranked first for instant settlement.
     if (forceNombaCard) {
       payMethods.push({
         id: "nomba",
@@ -1124,10 +1124,10 @@ const TopUpPage = () => {
       payMethods.push({
         id: "nomba",
         tone: "card",
-        label: ccyUpper === "CAD" ? "Card" : "Card",
+        label: ccyUpper === "CAD" ? "Card or Interac e-Transfer" : "Card",
         description:
           ccyUpper === "CAD"
-            ? "Debit/Credit Card — Visa/Mastercard"
+            ? "Instant · Visa, Mastercard, or e-Transfer"
             : "Card or bank transfer",
         content: (
           <SectionBoundary name="NombaTopUp">
@@ -1136,35 +1136,12 @@ const TopUpPage = () => {
               walletCurrency={currency}
               initialAmount={amount}
               embedded
-              collectRails={ccyUpper === "CAD" ? ["card"] : ["card", "eft"]}
+              collectRails={["card", "eft"]}
               onComplete={invalidateWallets}
             />
           </SectionBoundary>
         ),
       });
-      if (ccyUpper === "CAD") {
-        payMethods.push({
-          id: "nomba_eft",
-          tone: "bank",
-          label: "Bank",
-          description: "Nuvei EFT coming soon",
-          content: (
-            <SectionBoundary name="NombaEftTopUp">
-              <div className="space-y-3">
-                <NuveiEftComingSoon />
-                <NombaTopUpCard
-                  walletId={walletId}
-                  walletCurrency={currency}
-                  initialAmount={amount}
-                  embedded
-                  collectRails={["eft"]}
-                  onComplete={invalidateWallets}
-                />
-              </div>
-            </SectionBoundary>
-          ),
-        });
-      }
     }
 
     if (showRail("lenhub") && false && rails.has("lenhub")) {
@@ -1206,7 +1183,7 @@ const TopUpPage = () => {
       });
     }
 
-    if (isCadWallet && productFeatures.nuvei && !payMethods.some((m) => m.id === "nomba_eft" || m.id === "plaid")) {
+    if (isCadWallet && !payMethods.some((m) => m.id === "nuvei_eft" || m.id === "plaid" || m.id === "nomba_eft")) {
       payMethods.push({
         id: "nuvei_eft",
         tone: "bank",
@@ -1228,10 +1205,10 @@ const TopUpPage = () => {
       payMethods.push({
         id: "interac",
         tone: "bank",
-        label: "Interac e-Transfer",
+        label: "Interac Autodeposit",
         description: productFeatures.fincraInterac
-          ? "Auto-deposit"
-          : "Use bank account to make instant payments",
+          ? "Send from your bank · credits after the deposit matches"
+          : "Use bank account to make payments",
         content: (
           <SectionBoundary name="CadInteracTopUp">
             {useFincraCad || !(Number.isFinite(interacAmount) && interacAmount >= 1) ? (

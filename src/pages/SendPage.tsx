@@ -1401,7 +1401,7 @@ const SendPage = () => {
             email: user.email,
             corridor: sourceCurrency === "NGN" ? "nigeria" : "international",
             return_url: returnUrl,
-            payment_methods: sourceCurrency === "CAD" ? ["card"] : sourceCurrency === "NGN" ? ["card", "eft"] : ["card"],
+            payment_methods: sourceCurrency === "CAD" ? ["card", "eft"] : sourceCurrency === "NGN" ? ["card", "eft"] : ["card"],
           });
           if (!collection.payment_link) {
             throw new Error("Checkout link was empty — try again or use wallet balance.");
@@ -2422,8 +2422,26 @@ const SendPage = () => {
   }, [fundingSource]);
 
   const fundingMethodOptions: PaymentMethodOption<FundingSource>[] = [
+    { id: "wallet" as const, label: "Wallet", sublabel: "eFinMoney balance", icon: Wallet, tone: "wallet" as const },
     ...(cardFundingAvailable
-      ? [{ id: "card" as const, label: "Card", sublabel: "Debit or Credit · Visa/Mastercard", icon: CreditCard, tone: "card" as const }]
+      ? [{
+          id: "card" as const,
+          label: sourceCurrency === "CAD" ? "Card or Interac e-Transfer" : "Card",
+          sublabel: sourceCurrency === "CAD"
+            ? "Instant · Visa, Mastercard, or e-Transfer"
+            : "Debit or Credit · Visa/Mastercard",
+          icon: CreditCard,
+          tone: "card" as const,
+        }]
+      : []),
+    ...(interacFundingAvailable
+      ? [{
+          id: "interac" as const,
+          label: "Interac Autodeposit",
+          sublabel: "Send from your bank · credits after match",
+          icon: Banknote,
+          tone: "bank" as const,
+        }]
       : []),
     {
       id: "bank" as const,
@@ -2434,16 +2452,6 @@ const SendPage = () => {
       icon: Landmark,
       tone: "bank" as const,
     },
-    ...(interacFundingAvailable
-      ? [{
-          id: "interac" as const,
-          label: "Interac",
-          sublabel: "e-Transfer · Auto-deposit",
-          icon: Banknote,
-          tone: "bank" as const,
-        }]
-      : []),
-    { id: "wallet" as const, label: "Wallet", sublabel: "eFinMoney balance", icon: Wallet, tone: "wallet" as const },
   ];
 
   const fundingOptions = ([
@@ -3309,12 +3317,16 @@ const SendPage = () => {
                                         currency={sourceCurrency}
                                         symbol={sourceSymbol}
                                         cardProviderReady={!!cardSendProvider}
-                                        cardTitle={productFeatures.nombaNigeria ? "Debit or Credit" : undefined}
-                                        cardChargeNote={productFeatures.nombaNigeria ? "Visa, Mastercard, Amex or Verve on a secure checkout." : null}
-                                        interacTitle="Interac e-Transfer"
+                                        cardTitle={sourceCurrency === "CAD"
+                                          ? "Card or Interac e-Transfer"
+                                          : productFeatures.nombaNigeria ? "Debit or Credit" : undefined}
+                                        cardChargeNote={sourceCurrency === "CAD"
+                                          ? "Visa, Mastercard, or Interac e-Transfer on a secure checkout. Your CAD wallet credits instantly, then we pay the recipient."
+                                          : productFeatures.nombaNigeria ? "Visa, Mastercard, Amex or Verve on a secure checkout." : null}
+                                        interacTitle="Interac Autodeposit"
                                         interacDescription={
                                           productFeatures.fincraInterac
-                                            ? `Confirm to open Interac Auto-deposit for ${sourceSymbol}${totalCharge.toFixed(2)}. Send CAD with your payment code.`
+                                            ? `Confirm to open Autodeposit for ${sourceSymbol}${totalCharge.toFixed(2)}. Send CAD with your payment code. The deposit is matched, then we pay the recipient.`
                                             : undefined
                                         }
                                         cardMinNote={
@@ -3451,7 +3463,7 @@ const SendPage = () => {
                                             ) : (
                                               <span className="inline-flex items-center gap-2">
                                                 {fundingSource === "card" ? <CreditCard className="w-4 h-4" /> : fundingSource === "interac" ? <Banknote className="w-4 h-4" /> : fundingSource === "bank" ? <Landmark className="w-4 h-4" /> : fundingSource === "wise" ? <Wallet className="w-4 h-4" /> : <Shield className="w-4 h-4" />}
-                                                {useLink ? "Send secure link" : fundingSource === "card" ? "Pay with card" : fundingSource === "interac" ? "Pay with Interac" : fundingSource === "bank" ? "Pay from bank" : fundingSource === "wise" ? "Pay with Wise" : "Confirm Transfer"}
+                                                {useLink ? "Send secure link" : fundingSource === "card" ? (sourceCurrency === "CAD" ? "Pay with card or e-Transfer" : "Pay with card") : fundingSource === "interac" ? "Pay with Autodeposit" : fundingSource === "bank" ? "Pay from bank" : fundingSource === "wise" ? "Pay with Wise" : "Confirm Transfer"}
                                               </span>
                                             )}
                                           </Button>
@@ -3506,9 +3518,9 @@ const SendPage = () => {
                                         <span className="text-muted-foreground">Funding</span>
                                         <span className="font-medium capitalize">
                                           {fundingSource === "interac"
-                                            ? "Interac"
+                                            ? "Interac Autodeposit"
                                             : fundingSource === "card"
-                                              ? "Card"
+                                              ? (sourceCurrency === "CAD" ? "Card or Interac e-Transfer" : "Card")
                                               : fundingSource === "wise"
                                                 ? "Wise"
                                                 : fundingSource}

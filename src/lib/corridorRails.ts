@@ -169,7 +169,7 @@ export function collectMethodForPartner(partner: string): string | null {
 
 /** Code default when no collect policy is saved. */
 export const DEFAULT_COLLECT_PARTNER: Record<string, string> = {
-  CAD: "interac",
+  CAD: "nomba",
   USD: "square",
   EUR: "square",
   GBP: "square",
@@ -223,7 +223,7 @@ export function collectPayMethodIds(partnerOrMethod: string, currency?: string):
   const raw = partnerOrMethod.trim().toLowerCase();
   const method = collectMethodForPartner(raw) || raw;
   const ccy = (currency || "").toUpperCase();
-  if (method === "nomba" && ccy === "CAD") return ["nomba", "nomba_eft"];
+  if (method === "nomba" && ccy === "CAD") return ["nomba"];
   if (method === "square" || method === "paypal") return ["square"];
   if (method === "interac") return ["interac"];
   if (method === "plaid") return ["plaid"];
