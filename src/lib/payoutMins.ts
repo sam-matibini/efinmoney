@@ -5,7 +5,8 @@ export const PAYOUT_MIN_BY_CURRENCY: Record<string, number> = {
   KES: 150,
   GHS: 10,
   USD: 1,
-  UGX: 500,
+  // Nomba Global Payout Uganda floor is UGX 5,500 (instant MoMo).
+  UGX: 5500,
   TZS: 1000,
   ZMW: 5,
   RWF: 500,

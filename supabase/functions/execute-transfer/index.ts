@@ -505,6 +505,11 @@ Deno.serve(async (req) => {
       recipientCountry === "KE" ||
       recipientCountry === "KENYA" ||
       (recipientCountryHint ?? "").trim().toUpperCase() === "KENYA";
+    const isUganda =
+      targetCurrency === "UGX" ||
+      recipientCountry === "UG" ||
+      recipientCountry === "UGANDA" ||
+      (recipientCountryHint ?? "").trim().toUpperCase() === "UGANDA";
     const isMobileMoneyMethod = isMobileMoneyPayoutMethod(transfer.payout_method);
     const usePawapay =
       (payload.use_pawapay === true || transfer.use_pawapay === true) &&
@@ -547,8 +552,8 @@ Deno.serve(async (req) => {
       !!transfer.recipient_bank_code;
 
     // Zambia MoMo stays Fincra-only (Nomba does not support ZMW).
-    // Kenya and Uganda (and every other Nomba+Fincra corridor) use availability
-    // + least-cost between Nomba and Fincra — not an exclusive rail.
+    // Uganda: Nomba first, Fincra failover (do not least-cost reorder).
+    // Other Nomba+Fincra corridors use availability + least-cost ranking.
     const fincraCapable =
       !isCanada
       && transfer.payout_method !== "card_push"
@@ -560,7 +565,7 @@ Deno.serve(async (req) => {
     // Zambia MoMo is Fincra-exclusive: Nomba has no ZMW corridor.
     const zambiaMomo = isMobileMoneyMethod && (isZambia || targetCurrency === "ZMW");
     const fincraExclusiveCorridor = zambiaMomo;
-    // Kenya is Nomba+Fincra with least-cost ranking (no exclusive rail).
+    // Uganda keeps policy order (Nomba → Fincra); Kenya uses least-cost.
 
 
 
@@ -602,7 +607,8 @@ Deno.serve(async (req) => {
       amount: Number(transfer.source_amount) || 0,
     };
 
-    if (!isCanada && policyRails.length > 1) {
+    // Uganda: keep Nomba preferred / Fincra failover — do not reorder by cost.
+    if (!isCanada && !isUganda && policyRails.length > 1) {
       try {
         const ranked = await resolveRoute(supabase, routeRequest);
         if (ranked.candidates.length) {
@@ -612,6 +618,8 @@ Deno.serve(async (req) => {
       } catch (e) {
         console.error("least-cost rail ranking failed, using policy order", e);
       }
+    } else if (isUganda && policyRails.length) {
+      console.log("uganda payout rails (Nomba-first)", policyRails);
     }
 
     let engineRouted = false;

@@ -56,7 +56,7 @@ export const MIN_AMOUNTS: Record<string, number> = {
   KES: 10,
   GHS: 1,
   USD: 1,
-  UGX: 500,
+  UGX: 5500,
   TZS: 1000,
   ZMW: 5,
   RWF: 500,

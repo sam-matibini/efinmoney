@@ -793,7 +793,8 @@ const CanadaSendFlow = () => {
     const b = beneficiaries.find((x) => x.id === bid);
     if (b && isCanadaBeneficiary(b)) {
       applyCanadaBeneficiary(b);
-      setStep(2);
+      // Stay on Amount (step 1) so the send amount is entered before recipient details.
+      // Deep-linking used to jump to step 2 with C$0.00 and no amount field.
       const next = new URLSearchParams(searchParams);
       next.delete("beneficiaryId");
       setSearchParams(next, { replace: true });
@@ -1023,7 +1024,7 @@ const CanadaSendFlow = () => {
     ? true
     : productFeatures.nombaNigeria || (cardNumComplete && cardExpComplete && cardCvcComplete);
 
-  const isStep2Valid = recipientValid;
+  const isStep2Valid = recipientValid && parsedAmount > 0;
 
   const isStep3Valid = method === "paylink"
     ? !!selectedWallet && !insufficient
@@ -1506,6 +1507,41 @@ const CanadaSendFlow = () => {
               </div>
             )}
 
+            {method !== "stripe_connect" && method !== "paylink" && (
+              <div className="space-y-3 p-4 rounded-xl border border-primary/20 bg-primary/[0.03]">
+                <ContactQuickField
+                  label="Sending to"
+                  filterCanada
+                  placeholder="Select contact"
+                  valueLabel={pickedBeneficiaryId ? recipientName : null}
+                  onSelect={applyCanadaBeneficiary}
+                  onClear={pickedBeneficiaryId ? clearSelectedContact : undefined}
+                />
+                {recipientName ? (
+                  <div className="rounded-lg border border-border/70 bg-background/80 px-3 py-2.5 text-sm space-y-1">
+                    <p className="font-medium">{recipientName}</p>
+                    {recipientEmail && (
+                      <p className="text-muted-foreground text-xs">Interac · {recipientEmail}</p>
+                    )}
+                    {!recipientEmail && recipientPhone && (
+                      <p className="text-muted-foreground text-xs">Interac · {recipientPhone}</p>
+                    )}
+                    <button
+                      type="button"
+                      className="text-xs text-primary underline"
+                      onClick={() => setStep(2)}
+                    >
+                      Edit recipient details
+                    </button>
+                  </div>
+                ) : (
+                  <p className="text-xs text-muted-foreground">
+                    Pick a contact now, or continue — name and Interac details are on the next step.
+                  </p>
+                )}
+              </div>
+            )}
+
             <div className="space-y-2">
               <Label>Amount</Label>
               <div className="relative">
@@ -1596,10 +1632,37 @@ const CanadaSendFlow = () => {
           <CardHeader className="pb-4 border-b border-border/60 bg-muted/20">
             <CardTitle className="text-xl font-display">Who are you sending to?</CardTitle>
             <p className="text-sm text-muted-foreground mt-1">
-              C${parsedAmount.toFixed(2)} via {methodLabel.toLowerCase()}
+              {parsedAmount > 0
+                ? `C$${parsedAmount.toFixed(2)} via ${methodLabel.toLowerCase()}`
+                : `Enter an amount · ${methodLabel}`}
             </p>
           </CardHeader>
           <CardContent className="space-y-6 pt-6">
+            <div className="space-y-2">
+              <Label>Amount</Label>
+              <div className="relative">
+                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xl font-medium text-muted-foreground">C$</span>
+                <Input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  placeholder="0.00"
+                  value={amount}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    if (v === "" || parseFloat(v) >= 0) setAmount(v);
+                  }}
+                  className="pl-14 text-3xl font-display font-bold h-14 tracking-tight"
+                />
+              </div>
+              {selectedWallet && (
+                <p className="text-xs text-muted-foreground">
+                  Wallet balance: C${Number(selectedWallet.balance).toFixed(2)}
+                  {parsedAmount <= 0 && " · enter how much to send"}
+                </p>
+              )}
+            </div>
+
             {method !== "stripe_connect" && method !== "paylink" && (
               <div className="space-y-3 p-4 rounded-xl border border-primary/20 bg-primary/[0.03]">
                 <ContactQuickField
