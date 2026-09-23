@@ -42,11 +42,13 @@ assert("Fincra pays CAD Interac", fincraPayoutSupported("CAD", "CA"));
 const ugRails = defaultPayoutRails({ currency: "UGX", country: "UG", method: "mtn_mobile" });
 assert("UGX rails include Nomba", ugRails.includes("nomba"));
 assert("UGX rails include Fincra", ugRails.includes("fincra"));
-assert("UGX rails put Nomba first", ugRails[0] === "nomba");
-assert("UGX Airtel also Nomba-first", defaultPayoutRails({ currency: "UGX", country: "UG", method: "airtel_money" })[0] === "nomba");
+assert("UGX rails put Fincra first", ugRails[0] === "fincra");
+assert("UGX Airtel also Fincra-first", defaultPayoutRails({ currency: "UGX", country: "UG", method: "airtel_money" })[0] === "fincra");
+assert("UGX rails include Flutterwave", ugRails.includes("flutterwave"));
 
 const cad = sanitizeCanadaPayoutRails(["nomba", "fincra", "flutterwave"]);
 assert("CAD sanitize keeps Nomba and Fincra", cad.includes("nomba") && cad.includes("fincra"));
+assert("CAD sanitize puts Fincra first", cad[0] === "fincra");
 assert("CAD sanitize drops Flutterwave", !cad.includes("flutterwave"));
 
 const cheapFincra = orderRailsByLeastCost(

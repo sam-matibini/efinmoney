@@ -29,6 +29,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import NotificationsPanel from "@/components/header/NotificationsPanel";
+import PendingTransfersButton from "@/components/header/PendingTransfersButton";
 import SupportLink from "@/components/header/SupportLink";
 import QuickActionsPopover from "@/components/layout/QuickActionsPopover";
 import SearchModal from "@/components/header/SearchModal";
@@ -288,6 +289,7 @@ const Header = () => {
 
             <ThemeToggle />
             <SupportLink />
+            <PendingTransfersButton />
             <NotificationsPanel />
             <div className="hidden xl:block">
               <QuickActionsPopover />

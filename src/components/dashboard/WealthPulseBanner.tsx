@@ -1,9 +1,10 @@
-import { memo } from "react";
+import { memo, useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { Globe2, ArrowUpRight, CheckCircle2, Loader2 } from "lucide-react";
 import { useDashboardStats } from "@/hooks/useDashboardStats";
 import CorridorGlobe from "@/components/dashboard/CorridorGlobe";
+import PendingTransfersDialog from "@/components/dashboard/PendingTransfersDialog";
 
 const fmtUsd = (n: number) =>
   n >= 1000
@@ -18,58 +19,68 @@ const WealthPulseBannerInner = () => {
     recentCountries,
     inFlightCount,
     inFlightUsd,
+    transfers,
   } = useDashboardStats();
   const navigate = useNavigate();
+  const [pendingOpen, setPendingOpen] = useState(false);
 
   return (
-    <motion.section
-      initial={reduceMotion ? false : { opacity: 0, y: -10 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.4, ease: [0.23, 1, 0.32, 1] }}
-      className="relative mb-8 overflow-hidden rounded-2xl border border-border bg-card shadow-sm"
-    >
-      <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-primary/[0.04] via-transparent to-[hsl(var(--accent-amber)/0.04)]" />
+    <>
+      <motion.section
+        initial={reduceMotion ? false : { opacity: 0, y: -10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4, ease: [0.23, 1, 0.32, 1] }}
+        className="relative mb-8 overflow-hidden rounded-2xl border border-border bg-card shadow-sm"
+      >
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-primary/[0.04] via-transparent to-[hsl(var(--accent-amber)/0.04)]" />
 
-      <div className="relative grid items-center gap-4 p-5 sm:p-7 md:grid-cols-[1.15fr_minmax(220px,0.85fr)]">
-        <div>
-          <p className="text-sm font-medium text-muted-foreground">Money in motion</p>
+        <div className="relative grid items-center gap-4 p-5 sm:p-7 md:grid-cols-[1.15fr_minmax(220px,0.85fr)]">
+          <div>
+            <p className="text-sm font-medium text-muted-foreground">Money in motion</p>
 
-          <div className="mt-4">
-            <p className="text-xs text-muted-foreground">Sent this month</p>
-            <p className="font-display text-4xl font-bold tracking-tight text-foreground sm:text-5xl">
-              {fmtUsd(sentMonthUsd)}
-            </p>
+            <div className="mt-4">
+              <p className="text-xs text-muted-foreground">Sent this month</p>
+              <p className="font-display text-4xl font-bold tracking-tight text-foreground sm:text-5xl">
+                {fmtUsd(sentMonthUsd)}
+              </p>
+            </div>
+
+            <div className="mt-5 grid max-w-md grid-cols-2 gap-2.5">
+              <KpiChip
+                label="Countries reached"
+                value={String(countryCount)}
+                icon={<Globe2 className="h-3.5 w-3.5" />}
+                flags={recentCountries}
+                onClick={() => navigate("/transfers")}
+              />
+              <KpiChip
+                label={inFlightCount > 0 ? "In transit now" : "All settled"}
+                value={inFlightCount > 0 ? fmtUsd(inFlightUsd) : "Up to date"}
+                icon={
+                  inFlightCount > 0 ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
+                  )
+                }
+                highlight={inFlightCount > 0}
+                onClick={() => setPendingOpen(true)}
+              />
+            </div>
           </div>
 
-          <div className="mt-5 grid max-w-md grid-cols-2 gap-2.5">
-            <KpiChip
-              label="Countries reached"
-              value={String(countryCount)}
-              icon={<Globe2 className="h-3.5 w-3.5" />}
-              flags={recentCountries}
-              onClick={() => navigate("/transfers")}
-            />
-            <KpiChip
-              label={inFlightCount > 0 ? "In transit now" : "All settled"}
-              value={inFlightCount > 0 ? fmtUsd(inFlightUsd) : "Up to date"}
-              icon={
-                inFlightCount > 0 ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                ) : (
-                  <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
-                )
-              }
-              highlight={inFlightCount > 0}
-              onClick={() => navigate("/transfers")}
-            />
+          <div className="flex items-center justify-center md:justify-end">
+            <CorridorGlobe countries={recentCountries} />
           </div>
         </div>
+      </motion.section>
 
-        <div className="flex items-center justify-center md:justify-end">
-          <CorridorGlobe countries={recentCountries} />
-        </div>
-      </div>
-    </motion.section>
+      <PendingTransfersDialog
+        open={pendingOpen}
+        onOpenChange={setPendingOpen}
+        transfers={transfers}
+      />
+    </>
   );
 };
 
@@ -112,10 +123,10 @@ const KpiChip = ({
               <img
                 src={`https://flagcdn.com/w40/${cc}.png`}
                 srcSet={`https://flagcdn.com/w80/${cc}.png 2x`}
-            alt={cc}
-            loading="lazy"
+                alt={cc}
+                loading="lazy"
                 className="h-full w-full rounded-full object-cover"
-          />
+              />
             </span>
           </span>
         ))}

@@ -607,7 +607,7 @@ Deno.serve(async (req) => {
       amount: Number(transfer.source_amount) || 0,
     };
 
-    // Uganda: keep Nomba preferred / Fincra failover — do not reorder by cost.
+    // Uganda: keep Fincra preferred (Nomba has no UGX FX pair from trade region NG).
     if (!isCanada && !isUganda && policyRails.length > 1) {
       try {
         const ranked = await resolveRoute(supabase, routeRequest);
@@ -619,7 +619,14 @@ Deno.serve(async (req) => {
         console.error("least-cost rail ranking failed, using policy order", e);
       }
     } else if (isUganda && policyRails.length) {
-      console.log("uganda payout rails (Nomba-first)", policyRails);
+      // Force Fincra ahead of Nomba even if an old policy still prefers Nomba.
+      const ugOrdered = ["fincra", "flutterwave", "paytota", "flovide", "nomba"];
+      const kept = policyRails.map((r) => r.toLowerCase());
+      policyRails = [
+        ...ugOrdered.filter((r) => kept.includes(r)),
+        ...kept.filter((r) => !ugOrdered.includes(r)),
+      ];
+      console.log("uganda payout rails (Fincra-first)", policyRails);
     }
 
     let engineRouted = false;
@@ -882,6 +889,13 @@ Deno.serve(async (req) => {
             payoutResult = { ...r, rail: r?.rail || rail, priority_chain: canadaAttempts };
           } else {
             if (r?.error_class === "hard") canadaHardDecline = true;
+            // Fee / corridor-down from Fincra must never block Nomba failover.
+            if (
+              rail === "fincra"
+              && /disbursement fee|unable to calculate|failed to calculate/i.test(String(r?.error || ""))
+            ) {
+              canadaHardDecline = false;
+            }
             const err = String(r?.error || r?.provider_message || `${rail} payout failed`);
             railErrors.push(`${rail}: ${err}`);
             payoutResult = {
@@ -894,23 +908,14 @@ Deno.serve(async (req) => {
           }
         };
 
-        // Nomba + Fincra Interac/EFT by availability and least cost.
-        // Never Flutterwave, Flovide, Paysafe, or Kenya M-Pesa.
-        let canadaRails = availableCanadaCadPayoutRails({
+        // Fincra Interac/EFT first (CAD wallet float), Nomba failover.
+        // Never Flutterwave, Flovide, Paysafe, or Kenya M-Pesa. Do not least-cost reorder.
+        const canadaRails = availableCanadaCadPayoutRails({
           nombaConfigured: nombaApiConfigured(),
           fincraConfigured,
           policyRails: resolvedPolicyRails,
         });
-        if (canadaRails.length > 1) {
-          try {
-            const ranked = await resolveRoute(supabase, routeRequest);
-            if (ranked.candidates.length) {
-              canadaRails = orderRailsByLeastCost(canadaRails, ranked.candidates);
-            }
-          } catch (e) {
-            console.error("Canada least-cost ranking failed, using Nomba then Fincra", e);
-          }
-        }
+        console.log("canada payout rails (Fincra-first)", canadaRails);
         for (const rail of canadaRails) {
           if (rail === "nomba") {
             await tryCanadaRail("nomba", async () => {

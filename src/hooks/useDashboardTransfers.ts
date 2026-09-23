@@ -5,15 +5,18 @@ import { useAuth } from "./useAuth";
 export const DASHBOARD_TRANSFER_LIMIT = 200;
 
 export const DASHBOARD_TRANSFER_SELECT =
-  "id, created_at, source_amount, source_currency, recipient_country, status";
+  "id, created_at, source_amount, source_currency, target_currency, recipient_name, recipient_country, status, failure_reason";
 
 export interface DashboardTransfer {
   id: string;
   created_at: string;
   source_amount: number;
   source_currency: string;
+  target_currency?: string;
+  recipient_name?: string;
   recipient_country: string;
   status: string;
+  failure_reason?: string | null;
 }
 
 export const dashboardTransfersQueryKey = (userId: string) =>

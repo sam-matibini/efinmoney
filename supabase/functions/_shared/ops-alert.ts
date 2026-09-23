@@ -78,6 +78,12 @@ export function explainPayoutError(raw: string): { plain: string; tip: string } 
       tip: "Top up that provider’s wallet, then retry from the ops queue — or use another provider.",
     };
   }
+  if (lower.includes("disbursement fee") || lower.includes("calculate") && lower.includes("fee")) {
+    return {
+      plain: "Fincra could not price a CAD Interac payout fee on this merchant account (CAD Interac payout may not be fully enabled).",
+      tip: "Ask Fincra to enable CAD Interac disbursement fees, then retry — or retry with Nomba from the ops queue.",
+    };
+  }
   if (lower.includes("timeout") || lower.includes("timed out") || lower.includes("network")) {
     return {
       plain: "The payment company did not respond in time (timeout / network).",

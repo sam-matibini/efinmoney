@@ -25,6 +25,7 @@ export const headerIconVariants = {
   search: "bg-sky-500/12 text-sky-600 hover:bg-sky-500/22 dark:text-sky-400",
   theme: "bg-indigo-500/12 text-indigo-600 hover:bg-indigo-500/22 dark:text-indigo-400",
   notifications: "bg-amber-500/12 text-amber-600 hover:bg-amber-500/22 dark:text-amber-400",
+  pending: "bg-emerald-500/12 text-emerald-700 hover:bg-emerald-500/22 dark:text-emerald-400",
   quickActions: "bg-violet-500/12 text-violet-600 hover:bg-violet-500/22 dark:text-violet-400",
 } as const;
 

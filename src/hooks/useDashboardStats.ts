@@ -4,7 +4,7 @@ import { useFxRates } from "@/hooks/useFxRates";
 import { buildUsdRateMap, convertToUsd } from "@/lib/fx";
 import { normalizeCountryCode } from "@/lib/flags";
 
-const PENDING = ["initiated", "funded", "processing"];
+const PENDING = ["initiated", "funded", "processing", "pending_liquidity", "pending_ops"];
 
 export const useDashboardStats = () => {
   const { data: transfers, isLoading } = useDashboardTransfers();

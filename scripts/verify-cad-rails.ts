@@ -59,9 +59,9 @@ assert(
 );
 
 const cadRails = defaultPayoutRails({ currency: "CAD", country: "CA", method: "interac" });
-assert("CAD default rails start with nomba", cadRails[0] === "nomba");
-assert("CAD default rails include Fincra", cadRails.includes("fincra"));
-assert("CAD default rails are Nomba then Fincra", cadRails.join(",") === "nomba,fincra");
+assert("CAD default rails start with Fincra", cadRails[0] === "fincra");
+assert("CAD default rails include Nomba", cadRails.includes("nomba"));
+assert("CAD default rails are Fincra then Nomba", cadRails.join(",") === "fincra,nomba");
 assert("CAD default rails exclude flutterwave", !cadRails.includes("flutterwave"));
 assert("CAD default rails exclude flovide", !cadRails.includes("flovide"));
 assert("CAD default rails exclude paysafe", !cadRails.includes("paysafe"));
@@ -76,6 +76,7 @@ const cleaned = sanitizeCanadaPayoutRails(["flutterwave", "fincra", "nomba", "fl
 assert("sanitize drops flutterwave", !cleaned.includes("flutterwave"));
 assert("sanitize keeps Fincra payout", cleaned.includes("fincra"));
 assert("sanitize keeps nomba", cleaned.includes("nomba"));
+assert("sanitize puts Fincra first", cleaned[0] === "fincra");
 assert("sanitize drops flovide", !cleaned.includes("flovide"));
 assert("sanitize drops paysafe", !cleaned.includes("paysafe"));
 assert("sanitize drops Wise", !cleaned.includes("wise"));
@@ -151,12 +152,12 @@ assert(
   availableCanadaCadPayoutRails({ nombaConfigured: true, fincraConfigured: false }).join(",") === "nomba",
 );
 assert(
-  "CAD available rails drop Flutterwave even if listed",
+  "CAD available rails drop Flutterwave and put Fincra first",
   availableCanadaCadPayoutRails({
     nombaConfigured: true,
     fincraConfigured: true,
     policyRails: ["flutterwave", "nomba", "fincra"],
-  }).join(",") === "nomba,fincra",
+  }).join(",") === "fincra,nomba",
 );
 assert(
   "CAD available empty when neither rail is live",

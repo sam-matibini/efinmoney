@@ -157,8 +157,8 @@ export const AFRICA_MOMO_PAYOUT_RAILS = new Set([
   "lenhub",
 ]);
 
-/** Canada CAD payout: Nomba + Fincra Interac/EFT, ranked by least cost at send time. */
-export const CANADA_CAD_PAYOUT_RAILS = ["nomba", "fincra"];
+/** Canada CAD payout: Fincra Interac/EFT first (CAD float / Autodeposit), Nomba failover. */
+export const CANADA_CAD_PAYOUT_RAILS = ["fincra", "nomba"];
 
 /** Partners that must never pay CAD (Africa MoMo, retired CA rails). Fincra CAD Interac/EFT is allowed. */
 const CANADA_BLOCKED_PAYOUT_RAILS = new Set([
@@ -249,20 +249,16 @@ export function resolvePayoutNetwork(
   return CURRENCY_DEFAULT_NETWORK[ccy] || "";
 }
 
-/** Drop Kenya/Africa MoMo and retired CA partners from a CAD payout rail list. */
+/** Drop Kenya/Africa MoMo and retired CA partners; keep Fincra→Nomba canonical order. */
 export function sanitizeCanadaPayoutRails(rails: string[]): string[] {
-  const kept = rails
-    .map((r) => r.trim().toLowerCase())
-    .filter((r) => r && !CANADA_BLOCKED_PAYOUT_RAILS.has(r) && (r === "nomba" || r === "fincra"));
-  if (!kept.length) return [...CANADA_CAD_PAYOUT_RAILS];
-  const out: string[] = [];
-  for (const r of kept) {
-    if (!out.includes(r)) out.push(r);
-  }
-  for (const r of CANADA_CAD_PAYOUT_RAILS) {
-    if (!out.includes(r)) out.push(r);
-  }
-  return out;
+  const kept = new Set(
+    rails
+      .map((r) => r.trim().toLowerCase())
+      .filter((r) => r && !CANADA_BLOCKED_PAYOUT_RAILS.has(r) && (r === "nomba" || r === "fincra")),
+  );
+  if (!kept.size) return [...CANADA_CAD_PAYOUT_RAILS];
+  const ordered = CANADA_CAD_PAYOUT_RAILS.filter((r) => kept.has(r));
+  return ordered.length ? ordered : [...CANADA_CAD_PAYOUT_RAILS];
 }
 
 /** CAD Interac/EFT rails that are actually configured to send. */
@@ -352,13 +348,17 @@ export function defaultPayoutRails(params: {
   if (ccy === "ZMW" || country === "ZM") return ["fincra"];
 
   const fincraAfrica = ["fincra", "flovide", "flutterwave"];
+  // Uganda: Nomba has no tradable UGX pairs from trade region NG on our account —
+  // prefer Fincra (proven), then Flutterwave / Paytota / Flovide. Nomba last as optional try.
+  const ugandaRails = ["fincra", "flutterwave", "paytota", "flovide", "nomba"];
   const eastAfrica = ["fincra", "flovide", "flutterwave", "paytota"];
 
   switch (kind) {
     case "domestic_ngn":
       return ["nomba", "fincra", "flovide", "flutterwave", "swychr"];
     case "global_momo":
-      if (["UGX", "KES", "RWF", "TZS"].includes(ccy)) return ["nomba", ...eastAfrica];
+      if (ccy === "UGX" || country === "UG") return ugandaRails;
+      if (["KES", "RWF", "TZS"].includes(ccy)) return ["nomba", ...eastAfrica];
       if (["GHS", "XOF", "XAF", "ETB", "CDF"].includes(ccy) || (ccy === "USD" && country === "CD")) {
         return ["nomba", ...fincraAfrica];
       }

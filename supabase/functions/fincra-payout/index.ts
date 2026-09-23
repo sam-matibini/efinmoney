@@ -146,7 +146,7 @@ const FINCRA_MM_CODE: Record<string, string> = {
 };
 
 /** Currencies we will try as Fincra funding wallets (after preferred). */
-const DEFAULT_FUNDING_FALLBACKS = ["NGN", "USD", "GHS", "KES", "ZMW"];
+const DEFAULT_FUNDING_FALLBACKS = ["NGN", "CAD", "USD", "GHS", "KES", "ZMW"];
 
 const DIAL_BY_CURRENCY: Record<string, string> = {
   NGN: "234",
@@ -301,7 +301,12 @@ function isFincraCorridorDownError(message: string): boolean {
   return m.includes("maintenance")
     || m.includes("temporarily unavailable")
     || m.includes("currently unavailable")
-    || m.includes("service unavailable");
+    || m.includes("service unavailable")
+    // CAD Interac: merchant fee schedule missing / not priced — fail over to Nomba.
+    || m.includes("unable to calculate custom disbursement fee")
+    || m.includes("failed to calculate disbursement fee")
+    || m.includes("calculate disbursement fee")
+    || m.includes("disbursement fee");
 }
 
 export type FincraErrorClass = "corridor_down" | "transient" | "hard";
@@ -339,11 +344,11 @@ function fundingCandidates(preferred: string, dest: string): string[] {
     .split(",")
     .map((s) => s.trim().toUpperCase())
     .filter(Boolean);
-  // Zambia is strictly NGN -> USD -> ZMW. Never let env fallbacks pull in a wallet
+  // Zambia: NGN → CAD → USD → ZMW. Never let env fallbacks pull in a wallet
   // (RWF/UGX/…) that Fincra cannot quote from — that produced the
   // "No currency supported to make payout to, from RWF" failures.
   if (dest === "ZMW") {
-    const allowed = ["NGN", "USD", "ZMW"];
+    const allowed = ["NGN", "CAD", "USD", "ZMW"];
     const list = allowed.includes(preferred)
       ? [preferred, ...allowed.filter((c) => c !== preferred)]
       : allowed;
@@ -365,9 +370,9 @@ function fundingCandidates(preferred: string, dest: string): string[] {
     }
     return out.length ? out : ["NGN"];
   }
-  // MoMo corridors: don't wander into random wallets that can't fund the quote.
+  // MoMo corridors: prefer NGN float, then CAD (treasury often sits there), then USD.
   const defaults = ["KES", "GHS"].includes(dest)
-    ? ["NGN", "USD", dest]
+    ? ["NGN", "CAD", "USD", dest]
     : DEFAULT_FUNDING_FALLBACKS;
   const list = [preferred, dest, ...extras, ...defaults];
 
@@ -410,23 +415,26 @@ async function generateDisbursementQuote(opts: {
   /** Amount the beneficiary should receive in destination currency. */
   receiveAmount: number;
   paymentDestination: "mobile_money_wallet" | "bank_account";
+  paymentScheme?: string;
 }): Promise<{ ok: true; quote: QuoteResult } | { ok: false; error: string }> {
   const amountStr = String(opts.receiveAmount);
+  const body: Record<string, unknown> = {
+    sourceCurrency: opts.sourceCurrency,
+    destinationCurrency: opts.destinationCurrency,
+    amount: amountStr,
+    // receive → amount is what beneficiary gets; quote returns NGN (etc.) to charge.
+    action: "receive",
+    transactionType: "disbursement",
+    business: opts.businessId,
+    // Fee from our Fincra float so recipient gets the full destination amount.
+    feeBearer: "business",
+    paymentDestination: opts.paymentDestination,
+    beneficiaryType: "individual",
+  };
+  if (opts.paymentScheme) body.paymentScheme = opts.paymentScheme;
   const { ok, status, json } = await fincraFetch("/quotes/generate", {
     method: "POST",
-    body: JSON.stringify({
-      sourceCurrency: opts.sourceCurrency,
-      destinationCurrency: opts.destinationCurrency,
-      amount: amountStr,
-      // receive → amount is what beneficiary gets; quote returns NGN (etc.) to charge.
-      action: "receive",
-      transactionType: "disbursement",
-      business: opts.businessId,
-      // Fee from our Fincra float so recipient gets the full destination amount.
-      feeBearer: "business",
-      paymentDestination: opts.paymentDestination,
-      beneficiaryType: "individual",
-    }),
+    body: JSON.stringify(body),
   });
 
   if (!ok) {
@@ -493,7 +501,10 @@ function parseCadEftAccount(raw: string): { institution: string; transit: string
   return null;
 }
 
-/** CAD Interac e-Transfer or EFT via Fincra disbursements. Failover-safe (no refund when skip_reversal). */
+/** CAD Interac e-Transfer or EFT via Fincra disbursements. Failover-safe (no refund when skip_reversal).
+ * Docs: https://docs.fincra.com/docs/send-cad-payouts-via-interac-e-transfer
+ * Interac uses beneficiary.interacEmail + paymentScheme "interac"; amount is a JSON number.
+ */
 async function payoutCanadaCadViaFincra(opts: {
   supabase: ReturnType<typeof createClient>;
   transfer: Record<string, unknown>;
@@ -534,7 +545,7 @@ async function payoutCanadaCadViaFincra(opts: {
     }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
   let beneficiary: Record<string, unknown>;
-  let paymentScheme: string | undefined;
+  let paymentScheme: string;
 
   if (isEft) {
     const parsed = parseCadEftAccount(String(opts.transfer.recipient_account || ""));
@@ -565,34 +576,84 @@ async function payoutCanadaCadViaFincra(opts: {
     if (!dest.ok) {
       return jsonFail(dest.error, "hard", true, { code: "missing_interac_contact" });
     }
+    // Fincra CAD Interac payout requires an Autodeposit email (not mobile-only).
+    if (!dest.dest.email) {
+      return jsonFail(
+        "Fincra CAD Interac payout requires the recipient’s Autodeposit email — phone-only goes to Nomba failover",
+        "unavailable",
+        false,
+        { code: "fincra_interac_email_required" },
+      );
+    }
+
+    // Verify Autodeposit before disbursing (docs: POST /core/accounts/resolve or /accounts/resolve).
+    let resolvedName = opts.recipient_name;
+    const resolveBodies = [
+      { currency: "CAD", type: "interac_etransfer", interacEmail: dest.dest.email },
+      { currency: "CAD", type: "interac", interacEmail: dest.dest.email },
+    ];
+    let resolveOk = false;
+    for (const path of ["/core/accounts/resolve", "/accounts/resolve"]) {
+      for (const body of resolveBodies) {
+        try {
+          const resolved = await fincraFetch(path, { method: "POST", body: JSON.stringify(body) });
+          const data = (resolved.json?.data ?? {}) as Record<string, unknown>;
+          if (resolved.ok && data.autoDepositEnabled === false) {
+            return jsonFail(
+              `Recipient ${dest.dest.email} does not have Interac Autodeposit enabled — ask them to enable it, or use Nomba`,
+              "hard",
+              true,
+              { code: "interac_autodeposit_disabled" },
+            );
+          }
+          if (resolved.ok && (data.autoDepositEnabled === true || data.accountName || data.email)) {
+            resolveOk = true;
+            if (data.accountName) resolvedName = String(data.accountName);
+            break;
+          }
+          if (!resolved.ok) {
+            attemptErrors.push(`resolve ${path}: ${String(resolved.json?.message || resolved.json?.error || resolved.status)}`);
+          }
+        } catch (e) {
+          attemptErrors.push(`resolve ${path}: ${e instanceof Error ? e.message : "error"}`);
+        }
+      }
+      if (resolveOk) break;
+    }
+    // Soft-continue if resolve endpoint is unavailable on this merchant — payout may still succeed.
+    if (!resolveOk) {
+      console.warn("fincra CAD Interac resolve skipped/failed", attemptErrors.slice(-3));
+    }
+
+    const nameParts = splitName(resolvedName);
     paymentScheme = "interac";
     beneficiary = {
-      firstName,
-      lastName,
+      firstName: nameParts.firstName,
+      lastName: nameParts.lastName,
       type: "individual",
-      accountHolderName: opts.recipient_name,
+      accountHolderName: resolvedName,
+      interacEmail: dest.dest.email,
       country: "CA",
-      ...(dest.dest.email
-        ? { email: dest.dest.email, accountNumber: dest.dest.email }
-        : {}),
-      ...(dest.dest.phone
-        ? { phone: dest.dest.phone.replace(/\D/g, ""), accountNumber: dest.dest.phone.replace(/\D/g, "") }
-        : {}),
     };
   }
 
-  const schemes = isEft
-    ? ["eft", "EFT", undefined]
-    : ["interac", "INTERAC", "INTERAC_ETRANSFER", undefined];
-  const funding = ["CAD", "NGN", "USD"];
+  const schemes = isEft ? ["eft", "EFT"] : ["interac"];
+  // CAD Interac: prefer same-currency CAD wallet (docs). Only fall back to NGN if CAD float
+  // is short. Never USD — Fincra returns "failed to calculate disbursement fee" on USD→CAD Interac.
+  const funding = ["CAD", "NGN"];
 
   let successJson: Record<string, unknown> | null = null;
   let usedSource = "CAD";
   let usedCustomerReference = opts.transfer_id;
   let usedQuote: QuoteResult | null = null;
+  let cadWalletShort = false;
 
   for (const sourceCurrency of funding) {
     if (successJson) break;
+    // After a real CAD debit failure that isn't "insufficient", stop — don't thrash quotes.
+    if (sourceCurrency !== "CAD" && !cadWalletShort && attemptErrors.some((a) => a.startsWith("CAD scheme="))) {
+      break;
+    }
     const cross = sourceCurrency !== "CAD";
     let quoted: QuoteResult | null = null;
     if (cross) {
@@ -602,6 +663,7 @@ async function payoutCanadaCadViaFincra(opts: {
         destinationCurrency: "CAD",
         receiveAmount: destAmount,
         paymentDestination: "bank_account",
+        paymentScheme,
       });
       if (!q.ok) {
         attemptErrors.push(`${sourceCurrency}->CAD quote: ${q.error}`);
@@ -612,20 +674,23 @@ async function payoutCanadaCadViaFincra(opts: {
 
     for (const scheme of schemes) {
       if (successJson) break;
-      const customerReference = `${opts.transfer_id}__cad_${sourceCurrency}_${scheme || "none"}_${Date.now().toString(36)}`;
+      const customerReference = `${opts.transfer_id}__cad_${sourceCurrency}_${scheme}_${Date.now().toString(36)}`;
       const payload: Record<string, unknown> = {
         business: cfg.businessId,
         sourceCurrency,
         destinationCurrency: "CAD",
         description: `eFinMoney CAD ${isEft ? "EFT" : "Interac"} to ${opts.recipient_name}`,
         paymentDestination: "bank_account",
+        paymentScheme: scheme,
         customerReference,
         beneficiary,
+        // Fee from merchant float so recipient gets the full amount (Fincra custom fee schedules).
+        feeBearer: "business",
+        // Fincra docs require amount as a JSON number (not a string).
         amount: cross && quoted
-          ? String(Math.round(quoted.sourceAmount * 100) / 100)
-          : String(destAmount),
+          ? Math.round(quoted.sourceAmount * 100) / 100
+          : destAmount,
       };
-      if (scheme) payload.paymentScheme = scheme;
       if (cross && quoted) payload.quoteReference = quoted.reference;
 
       const { ok, status, json } = await fincraFetch("/disbursements/payouts", {
@@ -644,7 +709,7 @@ async function payoutCanadaCadViaFincra(opts: {
         || String((json as { error?: string; message?: string })?.error
           || (json as { message?: string })?.message
           || `HTTP ${status}`);
-      attemptErrors.push(`${sourceCurrency} scheme=${scheme || "none"}: ${reason}`);
+      attemptErrors.push(`${sourceCurrency} scheme=${scheme}: ${reason}`);
       const lower = reason.toLowerCase();
       if (lower.includes("destination currency") && lower.includes("not supported")) {
         return jsonFail(
@@ -652,12 +717,18 @@ async function payoutCanadaCadViaFincra(opts: {
           "unavailable",
         );
       }
+      if (sourceCurrency === "CAD" && isFincraBalanceError(reason)) {
+        cadWalletShort = true;
+        break;
+      }
       if (isFincraBalanceError(reason) || isUnsupportedFundingError(reason)) break;
     }
   }
 
   if (!successJson) {
-    const reason = attemptErrors[attemptErrors.length - 1] || "Fincra CAD payout failed";
+    const reason = (attemptErrors.length
+      ? attemptErrors.join(" | ")
+      : "Fincra CAD payout failed").slice(0, 500);
     if (opts.skip_reversal) {
       return jsonFail(reason, classifyFincraError(reason) === "hard" ? "hard" : "unavailable");
     }
@@ -736,8 +807,11 @@ Deno.serve(async (req) => {
     const senderId = transfer.sender_id as string;
     currentUserId = senderId;
 
-    const destCcy = String(currency || transfer.target_currency || "").toUpperCase();
-    if (destCcy === "CAD") {
+    const destCcy = String(currency || transfer.target_currency || transfer.source_currency || "").toUpperCase();
+    const isDomesticCanada = String(transfer.transfer_type || "").toLowerCase() === "domestic_canada"
+      || String(transfer.recipient_country || "").toUpperCase() === "CA"
+      || destCcy === "CAD";
+    if (destCcy === "CAD" || (isDomesticCanada && (destCcy === "CAD" || !currency))) {
       return await payoutCanadaCadViaFincra({
         supabase,
         transfer,
@@ -1176,11 +1250,15 @@ Deno.serve(async (req) => {
         : `${ccy === "ZMW" ? "Zambia mobile money" : `${ccy} payouts`} is temporarily unavailable — your funds have not left your wallet. ${reason}`;
 
       if (isBalanceError) {
-        await supabase.from("admin_notifications").insert({
-          title: "Fincra wallet balance low",
-          message: `Payout for transfer ${transfer_id} failed across funding wallets: ${detail}. Preferred source=${preferred}, dest=${ccy}.`,
-          type: "treasury",
-        }).catch(() => {/* non-blocking */});
+        try {
+          await supabase.from("admin_notifications").insert({
+            title: "Fincra wallet balance low",
+            message: `Payout for transfer ${transfer_id} failed across funding wallets: ${detail}. Preferred source=${preferred}, dest=${ccy}.`,
+            type: "treasury",
+          });
+        } catch {
+          /* non-blocking — Postgrest builders are thenable, not Promise (no .catch) */
+        }
       }
 
       if (skip_reversal) {

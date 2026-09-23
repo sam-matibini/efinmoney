@@ -363,12 +363,14 @@ Deno.serve(async (req) => {
         }
 
         if (!intent && interacAmbiguous > 1) {
-          await supabase.from("admin_notifications").insert({
-            title: "Interac deposit needs manual allocation",
-            message:
-              `CAD ${amount} arrived but ${interacAmbiguous} open Interac payments match. Allocate manually. Wise txn ${idempotencyKey}.`,
-            type: "treasury",
-          }).catch(() => {/* ignore */});
+          try {
+            await supabase.from("admin_notifications").insert({
+              title: "Interac deposit needs manual allocation",
+              message:
+                `CAD ${amount} arrived but ${interacAmbiguous} open Interac payments match. Allocate manually. Wise txn ${idempotencyKey}.`,
+              type: "treasury",
+            });
+          } catch { /* ignore */ }
         }
       }
 
@@ -455,18 +457,22 @@ Deno.serve(async (req) => {
 
         } catch (creditErr) {
           console.error("wise-webhook: credit failed", creditErr);
-          await supabase.from("admin_notifications").insert({
-            title: "Wise top-up credit failed",
-            message: `Intent ${intent.reference}: ${creditErr instanceof Error ? creditErr.message : String(creditErr)}`,
-            type: "treasury",
-          }).catch(() => {/* ignore */});
+          try {
+            await supabase.from("admin_notifications").insert({
+              title: "Wise top-up credit failed",
+              message: `Intent ${intent.reference}: ${creditErr instanceof Error ? creditErr.message : String(creditErr)}`,
+              type: "treasury",
+            });
+          } catch { /* ignore */ }
         }
       } else if (txType === "credit" || eventType === "balances#credit") {
-        await supabase.from("admin_notifications").insert({
-          title: "Wise balance credited (unmatched)",
-          message: `${currency} ${amount} deposited — no pending top-up intent matched. Balance ${balanceId || "(unknown)"}.`,
-          type: "treasury",
-        }).catch(() => {/* ignore */});
+        try {
+          await supabase.from("admin_notifications").insert({
+            title: "Wise balance credited (unmatched)",
+            message: `${currency} ${amount} deposited — no pending top-up intent matched. Balance ${balanceId || "(unknown)"}.`,
+            type: "treasury",
+          });
+        } catch { /* ignore */ }
       }
     }
   }
