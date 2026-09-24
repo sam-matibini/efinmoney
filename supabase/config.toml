@@ -369,6 +369,21 @@ verify_jwt = false
 [functions.plaid-refresh-balances]
 verify_jwt = false
 
+[functions.plaid-idv-create]
+verify_jwt = false
+
+[functions.plaid-idv-finalize]
+verify_jwt = false
+
+[functions.plaid-idv-get]
+verify_jwt = false
+
+[functions.plaid-webhook]
+verify_jwt = false
+
+[functions.plaid-monitor-upsert]
+verify_jwt = false
+
 [functions.intra-ca-transfer-create]
 verify_jwt = false
 

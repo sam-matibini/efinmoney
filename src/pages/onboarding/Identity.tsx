@@ -5,7 +5,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 
 import { useKyc } from "@/hooks/useKyc";
-import PersonaVerification from "@/components/kyc/PersonaVerification";
+import PlaidIdvVerification from "@/components/kyc/PlaidIdvVerification";
 import ManualKycForm from "@/components/kyc/ManualKycForm";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -23,20 +23,16 @@ const Identity = () => {
   const queryClient = useQueryClient();
 
   const [searchParams, setSearchParams] = useSearchParams();
-  const autoStartPersona = searchParams.get("autostart") === "persona";
+  const autoStartPlaid =
+    searchParams.get("autostart") === "plaid" || searchParams.get("autostart") === "persona";
   const [manualOpen, setManualOpen] = useState(searchParams.get("method") === "manual");
 
   const awaitingReview = kyc?.verification_status === "pending_review";
   const wasRejected = kyc?.verification_status === "rejected";
 
-  // Completion can be signalled more than once (overlapping status polls, a
-  // resumed popup). Finalize exactly once. Success is silent — the bell gets a
-  // one-time "You're verified" notification from the DB trigger. Only failures
-  // toast, pinned to a fixed id so a stray duplicate replaces instead of stacks.
   const finalizingRef = useRef(false);
   const FINALIZE_TOAST_ID = "kyc-finalize";
 
-  // Ensure a KYC row exists so subsequent webhook updates attach correctly
   useEffect(() => {
     if (!user) return;
     if (isBusiness) return;
@@ -47,7 +43,7 @@ const Identity = () => {
       .from("kyc_verifications")
       .upsert(
         { user_id: user.id, current_step: "identity", verification_status: "in_progress" },
-        { onConflict: "user_id" }
+        { onConflict: "user_id" },
       )
       .then(() => refetch());
   }, [user, kyc?.verification_status, isVerified, hasPassedCoreChecks, refetch, isBusiness]);
@@ -80,19 +76,18 @@ const Identity = () => {
     setSearchParams(next, { replace: true });
   };
 
-  const onPersonaComplete = async (info?: { inquiryId?: string; status?: string }) => {
-    // Guard against duplicate completion signals — finalize just once.
+  const onPlaidComplete = async (info?: { identityVerificationId?: string; status?: string }) => {
     if (finalizingRef.current) return;
     finalizingRef.current = true;
 
     try {
-      // Trust our own flow: as soon as Persona's SDK fires onComplete
-      // (ID + Face captured), auto-approve in our system. No Persona
-      // decision wait — the DB trigger upgrades the user to Tier 3 instantly.
-      const { error } = await supabase.functions.invoke("persona-self-approve", {
-        body: { inquiryId: info?.inquiryId },
-      });
-      if (error) throw error;
+      // Finalize may already have approved via plaid-idv-finalize; call again for safety.
+      if (info?.status !== "success") {
+        const { error } = await supabase.functions.invoke("plaid-idv-finalize", {
+          body: { identity_verification_id: info?.identityVerificationId },
+        });
+        if (error) throw error;
+      }
 
       if (user) {
         await Promise.all([
@@ -101,12 +96,10 @@ const Identity = () => {
         ]);
       }
       await refetch();
-      // Silent success — the "You're verified" bell notification (created by the
-      // DB trigger on approval) is the only confirmation. No toast.
       navigate("/dashboard", { replace: true });
     } catch (e) {
-      console.error("Auto-approve failed", e);
-      finalizingRef.current = false; // allow a retry
+      console.error("Plaid KYC finalize failed", e);
+      finalizingRef.current = false;
       toast.error("Couldn't finalize verification. Please try again.", { id: FINALIZE_TOAST_ID });
     }
   };
@@ -126,7 +119,10 @@ const Identity = () => {
           <Button
             variant="ghost"
             size="sm"
-            onClick={async () => { await signOut(); navigate("/auth"); }}
+            onClick={async () => {
+              await signOut();
+              navigate("/auth");
+            }}
             className="text-muted-foreground hover:text-foreground -ml-2"
           >
             <ArrowLeft className="w-4 h-4 mr-1" />
@@ -141,7 +137,7 @@ const Identity = () => {
         <div className="text-center space-y-2">
           <h1 className="text-2xl font-bold text-foreground">Verify your identity</h1>
           <p className="text-sm text-muted-foreground">
-            Choose how you'd like to verify. Persona is usually instant; document upload is reviewed by our
+            Choose how you'd like to verify. Plaid is usually instant; document upload is reviewed by our
             compliance team.
           </p>
         </div>
@@ -183,20 +179,20 @@ const Identity = () => {
                   <ShieldCheck className="w-5 h-5 text-primary" />
                 </div>
                 <div className="flex-1">
-                  <h3 className="font-semibold text-foreground text-sm">Verify with Persona</h3>
+                  <h3 className="font-semibold text-foreground text-sm">Verify with Plaid</h3>
                   <p className="text-xs text-muted-foreground">
                     Global ID verification with passport, driver's licence or national ID. Usually instant.
                   </p>
                 </div>
               </div>
               {user && (
-                <PersonaVerification
+                <PlaidIdvVerification
                   userId={user.id}
                   className="w-full"
-                  label="Start with Persona"
-                  autoStart={autoStartPersona}
-                  onComplete={onPersonaComplete}
-                  onError={() => toast.error("Persona is temporarily unavailable.")}
+                  label="Start with Plaid"
+                  autoStart={autoStartPlaid}
+                  onComplete={onPlaidComplete}
+                  onError={() => toast.error("Plaid verification is temporarily unavailable.")}
                 />
               )}
             </Card>
@@ -209,8 +205,8 @@ const Identity = () => {
                 <div className="flex-1">
                   <h3 className="font-semibold text-foreground text-sm">Upload documents for manual review</h3>
                   <p className="text-xs text-muted-foreground">
-                    Optional if Persona isn't available. A compliance officer reviews your ID and selfie
-                    in 1–2 business days.
+                    Optional if Plaid isn't available. A compliance officer reviews your ID and selfie in 1–2
+                    business days.
                   </p>
                 </div>
               </div>

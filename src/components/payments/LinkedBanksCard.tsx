@@ -150,10 +150,24 @@ export default function LinkedBanksCard() {
       const { data, error } = await supabase
         .from("plaid_accounts")
         .select(
-          "id,name,mask,subtype,account_number,institution_number,branch_number,currency_code,available_balance,current_balance,balances_iso_currency,balances_updated_at,plaid_items(institution_name,status)",
+          "id,name,mask,subtype,account_number,institution_number,branch_number,currency_code,available_balance,current_balance,balances_iso_currency,balances_updated_at,item_id,plaid_items(institution_name,status)",
         )
         .eq("user_id", user.id)
         .order("created_at", { ascending: false });
+      if (error) throw error;
+      return data ?? [];
+    },
+    enabled: !!user,
+  });
+
+  const { data: identityChecks = [] } = useQuery({
+    queryKey: ["plaid_identity_checks", user?.id],
+    queryFn: async () => {
+      if (!user) return [];
+      const { data, error } = await supabase
+        .from("plaid_identity_checks")
+        .select("plaid_item_id, plaid_account_id, match_status")
+        .eq("user_id", user.id);
       if (error) throw error;
       return data ?? [];
     },
@@ -182,6 +196,12 @@ export default function LinkedBanksCard() {
   const linked = useMemo<LinkedBank[]>(() => {
     const rows: LinkedBank[] = [];
     const seen = new Set<string>();
+    const matchByItem = new Map(
+      (identityChecks as Array<{ plaid_item_id: string; match_status: string }>).map((c) => [
+        c.plaid_item_id,
+        c.match_status,
+      ]),
+    );
     for (const a of plaidAccounts) {
       const inst =
         (a.plaid_items as { institution_name?: string; status?: string } | null)?.institution_name || "Bank";
@@ -211,6 +231,7 @@ export default function LinkedBanksCard() {
         liveCurrency: a.balances_iso_currency || a.currency_code,
         liveUpdatedAt: a.balances_updated_at,
         needsReconnect: itemStatus === "login_required",
+        identityMatch: matchByItem.get(String((a as { item_id?: string }).item_id || "")) || null,
         plaidAccountId: a.id,
       });
     }
@@ -235,7 +256,7 @@ export default function LinkedBanksCard() {
       });
     }
     return rows;
-  }, [plaidAccounts, savedBanks]);
+  }, [plaidAccounts, savedBanks, identityChecks]);
 
   const currency = COUNTRY_TO_CURRENCY[country] || "NGN";
   const schema = bankSchemaForCountry(country);
@@ -898,6 +919,16 @@ export default function LinkedBanksCard() {
                           <Badge variant="outline">{bank.currency}</Badge>
                           {bank.source === "plaid" && <Badge variant="secondary">Plaid</Badge>}
                           {bank.needsReconnect && <Badge variant="destructive">Reconnect</Badge>}
+                          {bank.identityMatch === "matched" && (
+                            <Badge variant="outline" className="border-emerald-500/40 text-emerald-700">
+                              Ownership matched
+                            </Badge>
+                          )}
+                          {bank.identityMatch === "mismatch" && (
+                            <Badge variant="outline" className="border-amber-500/40 text-amber-700">
+                              Name mismatch
+                            </Badge>
+                          )}
                           {spec.canPayout ? (
                             <Badge>{bankTransferMethodsFor(bank.country, bank.currency).map((m) => m.label).join(" · ")}</Badge>
                           ) : (

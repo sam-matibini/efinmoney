@@ -1,28 +1,12 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { corsPreflightResponse, jsonResponse } from "../_shared/cors.ts";
 import { plaidBalanceFields } from "../_shared/plaidBalances.ts";
-
-const ALLOWED_ENVS = new Set(["sandbox", "development", "production"]);
-const RAW_ENV = (Deno.env.get("PLAID_ENV") || "production").trim().toLowerCase();
-const PLAID_ENV = ALLOWED_ENVS.has(RAW_ENV) ? RAW_ENV : "production";
-const PLAID_BASE = `https://${PLAID_ENV}.plaid.com`;
-
-function plaidCredentials() {
-  const clientId = (Deno.env.get("PLAID_CLIENT_ID") || "").trim();
-  const secret = (Deno.env.get("PLAID_SECRET") || "").trim();
-  return { clientId, secret };
-}
+import { plaidConfigured, plaidCredentials, plaidErrorMessage, plaidFetch } from "../_shared/plaid.ts";
 
 async function plaid(path: string, body: Record<string, unknown>) {
-  const { clientId, secret } = plaidCredentials();
-  const res = await fetch(`${PLAID_BASE}${path}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ client_id: clientId, secret, ...body }),
-  });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error_message || data.display_message || `Plaid ${path} failed`);
-  return data;
+  const res = await plaidFetch(path, body);
+  if (!res.ok) throw new Error(plaidErrorMessage(res.json, `Plaid ${path} failed`));
+  return res.json;
 }
 
 Deno.serve(async (req) => {
@@ -42,7 +26,7 @@ Deno.serve(async (req) => {
     if (authErr || !user) return jsonResponse({ error: "Unauthorized" }, 401);
 
     const { clientId, secret } = plaidCredentials();
-    if (!clientId || !secret) {
+    if (!clientId || !secret || !plaidConfigured()) {
       return jsonResponse({
         error: "Plaid is not configured. Set PLAID_CLIENT_ID and PLAID_SECRET on the edge function.",
       }, 500);
@@ -104,13 +88,65 @@ Deno.serve(async (req) => {
       };
     });
     let insertedIds: string[] = [];
+    let insertedAccounts: Array<{ id: string; plaid_account_id: string }> = [];
     if (accountsToInsert.length) {
       const { data: inserted, error: aErr } = await supabase
         .from("plaid_accounts")
         .insert(accountsToInsert)
-        .select("id");
+        .select("id, plaid_account_id");
       if (aErr) throw aErr;
-      insertedIds = (inserted || []).map((r: { id: string }) => r.id);
+      insertedAccounts = (inserted || []) as Array<{ id: string; plaid_account_id: string }>;
+      insertedIds = insertedAccounts.map((r) => r.id);
+    }
+
+    // Ownership check via Identity product (best-effort — do not fail the link).
+    let identityMatch: string | null = null;
+    try {
+      const ident = await plaid("/identity/get", { access_token: exch.access_token });
+      const accounts = (ident.accounts || []) as Array<Record<string, unknown>>;
+      const owners = accounts.flatMap((a) => (a.owners as Array<Record<string, unknown>>) || []);
+      const names = owners.flatMap((o) => (o.names as string[]) || []);
+      const emails = owners.flatMap((o) =>
+        ((o.emails as Array<Record<string, unknown>>) || []).map((e) => e.data),
+      );
+      const phones = owners.flatMap((o) =>
+        ((o.phone_numbers as Array<Record<string, unknown>>) || []).map((p) => p.data),
+      );
+      const addresses = owners.flatMap((o) => (o.addresses as unknown[]) || []);
+
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("full_name")
+        .eq("user_id", user.id)
+        .maybeSingle();
+      const profileName = String(profile?.full_name || "").trim().toLowerCase();
+      const nameHit = profileName
+        ? names.some((n) => String(n).toLowerCase().includes(profileName.split(/\s+/)[0] || "") ||
+          profileName.includes(String(n).toLowerCase().split(/\s+/)[0] || ""))
+        : false;
+      const emailHit = user.email
+        ? emails.some((e) => String(e).toLowerCase() === user.email!.toLowerCase())
+        : false;
+      identityMatch = nameHit || emailHit ? "matched" : names.length ? "mismatch" : "unknown";
+
+      const firstAccountId = insertedAccounts[0]?.id ?? null;
+      await supabase.from("plaid_identity_checks").upsert(
+        {
+          user_id: user.id,
+          plaid_item_id: itemRow.id,
+          plaid_account_id: firstAccountId,
+          names,
+          emails,
+          phone_numbers: phones,
+          addresses,
+          match_status: identityMatch,
+          raw_payload: ident,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "plaid_item_id", ignoreDuplicates: false },
+      );
+    } catch (e) {
+      console.warn("identity/get at link time failed:", e);
     }
 
     return jsonResponse({
@@ -119,6 +155,7 @@ Deno.serve(async (req) => {
       accounts: accountsToInsert.length,
       account_ids: insertedIds,
       account_id: insertedIds[0] ?? null,
+      identity_match: identityMatch,
     });
   } catch (e) {
     console.error("plaid-exchange-token error", e);

@@ -348,6 +348,12 @@ export const useKyb = () => {
         .update({ kyb_status: "pending_review", current_step: "review" })
         .eq("id", businessId);
       if (error) throw error;
+      // Best-effort Plaid Monitor screen for the submitting owner.
+      try {
+        await supabase.functions.invoke("plaid-monitor-upsert", { body: {} });
+      } catch (e) {
+        console.warn("plaid-monitor-upsert after KYB submit", e);
+      }
     },
     onSuccess: invalidate,
   });

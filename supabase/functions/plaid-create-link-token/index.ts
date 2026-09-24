@@ -78,6 +78,7 @@ Deno.serve(async (req) => {
     // Prefer Instant Auth (bank login). Instant Match is a different flow
     // (manual account numbers) and can open a blank "Verify your identity" pane.
     // Balance is not a Link product — live balances use /accounts/balance/get on Auth items.
+    // Identity (ownership) is requested alongside Auth when enabled on the Plaid account.
     const linkBody: Record<string, unknown> = {
       client_id: clientId,
       secret,
@@ -85,7 +86,7 @@ Deno.serve(async (req) => {
       language: body.language === "fr" ? "fr" : "en",
       country_codes,
       user: userPayload,
-      products: ["auth"],
+      products: ["auth", "identity"],
       auth: {
         auth_type_select_enabled: false,
         instant_match_enabled: false,
@@ -108,9 +109,32 @@ Deno.serve(async (req) => {
     });
     let data = await res.json();
 
+    // Identity product may not be enabled yet — fall back to Auth-only so bank linking still works.
+    if (!res.ok && Array.isArray(linkBody.products) && (linkBody.products as string[]).includes("identity")) {
+      const errBlob = `${data.error_message || ""} ${data.error_code || ""} ${JSON.stringify(data)}`;
+      if (/identity|product.?not.?enabled|additional.?consent|INVALID_PRODUCT/i.test(errBlob)) {
+        console.warn("plaid-create-link-token: retrying without identity", data.error_code || data.error_message);
+        linkBody.products = ["auth"];
+        const retryIdent = await fetch(`${PLAID_BASE}/link/token/create`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(linkBody),
+        });
+        data = await retryIdent.json();
+        if (retryIdent.ok && data?.link_token) {
+          return jsonResponse({
+            link_token: data.link_token,
+            expiration: data.expiration,
+            plaid_env: PLAID_ENV,
+            identity_omitted: true,
+          });
+        }
+      }
+    }
+
     // Secret slot is full so PLAID_REDIRECT_URI may not be registered in Dashboard.
     // Retry without redirect so Instant Auth still works (OAuth banks need the URI later).
-    if (!res.ok && linkBody.redirect_uri && /redirect/i.test(String(data.error_message || data.error_code || ""))) {
+    if (!data?.link_token && linkBody.redirect_uri && /redirect/i.test(String(data.error_message || data.error_code || ""))) {
       console.warn("plaid-create-link-token: retrying without redirect_uri", data.error_code || data.error_message);
       delete linkBody.redirect_uri;
       const retryRes = await fetch(`${PLAID_BASE}/link/token/create`, {

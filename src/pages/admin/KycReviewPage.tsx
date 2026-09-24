@@ -430,8 +430,40 @@ const KycReviewPage = () => {
             </Card>
 
 
-            {/* Internal notes */}
-            {/* Persona Verification Results */}
+            {/* Plaid Identity Verification Results */}
+            {(kyc.plaid_identity_verification_id || kyc.plaid_idv_status) && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <ShieldAlert className="w-4 h-4" /> Plaid verification results
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3 text-sm">
+                  <div className="flex flex-wrap gap-4">
+                    <div>
+                      <div className="text-xs text-muted-foreground">IDV status</div>
+                      <div className="font-medium capitalize">{kyc.plaid_idv_status || "—"}</div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-muted-foreground">Session ID</div>
+                      <div className="font-mono text-xs">{kyc.plaid_identity_verification_id || "—"}</div>
+                    </div>
+                  </div>
+                  {kyc.plaid_identity_verification_id && (
+                    <a
+                      className="text-xs text-primary hover:underline"
+                      href={`https://dashboard.plaid.com/identity_verification/sessions/${kyc.plaid_identity_verification_id}`}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      Open in Plaid dashboard ↗
+                    </a>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Persona Verification Results (legacy) */}
             {(kyc.persona_inquiry_id || kyc.persona_decision) && (
               <Card>
                 <CardHeader>

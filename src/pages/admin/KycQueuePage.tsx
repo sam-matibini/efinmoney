@@ -32,15 +32,16 @@ const KycQueuePage = () => {
     queryFn: async () => {
       let q = supabase
         .from("kyc_verifications")
-        .select("id, user_id, verification_status, verification_provider, id_document_type, id_document_country, submitted_at, reviewed_by, created_at, persona_inquiry_id, persona_decision, persona_verification_data", { count: "exact" });
+        .select("id, user_id, verification_status, verification_provider, id_document_type, id_document_country, submitted_at, reviewed_by, created_at, persona_inquiry_id, persona_decision, persona_verification_data, plaid_identity_verification_id, plaid_idv_status", { count: "exact" });
 
       if (statusFilter === "needs_signoff") {
-        // Persona auto-decided but no admin has reviewed yet
-        q = q.not("persona_decision", "is", null).is("reviewed_by", null);
+        // Auto-decided but no admin has reviewed yet
+        q = q.or("persona_decision.not.is.null,plaid_idv_status.eq.success").is("reviewed_by", null);
       } else if (statusFilter !== "all") {
         q = q.eq("verification_status", statusFilter as "pending_review");
       }
       if (providerFilter === "manual") q = q.eq("verification_provider", "manual");
+      else if (providerFilter === "plaid") q = q.or("verification_provider.eq.plaid,plaid_identity_verification_id.not.is.null");
       else if (providerFilter === "persona") q = q.or("verification_provider.eq.persona,persona_inquiry_id.not.is.null");
       else if (providerFilter === "interac") q = q.eq("verification_provider", "interac");
       if (docTypeFilter !== "all") q = q.eq("id_document_type", docTypeFilter as "passport");
@@ -127,7 +128,8 @@ const KycQueuePage = () => {
               <SelectContent>
                 <SelectItem value="all">All providers</SelectItem>
                 <SelectItem value="manual">Manual</SelectItem>
-                <SelectItem value="persona">Persona</SelectItem>
+                <SelectItem value="plaid">Plaid</SelectItem>
+                <SelectItem value="persona">Persona (legacy)</SelectItem>
                 <SelectItem value="interac">Interac</SelectItem>
               </SelectContent>
             </Select>

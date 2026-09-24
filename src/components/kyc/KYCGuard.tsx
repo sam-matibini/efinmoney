@@ -59,7 +59,7 @@ const KYCGuard = ({ children }: { children: ReactNode }) => {
     case "not_started":
       return <Navigate to="/onboarding/identity" replace />;
     case "in_progress": {
-      if (kyc.persona_inquiry_id) return <>{children}</>;
+      if (kyc.plaid_identity_verification_id || kyc.persona_inquiry_id) return <>{children}</>;
       const target = "/onboarding/identity";
       if (location.pathname === target) return <>{children}</>;
       return <Navigate to={target} replace />;

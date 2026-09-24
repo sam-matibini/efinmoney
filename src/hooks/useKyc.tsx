@@ -56,6 +56,8 @@ export interface KycRecord {
   persona_decision: "approved" | "declined" | "needs_review" | null;
   persona_decision_reason: string | null;
   persona_verification_data?: PersonaVerificationData | null;
+  plaid_identity_verification_id?: string | null;
+  plaid_idv_status?: string | null;
 }
 
 export interface RiskTier {
@@ -68,6 +70,15 @@ export interface RiskTier {
 
 const hasPassedCoreChecks = (kyc: KycRecord | null | undefined) => {
   if (!kyc) return false;
+
+  if (kyc.verification_provider === "plaid" || kyc.plaid_identity_verification_id) {
+    return (
+      kyc.verification_status === "approved" ||
+      (kyc.plaid_idv_status === "success" &&
+        kyc.id_verification_status === "approved" &&
+        kyc.liveness_check_status === "approved")
+    );
+  }
 
   const personaData = kyc.persona_verification_data;
   const personaCompleted = Boolean(personaData?.data?.attributes?.completedAt);
@@ -106,7 +117,7 @@ export const useKyc = () => {
       const d = q.state.data as KycRecord | null | undefined;
       if (!d) return false;
       if (d.verification_status === "approved" || d.verification_status === "rejected") return false;
-      return d.persona_inquiry_id ? 3000 : 5000;
+      return d.plaid_identity_verification_id || d.persona_inquiry_id ? 3000 : 5000;
     },
 
     queryFn: async () => {

@@ -57,6 +57,8 @@ export type LinkedBank = {
   liveCurrency?: string | null;
   liveUpdatedAt?: string | null;
   needsReconnect?: boolean;
+  /** Plaid Identity ownership match vs profile: matched | mismatch | unknown */
+  identityMatch?: string | null;
   /** `plaid_accounts.id` when this row came from Plaid. */
   plaidAccountId?: string;
 };

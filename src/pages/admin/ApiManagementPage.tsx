@@ -63,7 +63,7 @@ const INTEGRATIONS: Array<{
   { key: "nuvei", name: "Nuvei", description: "Payment Middleware sandbox — CAD Bank EFT coming soon (no live keys yet)", category: "Payments — Global & Cards", envHints: ["NUVEI_MW_BASE_URL", "NUVEI_MW_GATEWAY", "NUVEI_MW_SETTINGS_JSON", "NUVEI_MW_CREDENTIALS", "NUVEI_CAD_EFT_LIVE"] },
   { key: "verto", name: "Verto", description: "Corporate FX, V-Pay and partner bank payouts", category: "Payments — Global & Cards", envHints: ["VERTO_CLIENT_ID", "VERTO_API_KEY"] },
   // Banking
-  { key: "plaid", name: "Plaid", description: "Bank linking (CA/US) and live balances on the Bank tab", category: "Banking", envHints: ["PLAID_CLIENT_ID", "PLAID_SECRET", "PLAID_ENV"] },
+  { key: "plaid", name: "Plaid", description: "Bank linking (CA/US), Identity ownership, Identity Verification KYC, Monitor screening", category: "Banking", envHints: ["PLAID_CLIENT_ID", "PLAID_SECRET", "PLAID_ENV", "PLAID_IDV_TEMPLATE_ID", "PLAID_MONITOR_PROGRAM_ID"] },
   { key: "interac", name: "Interac", description: "Canada domestic e-Transfer / EFT rail", category: "Banking", envHints: ["INTERAC_CLIENT_ID", "INTERAC_PRIVATE_JWK"] },
   // Crypto & Stablecoin
   { key: "circle", name: "Circle", description: "USDC corridor & CPN stablecoin payouts", category: "Crypto & Stablecoin", envHints: ["CIRCLE_API_KEY"] },
@@ -149,9 +149,14 @@ const EDGE_FUNCTIONS: Array<{ name: string; description: string; jwt: boolean; c
   { name: "adyen-modify-payment",      description: "Modify or cancel Adyen payment",           jwt: false, category: "Adyen" },
   { name: "adyen-webhook",             description: "Receives Adyen events",                    jwt: false, category: "Adyen" },
   // Plaid
-  { name: "plaid-create-link-token",   description: "Create Plaid Link token",                  jwt: false, category: "Plaid" },
-  { name: "plaid-exchange-token",      description: "Exchange Plaid public token",               jwt: false, category: "Plaid" },
+  { name: "plaid-create-link-token",   description: "Create Plaid Link token (Auth + Identity)", jwt: false, category: "Plaid" },
+  { name: "plaid-exchange-token",      description: "Exchange Plaid public token + identity check", jwt: false, category: "Plaid" },
   { name: "plaid-refresh-balances",    description: "Live Plaid bank balances for Bank tab",     jwt: false, category: "Plaid" },
+  { name: "plaid-idv-create",          description: "Start Plaid Identity Verification (KYC)",  jwt: false, category: "Plaid" },
+  { name: "plaid-idv-finalize",        description: "Finalize Plaid IDV after Link success",    jwt: false, category: "Plaid" },
+  { name: "plaid-idv-get",             description: "Get Plaid IDV session status",             jwt: false, category: "Plaid" },
+  { name: "plaid-webhook",             description: "Plaid IDV + Monitor webhooks",             jwt: false, category: "Plaid" },
+  { name: "plaid-monitor-upsert",      description: "Create/refresh Plaid Monitor screening",   jwt: false, category: "Plaid" },
   // Interac
   { name: "vopay-interac-request",    description: "VoPay Interac Request Money → Loop Autodeposit", jwt: true,  category: "Interac" },
   { name: "vopay-webhook",            description: "VoPay Interac / EFT webhooks",                 jwt: false, category: "Interac" },
