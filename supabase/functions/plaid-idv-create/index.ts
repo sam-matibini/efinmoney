@@ -78,13 +78,18 @@ Deno.serve(async (req) => {
       { onConflict: "user_id", ignoreDuplicates: false },
     );
 
+    // Link expects identity_verification.template_id (not session id).
+    // Session id comes back later as metadata.link_session_id in onSuccess.
     const linkBody: Record<string, unknown> = {
       client_name: "eFinMoney",
       language: "en",
       country_codes: ["CA", "US"],
-      user: { client_user_id: user.id },
+      user: {
+        client_user_id: user.id,
+        ...(user.email ? { email_address: user.email } : {}),
+      },
       products: ["identity_verification"],
-      identity_verification: { id: idvId },
+      identity_verification: { template_id: templateId },
     };
     const redirectUri = (Deno.env.get("PLAID_REDIRECT_URI") || "").trim();
     if (redirectUri.startsWith("https://")) linkBody.redirect_uri = redirectUri;

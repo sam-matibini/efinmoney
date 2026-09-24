@@ -45,12 +45,12 @@ export const PlaidIdvVerification = ({
       const { data, error } = await supabase.functions.invoke("plaid-idv-create", {
         body: { user_id: userId },
       });
-      if (error) throw error;
       if (data?.error) throw new Error(String(data.error));
+      if (error) throw error;
       const token = String(data?.link_token || "");
       const verificationId = String(data?.identity_verification_id || "");
-      if (!token || !verificationId) throw new Error("Plaid IDV did not return a link token");
-      setIdvId(verificationId);
+      if (!token) throw new Error("Plaid IDV did not return a link token");
+      if (verificationId) setIdvId(verificationId);
       setLinkToken(token);
     } catch (e) {
       console.error("plaid-idv-create failed", e);
@@ -68,14 +68,18 @@ export const PlaidIdvVerification = ({
 
   const { open, ready } = usePlaidLink({
     token: linkToken || "",
-    onSuccess: async () => {
+    onSuccess: async (_publicToken, metadata) => {
       try {
+        // For IDV, link_session_id is the identity_verification_id.
+        const sessionId = String(
+          (metadata as { link_session_id?: string } | null)?.link_session_id || idvId || "",
+        ).trim();
         const { data, error } = await supabase.functions.invoke("plaid-idv-finalize", {
-          body: { identity_verification_id: idvId },
+          body: { identity_verification_id: sessionId || undefined },
         });
         if (error) throw error;
         if (data?.error) throw new Error(String(data.error));
-        finish(String(data?.identity_verification_id || idvId), String(data?.status || "success"));
+        finish(String(data?.identity_verification_id || sessionId), String(data?.status || "success"));
       } catch (e) {
         console.error("plaid-idv-finalize failed", e);
         setLoading(false);
