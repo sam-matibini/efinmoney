@@ -236,7 +236,7 @@ export async function reconcilePendingCadCollectionRfis(
     if (!id) continue;
     const matchCtx: FincraRfiContext = {
       ...ctx,
-      amountCad: ctx.amountCad ?? Number(row.amountReceived ?? row.destinationAmount ?? row.sourceAmount ?? row.amount) || undefined,
+      amountCad: ctx.amountCad ?? (Number(row.amountReceived ?? row.destinationAmount ?? row.sourceAmount ?? row.amount) || undefined),
       senderName: ctx.senderName || String(row.customerName || row.senderAccountName || "") || undefined,
       paymentCode: ctx.paymentCode,
       interacReference: ctx.interacReference || String(row.sessionId || "") || undefined,

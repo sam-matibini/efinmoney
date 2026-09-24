@@ -301,6 +301,15 @@ verify_jwt = false
 [functions.fincra-zm-probe]
 verify_jwt = false
 
+[functions.fincra-capability-probe]
+verify_jwt = false
+
+[functions.fincra-usd-bank]
+verify_jwt = false
+
+[functions.fincra-usd-va-submit]
+verify_jwt = false
+
 [functions.fincra-verify-transfer]
 verify_jwt = false
 

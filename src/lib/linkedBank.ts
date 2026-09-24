@@ -159,9 +159,9 @@ export function bankTransferMethodsFor(country: string, _currency?: string): Ban
       },
       {
         id: "wire",
-        label: "Wire",
-        description: "Domestic USD Fedwire using the same ABA routing and account.",
-        typical: "Same day",
+        label: "Wire / SWIFT",
+        description: "USD SWIFT wire via Fincra (needs beneficiary address + SWIFT/BIC on the bank).",
+        typical: "1–2 business days",
       },
     ];
   }
@@ -318,6 +318,19 @@ export function payoutSpecFor(bank: LinkedBank, method?: BankPayoutMethod | stri
       return fail(base, "US ACH and wires need a 9-digit ABA routing number.");
     }
     const usMethod: BankPayoutMethod = payoutMethod === "wire" ? "wire" : "ach";
+    if (usMethod === "wire") {
+      const street = str(d, "street", "address_street");
+      const city = str(d, "city", "address_city");
+      const state = str(d, "state", "address_state");
+      const zip = str(d, "zip", "postal_code");
+      const swift = str(d, "swift_bic", "swift", "bic");
+      if (!street || !city || !state || !zip) {
+        return fail(base, "USD SWIFT/wire needs beneficiary street, city, state, and ZIP on the linked bank.");
+      }
+      if (!swift) {
+        return fail(base, "USD SWIFT/wire needs a SWIFT/BIC code on the linked bank.");
+      }
+    }
     return {
       ...base,
       canPayout: true,

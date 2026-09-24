@@ -170,7 +170,7 @@ export function collectMethodForPartner(partner: string): string | null {
 /** Code default when no collect policy is saved. */
 export const DEFAULT_COLLECT_PARTNER: Record<string, string> = {
   CAD: "nomba",
-  USD: "square",
+  USD: "fincra",
   EUR: "square",
   GBP: "square",
   NGN: "nomba",
@@ -210,7 +210,7 @@ export const DEFAULT_PAYOUT_PARTNER: Record<string, string> = {
   CAD: "fincra",
   GBP: "nomba",
   EUR: "nomba",
-  USD: "nomba",
+  USD: "fincra",
   ZMW: "fincra",
 };
 

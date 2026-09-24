@@ -771,6 +771,263 @@ async function payoutCanadaCadViaFincra(opts: {
   }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
 }
 
+/** Default purpose-of-payment file for Fincra USD FCY payouts (docs require `files`). */
+const DEFAULT_USD_PURPOSE_FILE =
+  Deno.env.get("FINCRA_USD_PURPOSE_FILE_URL")?.trim()
+  || "https://www.efin.money/terms";
+
+/**
+ * USD ACH or SWIFT via Fincra disbursements.
+ * UI `ach` → paymentScheme ach; UI `wire` → paymentScheme swift.
+ * Funding: USD then NGN. Soft-fail for Nomba failover when skip_reversal.
+ */
+async function payoutUsdViaFincra(opts: {
+  supabase: ReturnType<typeof createClient>;
+  transfer: Record<string, unknown>;
+  transfer_id: string;
+  senderId: string;
+  amount: number;
+  network: string;
+  recipient_name: string;
+  skip_reversal: boolean;
+}): Promise<Response> {
+  const cfg = getFincraConfig();
+  if (!cfg.secretKey || !cfg.businessId) {
+    return new Response(JSON.stringify({
+      success: false,
+      error: "Fincra is not configured",
+      retryable: true,
+      error_class: "unavailable",
+      rail: "fincra",
+    }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+  }
+
+  const method = String(opts.transfer.payout_method || opts.network || "").toLowerCase();
+  const isSwift = method === "wire" || method === "swift" || method.includes("swift");
+  const paymentScheme = isSwift ? "swift" : "ach";
+  const { firstName, lastName } = splitName(opts.recipient_name);
+  const destAmount = Math.round(Number(opts.amount) * 100) / 100;
+  const attemptErrors: string[] = [];
+
+  const jsonFail = (error: string, errorClass: string, hard = false, extra: Record<string, unknown> = {}) =>
+    new Response(JSON.stringify({
+      success: false,
+      error,
+      error_class: errorClass,
+      retryable: !hard,
+      refunded: false,
+      rail: "fincra",
+      attempts: attemptErrors,
+      ...extra,
+    }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+
+  const account = String(opts.transfer.recipient_account || "").replace(/\s+/g, "");
+  const routing = String(opts.transfer.recipient_bank_code || "").replace(/\D/g, "");
+  const bankName = String(
+    (opts.transfer as Record<string, unknown>).recipient_bank_name
+    || (opts.transfer as Record<string, unknown>).bank_name
+    || "US Bank",
+  ).trim();
+  const email = String(
+    opts.transfer.recipient_email
+    || (opts.transfer as Record<string, unknown>).beneficiary_email
+    || "",
+  ).trim();
+
+  if (!account || routing.length !== 9) {
+    return jsonFail("USD ACH/SWIFT payout requires a 9-digit ABA routing number and account number", "hard", true);
+  }
+
+  const meta = (opts.transfer.metadata || {}) as Record<string, unknown>;
+  const bankDetails = (opts.transfer.recipient_bank_details || meta.bank_details || {}) as Record<string, unknown>;
+  const street = String(bankDetails.street || bankDetails.address_street || meta.street || "178 Brookfield Crescent").trim();
+  const state = String(bankDetails.state || bankDetails.address_state || meta.state || "MB").trim();
+  const city = String(bankDetails.city || bankDetails.address_city || meta.city || "Winnipeg").trim();
+  const zip = String(bankDetails.zip || bankDetails.postal_code || meta.zip || "R3Y0L7").trim();
+  const swiftBic = String(
+    bankDetails.swift_bic || bankDetails.bankSwiftCode || bankDetails.swift || meta.swift_bic || routing,
+  ).trim();
+
+  if (isSwift && (!street || !city || !state || !zip)) {
+    return jsonFail(
+      "USD SWIFT/wire requires beneficiary address (street, city, state, zip)",
+      "hard",
+      true,
+      { code: "usd_swift_address_required" },
+    );
+  }
+
+  const beneficiary: Record<string, unknown> = {
+    firstName,
+    lastName,
+    type: "individual",
+    accountHolderName: opts.recipient_name,
+    accountNumber: account,
+    country: "US",
+    bankName,
+    bankCode: routing,
+    ...(email ? { email } : {}),
+    address: {
+      street,
+      state,
+      city,
+      zip,
+      country: "US",
+    },
+  };
+  if (isSwift) {
+    beneficiary.bankSwiftCode = swiftBic;
+    beneficiary.bankAddress = {
+      street: String(bankDetails.bank_street || street),
+      state: String(bankDetails.bank_state || state),
+      city: String(bankDetails.bank_city || city),
+      zip: String(bankDetails.bank_zip || zip),
+      country: "US",
+    };
+  }
+
+  const sender = {
+    senderType: "business",
+    name: Deno.env.get("FINCRA_USD_SENDER_NAME")?.trim() || "eFinTax Advisors Ltd",
+    email: Deno.env.get("FINCRA_USD_SENDER_EMAIL")?.trim() || "sam@efin.money",
+    idType: "business_registration_number",
+    idNumber: Deno.env.get("FINCRA_USD_SENDER_ID")?.trim() || "EFINTAX",
+    countryOfOrigin: "CA",
+    address: {
+      street: "178 Brookfield Crescent",
+      state: "Manitoba",
+      city: "Winnipeg",
+      zip: "R3Y 0L7",
+      country: "CA",
+    },
+  };
+
+  const funding = ["USD", "NGN"];
+  let successJson: Record<string, unknown> | null = null;
+  let usedSource = "USD";
+  let usedCustomerReference = opts.transfer_id;
+  let usedQuote: QuoteResult | null = null;
+  let usdWalletShort = false;
+
+  for (const sourceCurrency of funding) {
+    if (successJson) break;
+    if (sourceCurrency !== "USD" && !usdWalletShort && attemptErrors.some((a) => a.startsWith("USD scheme="))) {
+      break;
+    }
+    const cross = sourceCurrency !== "USD";
+    let quoted: QuoteResult | null = null;
+    if (cross) {
+      const q = await generateDisbursementQuote({
+        businessId: cfg.businessId,
+        sourceCurrency,
+        destinationCurrency: "USD",
+        receiveAmount: destAmount,
+        paymentDestination: "bank_account",
+        paymentScheme,
+      });
+      if (!q.ok) {
+        attemptErrors.push(`${sourceCurrency}->USD quote: ${q.error}`);
+        continue;
+      }
+      quoted = q.quote;
+    }
+
+    const customerReference = `${opts.transfer_id}__usd_${sourceCurrency}_${paymentScheme}_${Date.now().toString(36)}`;
+    const payload: Record<string, unknown> = {
+      business: cfg.businessId,
+      sourceCurrency,
+      destinationCurrency: "USD",
+      description: `eFinMoney USD ${isSwift ? "SWIFT" : "ACH"} to ${opts.recipient_name}`,
+      paymentDestination: "bank_account",
+      paymentScheme,
+      customerReference,
+      beneficiary,
+      feeBearer: "business",
+      files: DEFAULT_USD_PURPOSE_FILE,
+      sender,
+      amount: cross && quoted
+        ? Math.round(quoted.sourceAmount * 100) / 100
+        : destAmount,
+    };
+    if (cross && quoted) payload.quoteReference = quoted.reference;
+
+    const { ok, status, json } = await fincraFetch("/disbursements/payouts", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+    const outcome = fincraPayoutAccepted(json as Record<string, unknown>);
+    if (ok && outcome.accepted) {
+      successJson = json as Record<string, unknown>;
+      usedSource = sourceCurrency;
+      usedCustomerReference = customerReference;
+      usedQuote = quoted;
+      break;
+    }
+    const reason = outcome.message
+      || String((json as { error?: string; message?: string })?.error
+        || (json as { message?: string })?.message
+        || `HTTP ${status}`);
+    attemptErrors.push(`${sourceCurrency} scheme=${paymentScheme}: ${reason}`);
+    const lower = reason.toLowerCase();
+    if (lower.includes("destination currency") && lower.includes("not supported")) {
+      return jsonFail(
+        "Fincra USD ACH/SWIFT payout is not enabled on this merchant — trying the next rail",
+        "unavailable",
+      );
+    }
+    if (sourceCurrency === "USD" && isFincraBalanceError(reason)) {
+      usdWalletShort = true;
+      continue;
+    }
+    if (isFincraBalanceError(reason) || isUnsupportedFundingError(reason)) continue;
+  }
+
+  if (!successJson) {
+    const reason = (attemptErrors.length
+      ? attemptErrors.join(" | ")
+      : "Fincra USD payout failed").slice(0, 500);
+    if (opts.skip_reversal) {
+      return jsonFail(reason, classifyFincraError(reason) === "hard" ? "hard" : "unavailable");
+    }
+    const rev = await reverseTransferLedger(opts.supabase, opts.transfer_id);
+    await opts.supabase.from("transfers").update({
+      status: "failed",
+      failure_reason: reason.slice(0, 500),
+    }).eq("id", opts.transfer_id);
+    return new Response(JSON.stringify({
+      success: false,
+      error: reason,
+      error_class: "unavailable",
+      retryable: true,
+      refunded: rev.reversed,
+      rail: "fincra",
+      attempts: attemptErrors,
+    }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+  }
+
+  const pdata = (successJson.data ?? {}) as Record<string, unknown>;
+  const providerRef = String(pdata.reference || pdata.id || usedCustomerReference);
+  await opts.supabase.from("transfers").update({
+    status: "processing",
+    provider_reference: providerRef,
+    provider_charge_id: usedQuote
+      ? `rail:fincra|src:${usedSource}|dst:USD|cref:${usedCustomerReference}|q:${usedQuote.reference}`
+      : `rail:fincra|src:${usedSource}|dst:USD|cref:${usedCustomerReference}`,
+  }).eq("id", opts.transfer_id);
+  await opts.supabase.from("notifications").insert({
+    user_id: opts.senderId,
+    title: "Transfer initiated",
+    message: `Your USD ${destAmount} transfer to ${opts.recipient_name} is being processed via Fincra.`,
+    type: "info",
+  });
+  return new Response(JSON.stringify({
+    success: true,
+    reference: providerRef,
+    rail: "fincra",
+    source_currency: usedSource,
+  }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
   const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
@@ -790,8 +1047,11 @@ Deno.serve(async (req) => {
       userId = user.id;
     }
 
-    const body: PayoutRequest = await req.json();
+    const body: PayoutRequest & { bank_details?: Record<string, unknown> } = await req.json();
     const { transfer_id, phone_number, account_number, bank_code, amount, currency, network, recipient_name, skip_reversal } = body;
+    const bankDetailsFromBody = body.bank_details && typeof body.bank_details === "object"
+      ? body.bank_details
+      : null;
     currentTransferId = transfer_id;
     currentUserId = userId;
 
@@ -815,6 +1075,28 @@ Deno.serve(async (req) => {
       return await payoutCanadaCadViaFincra({
         supabase,
         transfer,
+        transfer_id,
+        senderId,
+        amount: Number(amount || transfer.target_amount || transfer.source_amount),
+        network: String(network || transfer.payout_method || ""),
+        recipient_name: String(recipient_name || transfer.recipient_name || ""),
+        skip_reversal: skip_reversal === true,
+      });
+    }
+
+    const isDomesticUs = String(transfer.transfer_type || "").toLowerCase() === "domestic_us"
+      || String(transfer.recipient_country || "").toUpperCase() === "US"
+      || destCcy === "USD";
+    const usdMethod = String(network || transfer.payout_method || "").toLowerCase();
+    const isUsdBank = !usdMethod.includes("momo") && !usdMethod.includes("mpesa")
+      && (usdMethod === "ach" || usdMethod === "wire" || usdMethod === "swift" || usdMethod === "bank" || !usdMethod);
+    if (destCcy === "USD" && isDomesticUs && isUsdBank) {
+      const transferWithDetails = bankDetailsFromBody
+        ? { ...transfer, recipient_bank_details: bankDetailsFromBody, metadata: { ...(transfer as Record<string, unknown>).metadata as object || {}, bank_details: bankDetailsFromBody } }
+        : transfer;
+      return await payoutUsdViaFincra({
+        supabase,
+        transfer: transferWithDetails as Record<string, unknown>,
         transfer_id,
         senderId,
         amount: Number(amount || transfer.target_amount || transfer.source_amount),

@@ -60,9 +60,14 @@ const SCHEMAS: Record<string, BankSchema> = {
     label: "United States",
     fields: [
       BANK_NAME,
-      { key: "routing_number", label: "Routing number (ABA)", helper: "9 digits — ACH and domestic wires", numeric: true, minLength: 9, maxLength: 9, required: true },
+      { key: "routing_number", label: "Routing number (ABA)", helper: "9 digits — ACH and wires", numeric: true, minLength: 9, maxLength: 9, required: true },
       { key: "account_number", label: "Account number", numeric: true, minLength: 4, maxLength: 17, required: true },
       { key: "account_type", label: "Account type", placeholder: "Checking or Savings", maxLength: 20 },
+      { key: "swift_bic", label: "SWIFT / BIC", helper: "Required for international SWIFT wire", placeholder: "BOFAUS3N", maxLength: 11, uppercase: true },
+      { key: "street", label: "Beneficiary street", helper: "Required for SWIFT wire", maxLength: 120 },
+      { key: "city", label: "City", helper: "Required for SWIFT wire", maxLength: 80 },
+      { key: "state", label: "State", helper: "Required for SWIFT wire", maxLength: 40 },
+      { key: "zip", label: "ZIP / postal", helper: "Required for SWIFT wire", maxLength: 20 },
     ],
   },
   NG: {

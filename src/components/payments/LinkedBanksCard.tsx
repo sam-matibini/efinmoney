@@ -654,8 +654,16 @@ export default function LinkedBanksCard() {
         fee_amount: fee,
         funding_source: "wallet",
       });
+      const bankDetails = {
+        ...to.details,
+        bank_name: to.institution || to.details.bank_name || "",
+      };
       const { data, error } = await supabase.functions.invoke("execute-transfer", {
-        body: { transfer_id: transfer.id, recipient_country_hint: spec.recipientCountry },
+        body: {
+          transfer_id: transfer.id,
+          recipient_country_hint: spec.recipientCountry,
+          bank_details: bankDetails,
+        },
       });
       if (data?.success === false || data?.error) {
         throw new Error(String(data.error || data?.payout?.error || "Payout failed"));

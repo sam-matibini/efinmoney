@@ -10,7 +10,7 @@ import { validatePayoutMin } from "../_shared/payoutMins.ts";
 import { nombaApiConfigured } from "../_shared/nomba-api.ts";
 import { requireCadInteracDestination } from "../_shared/cadInteracPayout.ts";
 import { canResumeExecuteTransfer } from "../_shared/executeTransferResume.ts";
-import { isCanadaCadPayout, resolvePayoutNetwork, availableCanadaCadPayoutRails } from "../_shared/nomba-payout-corridors.ts";
+import { isCanadaCadPayout, isUsUsdBankPayout, resolvePayoutNetwork, availableCanadaCadPayoutRails, availableUsUsdPayoutRails } from "../_shared/nomba-payout-corridors.ts";
 import { orderRailsByLeastCost } from "../_shared/routingEngine.ts";
 
 const corsHeaders = {
@@ -529,6 +529,12 @@ Deno.serve(async (req) => {
       transferType: transfer.transfer_type,
       sourceCurrency: transfer.source_currency,
     });
+    const isUsUsd = isUsUsdBankPayout({
+      currency: targetCurrency,
+      country: recipientCountry || transfer.recipient_country,
+      method: transfer.payout_method,
+      transferType: transfer.transfer_type,
+    });
     const isGhana =
       targetCurrency === "GHS" ||
       recipientCountry === "GH" ||
@@ -556,6 +562,7 @@ Deno.serve(async (req) => {
     // Other Nomba+Fincra corridors use availability + least-cost ranking.
     const fincraCapable =
       !isCanada
+      && !isUsUsd
       && transfer.payout_method !== "card_push"
       && (
         (isMobileMoneyMethod && FINCRA_MOMO.has(targetCurrency))
@@ -593,7 +600,7 @@ Deno.serve(async (req) => {
     );
     // Canada CAD: skip the generic policy loop (it can include Flutterwave).
     // Dedicated Interac/EFT chain below ranks Nomba + Fincra by least cost.
-    let policyRails = isCanada ? [] : [...resolvedPolicyRails];
+    let policyRails = (isCanada || isUsUsd) ? [] : [...resolvedPolicyRails];
     let policyRouted = false;
 
     const routeRequest = {
@@ -667,6 +674,9 @@ Deno.serve(async (req) => {
       currency: transfer.target_currency ?? transfer.source_currency,
       network: resolveNetwork(transfer.payout_method, transfer.target_currency ?? transfer.source_currency),
       recipient_name: transfer.recipient_name,
+      ...(payload.bank_details && typeof payload.bank_details === "object"
+        ? { bank_details: payload.bank_details }
+        : {}),
     });
 
     const payoutOk = (r: any) =>
@@ -999,6 +1009,113 @@ Deno.serve(async (req) => {
               priority_chain: canadaAttempts,
             };
           }
+        }
+      } else if (isUsUsd) {
+        const usdAttempts: string[] = [];
+        let usdHardDecline = false;
+        const tryUsdRail = async (rail: string, fn: () => Promise<any>) => {
+          if (payoutOk(payoutResult) || usdHardDecline) return;
+          usdAttempts.push(rail);
+          railsAttempted.push(rail);
+          const started = Date.now();
+          const r = await fn();
+          const ok = payoutOk(r);
+          try {
+            await supabase.from("routing_attempts").insert({
+              transfer_id,
+              partner_code: rail,
+              function_slug: `${rail.replace(/_/g, "-")}-payout`,
+              attempt_number: usdAttempts.length,
+              outcome: ok ? "success" : "failed",
+              retryable: !ok && r?.error_class !== "hard" && r?.retryable !== false,
+              provider_reference: r?.reference ?? r?.provider_reference ?? null,
+              error_message: ok ? null : String(r?.error || r?.provider_message || "").slice(0, 500),
+              latency_ms: Date.now() - started,
+            });
+          } catch (e) {
+            console.error("routing_attempts insert failed", e);
+          }
+          if (ok) {
+            payoutResult = { ...r, rail: r?.rail || rail, priority_chain: usdAttempts };
+          } else {
+            if (r?.error_class === "hard") usdHardDecline = true;
+            if (
+              rail === "fincra"
+              && /disbursement fee|unable to calculate|failed to calculate|not enabled/i.test(String(r?.error || ""))
+            ) {
+              usdHardDecline = false;
+            }
+            const err = String(r?.error || r?.provider_message || `${rail} payout failed`);
+            railErrors.push(`${rail}: ${err}`);
+            payoutResult = {
+              ...(r || {}),
+              success: false,
+              rail,
+              error: err,
+              priority_chain: usdAttempts,
+            };
+          }
+        };
+
+        const usdRails = availableUsUsdPayoutRails({
+          nombaConfigured: nombaApiConfigured(),
+          fincraConfigured,
+          policyRails: resolvedPolicyRails,
+        });
+        console.log("us usd payout rails (Fincra-first)", usdRails);
+        for (const rail of usdRails) {
+          if (rail === "nomba") {
+            await tryUsdRail("nomba", async () => {
+              const nombaRes = await fetch(
+                `${Deno.env.get("SUPABASE_URL")}/functions/v1/nomba-payout`,
+                { method: "POST", headers: internalHeaders, body: JSON.stringify({ transfer_id }) },
+              );
+              return nombaRes.json().catch(() => ({
+                success: false,
+                error: `nomba-payout HTTP ${nombaRes.status}`,
+                rail: "nomba",
+              }));
+            });
+          } else if (rail === "fincra") {
+            await tryUsdRail("fincra", async () => {
+              await supabase.from("transfers").update({
+                provider_reference: `FINCRA-PENDING-${String(transfer_id).slice(0, 8)}`,
+                provider_charge_id: "rail:fincra",
+              }).eq("id", transfer_id);
+              const fincraRes = await fetch(
+                `${Deno.env.get("SUPABASE_URL")}/functions/v1/fincra-payout`,
+                {
+                  method: "POST",
+                  headers: internalHeaders,
+                  body: JSON.stringify({
+                    ...flwBody(),
+                    skip_reversal: true,
+                  }),
+                },
+              );
+              const json = await fincraRes.json().catch(() => ({
+                success: false,
+                error: `fincra-payout HTTP ${fincraRes.status}`,
+                rail: "fincra",
+              }));
+              if (!payoutOk(json)) {
+                await supabase.from("transfers").update({
+                  provider_charge_id: null,
+                  provider_reference: null,
+                }).eq("id", transfer_id);
+              }
+              return { ...json, rail: "fincra" };
+            });
+          }
+        }
+
+        if (!payoutOk(payoutResult) && !usdHardDecline && usdRails.length === 0) {
+          payoutResult = {
+            success: false,
+            error: "No USD ACH/SWIFT payout rail is configured (Fincra or Nomba)",
+            rail: "us_usd",
+            retryable: true,
+          };
         }
       } else if (fincraCapable) {
         // Fixed priority: Nomba (when configured) → Fincra → Flovide → Flutterwave → Paytota → Swychr

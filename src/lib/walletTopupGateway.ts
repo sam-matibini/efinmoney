@@ -366,7 +366,7 @@ export function pickBestIntlTopupMethod(
   } else if (c === "NGN") {
     priority = ["nomba", "fincra", "flutterwave", "wise", "paytota", "dodo"];
   } else if (c === "USD" || c === "GBP" || c === "EUR") {
-    priority = ["square", "paypal", "interac", "wise", "paytota", "dodo", "nomba", "flutterwave", "fincra"];
+    priority = ["fincra", "square", "paypal", "interac", "wise", "paytota", "dodo", "nomba", "flutterwave"];
   } else {
     priority = ["fincra", "flutterwave", "nomba", "paytota", "square", "dodo", "paypal", "interac", "wise"];
   }

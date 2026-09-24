@@ -37,6 +37,7 @@ import {
 } from "@/lib/corridorRails";
 import { usePaymentPartners } from "@/hooks/usePartnerNetwork";
 import CadCollectionPanel from "@/components/topup/CadCollectionPanel";
+import UsdBankCheckout from "@/components/payments/UsdBankCheckout";
 import WiseInteracInvoiceCheckout from "@/components/payments/WiseInteracInvoiceCheckout";
 
 import GhanaTopUpCard from "@/components/payments/GhanaTopUpCard";
@@ -115,7 +116,7 @@ function availableIntlMethods(currency: string): IntlTopupMethod[] {
   if (MULTI_RAIL_TOPUP_CURRENCIES.includes(c)) {
     // Nomba CAD first when live (charges USD → credits CAD)
     if (productFeatures.nombaNigeria && isNombaTopupLive(c)) methods.push("nomba");
-    if (productFeatures.fincra && ["EUR", "GBP"].includes(c)) methods.push("fincra");
+    if (productFeatures.fincra && ["EUR", "GBP", "USD"].includes(c)) methods.push("fincra");
     if (productFeatures.paytota) methods.push("paytota");
     if (productFeatures.dodo && c !== "CAD") methods.push("dodo");
     if (productFeatures.square && c !== "CAD") methods.push("square");
@@ -373,7 +374,7 @@ const TopUpPage = () => {
   useEffect(() => {
     if (supportsWesternProviderChoice(currency)) {
       const c = currency.toUpperCase();
-      const useFincra = isFincraTopupCurrency(c) && c !== "USD" && c !== "CAD";
+      const useFincra = isFincraTopupCurrency(c) && c !== "CAD";
       setWesternProvider(useFincra ? "fincra" : "flutterwave");
     }
     if (supportsAfricanProviderChoice(currency)) {
@@ -1229,6 +1230,30 @@ const TopUpPage = () => {
                 onExit={() => setSelectedMethodId("")}
               />
             )}
+          </SectionBoundary>
+        ),
+      });
+    }
+
+    if (
+      ccyUpper === "USD"
+      && productFeatures.fincraUsdBank
+      && productFeatures.fincra
+      && (rails.has("fincra") || showRail("fincra"))
+    ) {
+      payMethods.push({
+        id: "usd_bank",
+        tone: "bank",
+        label: "USD bank transfer",
+        description: "ACH to our Fincra USD account · include the memo to match",
+        content: (
+          <SectionBoundary name="UsdBankTopUp">
+            <UsdBankCheckout
+              walletId={walletId}
+              initialAmount={amount}
+              onComplete={invalidateWallets}
+              onExit={() => setSelectedMethodId("")}
+            />
           </SectionBoundary>
         ),
       });

@@ -17,8 +17,33 @@ Deno.serve(async (req) => {
       return Response.json({ balances: [] }, { headers: corsHeaders });
     }
 
-    // GET /disbursements/wallets returns all wallet balances for the business
-    const res = await fincraFetch("/disbursements/wallets", { method: "GET" });
+    // GET /wallets?businessID= returns balances ( /disbursements/wallets 404s on live )
+    const biz = cfg.businessId || "";
+    const path = biz
+      ? `/wallets?businessID=${encodeURIComponent(biz)}`
+      : "/disbursements/wallets";
+    const res = await fincraFetch(path, { method: "GET" });
+
+    if (!res.ok && biz) {
+      // Fallback: profile then wallets
+      const me = await fincraFetch("/profile/business/me", { method: "GET" });
+      const id = String((me.json?.data as Record<string, unknown> | undefined)?._id || biz);
+      const retry = await fincraFetch(`/wallets?businessID=${encodeURIComponent(id)}`, { method: "GET" });
+      if (retry.ok) {
+        const items: unknown[] = Array.isArray(retry.json?.data)
+          ? retry.json.data
+          : Array.isArray(retry.json)
+            ? retry.json as unknown[]
+            : [];
+        const balances = items
+          .filter((w: any) => w?.currency)
+          .map((w: any) => ({
+            currency_code: String(w.currency).toUpperCase(),
+            available_balance: Number(w.availableBalance ?? w.balance ?? 0),
+          }));
+        return Response.json({ balances }, { headers: corsHeaders });
+      }
+    }
 
     if (!res.ok) {
       console.error("partner-balance-fincra: wallets fetch failed", res.status, res.json);

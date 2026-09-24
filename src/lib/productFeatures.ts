@@ -39,6 +39,8 @@ export const productFeatures = {
   fincra: envFlag("VITE_FEATURE_FINCRA", true),
   /** Fincra CAD Interac Autodeposit — send checkout + CAD collections. */
   fincraInterac: envFlag("VITE_FEATURE_FINCRA_INTERAC", true),
+  /** Fincra USD bank receive (VA / ACH deposit) — gated until VA approved. */
+  fincraUsdBank: envFlag("VITE_FEATURE_FINCRA_USD_BANK", true),
   /** Nuvei Payment Middleware — CAD Bank EFT (sandbox; Coming soon until live keys). */
   nuvei: envFlag("VITE_FEATURE_NUVEI", true),
   /** Flovide (OhentPay) — Africa bank/MoMo. Not used for CAD Interac or CAD payout. */

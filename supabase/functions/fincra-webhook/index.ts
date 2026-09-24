@@ -2,6 +2,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { creditWalletViaFincra, isFincraWalletTopUp } from "../_shared/fincra-credit.ts";
 import { getFincraConfig } from "../_shared/fincra.ts";
 import { settleFincraCadInteracIntent } from "../_shared/fincraCad.ts";
+import { settleFincraUsdBankIntent } from "../_shared/fincraUsd.ts";
 import {
   answerFincraCollectionRfis,
   fincraCollectionId,
@@ -263,6 +264,80 @@ Deno.serve(async (req) => {
           }
         } else {
           console.warn("fincra-webhook: CAD deposit with no matching Interac intent", { amount, providerRef, eventName });
+        }
+      }
+    }
+
+    // USD bank VA / ACH deposits → match open user intents by reference, then amount
+    const usdCcy = eventCurrency(data) === "USD";
+    const isSuccessfulUsdCollection =
+      usdCcy
+      && !isRfiEvent
+      && !collectionPending
+      && (
+        eventName.includes("collection.successful")
+        || (eventName.includes("collection") && ["successful", "success", "completed", "settled"].includes(collectionStatus))
+        || eventName.includes("virtualaccount")
+        || eventName.includes("virtual_account")
+        || (eventName.includes("deposit") && eventName.includes("success"))
+        || (eventName.includes("successful") && !eventName.includes("payout") && !eventName.includes("charge") && !eventName.includes("collection"))
+      );
+
+    if (isSuccessfulUsdCollection || (eventName === "charge.successful" && usdCcy && !extractMeta(data).user_id && !isRfiEvent)) {
+      const amount = settleAmount(data);
+      const providerRef = String(data.chargeReference || data.reference || data.sessionId || data.id || "");
+      const description = String(data.description || data.narration || data.memo || "");
+      if (amount > 0) {
+        const nowIso = new Date().toISOString();
+        const openStatuses = ["pending", "awaiting_payment", "claimed_sent"];
+        const { data: candidates } = await supabase
+          .from("fincra_usd_bank_intents")
+          .select("id, user_id, wallet_id, amount, reference, public_id, status, purpose, transfer_id, provider_reference")
+          .in("status", openStatuses)
+          .eq("currency_code", "USD")
+          .gt("expires_at", nowIso)
+          .order("created_at", { ascending: true })
+          .limit(40);
+
+        const haystack = `${description} ${providerRef}`.toUpperCase();
+        const byRef = (candidates ?? []).find((row) => {
+          const refs = [row.reference, row.public_id].filter(Boolean).map((r) => String(r).toUpperCase());
+          return refs.some((r) => r.length >= 8 && haystack.includes(r));
+        });
+        const byUserRef = (candidates ?? []).find((row) => {
+          const pr = String(row.provider_reference || "").toUpperCase();
+          return pr.length >= 4 && (haystack.includes(pr) || pr === String(providerRef).toUpperCase());
+        });
+        const byAmount = (candidates ?? []).find((row) => {
+          const expected = Number(row.amount);
+          return Number.isFinite(expected) && Math.abs(expected - amount) < 0.02;
+        });
+        const match = byRef || byUserRef || byAmount;
+
+        if (match) {
+          try {
+            await settleFincraUsdBankIntent(
+              supabase,
+              {
+                id: match.id as string,
+                user_id: match.user_id as string,
+                wallet_id: match.wallet_id as string,
+                amount: Number(match.amount),
+                reference: String(match.reference),
+                public_id: match.public_id as string | null,
+                status: String(match.status),
+                purpose: String(match.purpose),
+                transfer_id: (match.transfer_id as string | null) ?? null,
+                provider_reference: (match.provider_reference as string | null) ?? null,
+              },
+              providerRef || null,
+              byRef ? "payment_code" : byUserRef ? "bank_reference" : "amount",
+            );
+          } catch (creditErr) {
+            console.error("fincra-webhook USD bank credit failed", creditErr);
+          }
+        } else {
+          console.warn("fincra-webhook: USD deposit with no matching bank intent", { amount, providerRef, eventName });
         }
       }
     }

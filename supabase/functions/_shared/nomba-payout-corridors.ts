@@ -160,6 +160,9 @@ export const AFRICA_MOMO_PAYOUT_RAILS = new Set([
 /** Canada CAD payout: Fincra Interac/EFT first (CAD float / Autodeposit), Nomba failover. */
 export const CANADA_CAD_PAYOUT_RAILS = ["fincra", "nomba"];
 
+/** US USD bank payout: Fincra ACH/SWIFT first, Nomba failover. */
+export const US_USD_PAYOUT_RAILS = ["fincra", "nomba"];
+
 /** Partners that must never pay CAD (Africa MoMo, retired CA rails). Fincra CAD Interac/EFT is allowed. */
 const CANADA_BLOCKED_PAYOUT_RAILS = new Set([
   ...AFRICA_MOMO_PAYOUT_RAILS,
@@ -227,6 +230,30 @@ export function isCanadaCadPayout(params: {
   return false;
 }
 
+/** True when this payout is USD to a US bank (ACH / wire / SWIFT). */
+export function isUsUsdBankPayout(params: {
+  currency?: string | null;
+  country?: string | null;
+  method?: string | null;
+  transferType?: string | null;
+}): boolean {
+  const method = String(params.method || "").toLowerCase();
+  if (method === "card_push" || method.includes("mpesa") || method.includes("momo")) return false;
+  const dest = String(params.currency || "").toUpperCase();
+  const country = String(params.country || "").trim().toUpperCase();
+  const type = String(params.transferType || "").toLowerCase();
+  if (type === "domestic_us" || type === "us_ach" || type === "us_wire") return true;
+  if (dest !== "USD" && dest !== "") return false;
+  if (["US", "USA", "UNITED STATES"].includes(country)) return true;
+  if (dest === "USD" && (!country || country === "US" || country === "USA")) {
+    // Bank-style methods or blank method (linked bank default)
+    if (!method || method === "bank" || method === "ach" || method === "wire" || method === "swift" || method.includes("ach")) {
+      return true;
+    }
+  }
+  return false;
+}
+
 /**
  * Network token for Flutterwave/Fincra/Nomba MoMo.
  * CAD never falls through to Kenya M-Pesa.
@@ -269,6 +296,34 @@ export function availableCanadaCadPayoutRails(opts: {
 }): string[] {
   const ordered = sanitizeCanadaPayoutRails(
     opts.policyRails?.length ? opts.policyRails : [...CANADA_CAD_PAYOUT_RAILS],
+  );
+  return ordered.filter((r) => {
+    if (r === "nomba") return opts.nombaConfigured;
+    if (r === "fincra") return opts.fincraConfigured;
+    return false;
+  });
+}
+
+/** Drop non-US rails; keep Fincra→Nomba canonical order. */
+export function sanitizeUsUsdPayoutRails(rails: string[]): string[] {
+  const kept = new Set(
+    rails
+      .map((r) => r.trim().toLowerCase())
+      .filter((r) => r === "nomba" || r === "fincra"),
+  );
+  if (!kept.size) return [...US_USD_PAYOUT_RAILS];
+  const ordered = US_USD_PAYOUT_RAILS.filter((r) => kept.has(r));
+  return ordered.length ? ordered : [...US_USD_PAYOUT_RAILS];
+}
+
+/** USD ACH/SWIFT rails that are actually configured to send. */
+export function availableUsUsdPayoutRails(opts: {
+  nombaConfigured: boolean;
+  fincraConfigured: boolean;
+  policyRails?: string[] | null;
+}): string[] {
+  const ordered = sanitizeUsUsdPayoutRails(
+    opts.policyRails?.length ? opts.policyRails : [...US_USD_PAYOUT_RAILS],
   );
   return ordered.filter((r) => {
     if (r === "nomba") return opts.nombaConfigured;
@@ -367,8 +422,9 @@ export function defaultPayoutRails(params: {
       return [...CANADA_CAD_PAYOUT_RAILS];
     case "global_bank":
       if (ccy === "CAD") return [...CANADA_CAD_PAYOUT_RAILS];
+      if (ccy === "USD" || country === "US") return [...US_USD_PAYOUT_RAILS];
       if (ccy === "ZAR" || ccy === "AED") return ["nomba", "fincra", "flutterwave"];
-      if (ccy === "USD" || ccy === "GBP" || ccy === "EUR") return ["nomba", "flutterwave"];
+      if (ccy === "GBP" || ccy === "EUR") return ["nomba", "flutterwave"];
       return ["nomba", "fincra", "flutterwave"];
     default:
       return [];
@@ -438,16 +494,18 @@ export function nombaBankPaymentMethod(currency: string, country: string, method
   return "BANK";
 }
 
-/** Currencies Fincra can pay out, including CAD Interac/EFT. */
+/** Currencies Fincra can pay out, including CAD Interac/EFT and USD ACH/SWIFT. */
 export const FINCRA_PAYOUT_CURRENCIES = new Set([
-  "NGN", "GHS", "KES", "UGX", "TZS", "ZMW", "ZAR", "XOF", "XAF", "RWF", "CAD",
+  "NGN", "GHS", "KES", "UGX", "TZS", "ZMW", "ZAR", "XOF", "XAF", "RWF", "CAD", "USD",
 ]);
 
 export function fincraPayoutSupported(currency?: string | null, country?: string | null): boolean {
   const ccy = String(currency || "").trim().toUpperCase();
   if (isCanadaCadPayout({ currency: ccy, country, method: "interac" })) return true;
-  if (ccy === "CAD") return true;
+  if (isUsUsdBankPayout({ currency: ccy, country, method: "ach" })) return true;
+  if (ccy === "CAD" || ccy === "USD") return true;
   const cc = String(country || "").trim().toUpperCase();
   if (cc === "CA" && (ccy === "CAD" || !ccy)) return true;
+  if (cc === "US" && (ccy === "USD" || !ccy)) return true;
   return FINCRA_PAYOUT_CURRENCIES.has(ccy);
 }
