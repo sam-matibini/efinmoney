@@ -615,7 +615,16 @@ Deno.serve(async (req) => {
     };
 
     // Uganda: keep Fincra preferred (Nomba has no UGX FX pair from trade region NG).
-    if (!isCanada && !isUganda && policyRails.length > 1) {
+    // Nigeria NGN bank: force Fincra ahead of Nomba even if an old policy prefers Nomba.
+    if (isNigeriaBank && policyRails.length) {
+      const ngOrdered = ["fincra", "nomba", "flovide", "flutterwave", "swychr"];
+      const kept = policyRails.map((r) => r.toLowerCase());
+      policyRails = [
+        ...ngOrdered.filter((r) => kept.includes(r)),
+        ...kept.filter((r) => !ngOrdered.includes(r)),
+      ];
+      console.log("nigeria NGN payout rails (Fincra-first)", policyRails);
+    } else if (!isCanada && !isUganda && policyRails.length > 1) {
       try {
         const ranked = await resolveRoute(supabase, routeRequest);
         if (ranked.candidates.length) {
@@ -672,6 +681,7 @@ Deno.serve(async (req) => {
       bank_code: transfer.recipient_bank_code,
       amount: Number(transfer.target_amount ?? transfer.source_amount),
       currency: transfer.target_currency ?? transfer.source_currency,
+      source_currency: transfer.source_currency,
       network: resolveNetwork(transfer.payout_method, transfer.target_currency ?? transfer.source_currency),
       recipient_name: transfer.recipient_name,
       ...(payload.bank_details && typeof payload.bank_details === "object"
@@ -689,12 +699,22 @@ Deno.serve(async (req) => {
         ? ` Providers: ${railErrors.join(" | ")}`
         : "";
       const humanNote = `${explained.plain} — ${explained.tip}${perRail}`.slice(0, 900);
+      const lower = reason.toLowerCase().replace(/_/g, " ");
+      const isFloatIssue = lower.includes("insufficient")
+        || lower.includes("balance")
+        || lower.includes("liquidity")
+        || lower.includes("float");
+      // Customers must never see INSUFFICIENT_BALANCE / provider float jargon.
+      // Ops still get the full note via ops_note + email.
+      const customerReason = isFloatIssue
+        ? "Your payment was received. We're finishing delivery to your recipient."
+        : (railErrors.join(" | ") || reason).slice(0, 500);
       await supabase.from("transfers").update({
         status: "pending_ops",
         ops_status: "needs_manual_settlement",
         ops_note: humanNote,
         rails_attempted: attempted,
-        failure_reason: (railErrors.join(" | ") || reason).slice(0, 500),
+        failure_reason: customerReason,
         ops_alerted_at: new Date().toISOString(),
       }).eq("id", transfer_id);
       const bankBits = [
@@ -1118,7 +1138,7 @@ Deno.serve(async (req) => {
           };
         }
       } else if (fincraCapable) {
-        // Fixed priority: Nomba (when configured) → Fincra → Flovide → Flutterwave → Paytota → Swychr
+        // Fixed priority: Fincra (NGN bank) / Nomba → Flovide → Flutterwave → Paytota → Swychr
         const attempts: string[] = [];
         // Set when a rail returns a hard decline (bad recipient/number/limits) — never
         // re-attempt that on another provider.
@@ -1175,37 +1195,25 @@ Deno.serve(async (req) => {
           && Deno.env.get("FLOVIDE_SECRET_KEY")?.trim()
         );
 
-        // 0) Nomba — default for every corridor it supports (NGN bank + Global Payout MoMo/bank)
-        if (nombaApiConfigured() && !zambiaMomo && targetCurrency !== "ZMW") {
-          await tryNext("nomba", async () => {
-            const nombaRes = await fetch(
-              `${Deno.env.get("SUPABASE_URL")}/functions/v1/nomba-payout`,
-              { method: "POST", headers: internalHeaders, body: JSON.stringify({ transfer_id }) },
-            );
-            return nombaRes.json().catch(() => ({
-              success: false,
-              error: `nomba-payout HTTP ${nombaRes.status}`,
-              rail: "nomba",
-            }));
-          });
-        }
-
-        // 1) Fincra
-        if (!fincraConfigured) {
-          console.error(
-            "fincra rail skipped: FINCRA_SECRET_KEY/FINCRA_BUSINESS_ID not configured",
-            { transfer_id, currency: targetCurrency, zambia: isZambia },
-          );
-          if (isZambia) {
-            payoutResult = {
-              success: false,
-              rail: "fincra",
-              error: "Zambia payout partner not configured (Fincra credentials missing).",
-              code: "partner_not_configured",
-            };
+        // Nigeria NGN bank: Fincra before Nomba (CAD/NGN float lives on Fincra).
+        const tryFincra = async () => {
+          if (!fincraConfigured || Deno.env.get("FINCRA_PAYOUT_SMART") === "false") {
+            if (!fincraConfigured) {
+              console.error(
+                "fincra rail skipped: FINCRA_SECRET_KEY/FINCRA_BUSINESS_ID not configured",
+                { transfer_id, currency: targetCurrency, zambia: isZambia },
+              );
+              if (isZambia) {
+                payoutResult = {
+                  success: false,
+                  rail: "fincra",
+                  error: "Zambia payout partner not configured (Fincra credentials missing).",
+                  code: "partner_not_configured",
+                };
+              }
+            }
+            return;
           }
-        }
-        if (fincraConfigured && Deno.env.get("FINCRA_PAYOUT_SMART") !== "false") {
           await tryNext("fincra", async () => {
             await supabase.from("transfers").update({
               provider_reference: `FINCRA-PENDING-${String(transfer_id).slice(0, 8)}`,
@@ -1235,6 +1243,30 @@ Deno.serve(async (req) => {
               provider_reference: null,
             }).eq("id", transfer_id);
           }
+        };
+
+        const tryNomba = async () => {
+          if (nombaApiConfigured() && !zambiaMomo && targetCurrency !== "ZMW") {
+            await tryNext("nomba", async () => {
+              const nombaRes = await fetch(
+                `${Deno.env.get("SUPABASE_URL")}/functions/v1/nomba-payout`,
+                { method: "POST", headers: internalHeaders, body: JSON.stringify({ transfer_id }) },
+              );
+              return nombaRes.json().catch(() => ({
+                success: false,
+                error: `nomba-payout HTTP ${nombaRes.status}`,
+                rail: "nomba",
+              }));
+            });
+          }
+        };
+
+        if (isNigeriaBank) {
+          await tryFincra();
+          await tryNomba();
+        } else {
+          await tryNomba();
+          await tryFincra();
         }
 
         // 2) Flovide — NGN bank / GHS bank / KES-GHS-UGX MoMo when earlier rails miss
@@ -1420,11 +1452,13 @@ Deno.serve(async (req) => {
       });
 
       // Preferred rail failed but a backup paid — short FYI to ops (no action required).
-      // Do NOT send this when we only held funds for ops (pending_ops) — that is not a payout.
+      // Do NOT send this when we only held funds for ops / liquidity queue — that is not a payout.
       if (
         railErrors.length > 0
         && payoutResult?.rail
         && payoutResult?.pending_ops !== true
+        && payoutResult?.pending_liquidity !== true
+        && payoutResult?.queued !== true
         && payoutResult?.success === true
       ) {
         const firstFail = railErrors[0] || "";
@@ -1466,7 +1500,7 @@ Deno.serve(async (req) => {
         success: false,
         error: payoutResult.error || payoutResult.provider_message || "Payout failed",
         code: payoutResult.code,
-        rail: payoutResult.rail || (isNigeriaBank ? "nomba" : undefined),
+        rail: payoutResult.rail || (isNigeriaBank ? "fincra" : undefined),
         provider_message: payoutResult.provider_message ?? null,
         nomba_raw: payoutResult.raw_response ?? payoutResult.nomba_raw ?? null,
         refunded: payoutResult.refunded,

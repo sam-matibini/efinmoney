@@ -27,6 +27,17 @@ const refOf = (id: string) => `EFM-${id.replace(/-/g, "").slice(0, 8).toUpperCas
 
 const friendlyFailureReason = (reason: string): string => {
   const r = reason.toLowerCase();
+  // Provider float / balance — never show raw codes like INSUFFICIENT_BALANCE to customers.
+  if (
+    r.includes("insufficient_balance")
+    || r.includes("insufficient balance")
+    || r.includes("provider balance")
+    || r.includes("insufficient funds")
+    || (r.includes("insufficient") && (r.includes("wallet") || r.includes("float") || r.includes("liquidity")))
+    || r.includes("pending_liquidity")
+  ) {
+    return "Your payment was received. We're finishing delivery to your recipient — this usually takes a few minutes. If it stays pending, contact support with your reference.";
+  }
   if (/^http\s*404\b/.test(r.trim()) || r.includes("http 404")) {
     return "The payout provider could not process this transfer (account or corridor not found). If the status is Failed, funds should be back in your wallet — check the bank (e.g. OPay) and use a 10-digit account number.";
   }
@@ -45,9 +56,6 @@ const friendlyFailureReason = (reason: string): string => {
     r.includes("non-whitelisted")
   ) {
     return "Flutterwave blocked this payout (IP not whitelisted for API transfers on the company account). Funds should be back in your wallet.";
-  }
-  if (r.includes("provider balance low") || r.includes("insufficient funds in customer wallet") || (r.includes("insufficient") && r.includes("wallet"))) {
-    return "Payouts in this currency are temporarily unavailable due to a provider balance issue. Your funds have been returned to your wallet. Please try again shortly or contact support.";
   }
   if (r.includes("paymenthub-1") || r.includes("payment type and currency code combination")) {
     return "This payout corridor is not yet enabled on our payments provider. Your funds have been returned to your wallet. Please try again later or contact support.";
@@ -68,11 +76,24 @@ const friendlyFailureReason = (reason: string): string => {
   if (r.includes("debit card") && r.includes("instant")) {
     return "Only Canadian debit cards can receive instant payouts. Please ask the recipient for a debit card.";
   }
-  // Soften only true in-progress liquidity notes — never hide hard provider errors.
-  if (r.includes("pending_liquidity") || (r.includes("available") && r.includes("need") && !r.includes("failed"))) {
+  if (r.includes("available") && r.includes("need") && !r.includes("failed")) {
     return "Your transfer is still being processed. Delivery usually completes within a few minutes.";
   }
   return reason.replace(/\s*\(raw:[^)]*\)\s*/gi, "").trim();
+};
+
+/** True when the failure is an internal/provider-ops issue customers must not see verbatim. */
+const isOpsOnlyFailureReason = (reason: string): boolean => {
+  const r = reason.toLowerCase();
+  return (
+    r.includes("insufficient")
+    || r.includes("balance")
+    || r.includes("liquidity")
+    || r.includes("float")
+    || r.includes("provider setup")
+    || r.includes("whitelist")
+    || r.includes("not enabled to make transfers")
+  );
 };
 
 const currencySymbol = (code: string) => {
@@ -594,7 +615,9 @@ const TransferTrackingPage = () => {
                       {["failed", "reversed", "expired"].includes(transfer.status) ? "Why it failed" : "Provider note"}
                     </p>
                     <p>{friendlyFailureReason(transfer.failure_reason)}</p>
-                    {friendlyFailureReason(transfer.failure_reason) !== transfer.failure_reason && (
+                    {/* Never leak raw provider codes (e.g. INSUFFICIENT_BALANCE) to customers */}
+                    {!isOpsOnlyFailureReason(transfer.failure_reason)
+                      && friendlyFailureReason(transfer.failure_reason) !== transfer.failure_reason && (
                       <p className="mt-2 text-[11px] font-mono opacity-80 break-words">{transfer.failure_reason}</p>
                     )}
                   </div>

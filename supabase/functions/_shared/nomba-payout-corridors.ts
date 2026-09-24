@@ -410,7 +410,8 @@ export function defaultPayoutRails(params: {
 
   switch (kind) {
     case "domestic_ngn":
-      return ["nomba", "fincra", "flovide", "flutterwave", "swychr"];
+      // Fincra first (NGN + CAD float); Nomba failover when Fincra is short.
+      return ["fincra", "nomba", "flovide", "flutterwave", "swychr"];
     case "global_momo":
       if (ccy === "UGX" || country === "UG") return ugandaRails;
       if (["KES", "RWF", "TZS"].includes(ccy)) return ["nomba", ...eastAfrica];

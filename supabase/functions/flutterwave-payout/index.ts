@@ -65,10 +65,11 @@ function isTemporaryProviderSetupError(message: string): boolean {
 }
 
 function isProviderBalanceError(message: string): boolean {
-  const m = message.toLowerCase();
+  const m = message.toLowerCase().replace(/_/g, " ");
   return m.includes("insufficient funds in customer wallet") ||
          m.includes("insufficient balance") ||
-         (m.includes("insufficient") && m.includes("wallet"));
+         (m.includes("insufficient") && m.includes("wallet")) ||
+         m.includes("insufficient funds");
 }
 
 function splitRecipientName(full: string): { first: string; last: string } {

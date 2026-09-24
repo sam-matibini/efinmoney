@@ -1,5 +1,5 @@
 // Send transactional emails via Resend.
-// Body: { type: 'welcome' | 'transfer_completed' | 'kyc_update' | 'kyb_update' | 'topup_completed' | 'payment_link' | 'password_reset' | 'signup_confirmation' | 'email_change', to: string, data?: Record<string, any> }
+// Body: { type: 'welcome' | 'transfer_completed' | 'transfer_apology_completed' | 'kyc_update' | 'kyb_update' | 'topup_completed' | 'payment_link' | 'password_reset' | 'signup_confirmation' | 'email_change', to: string, data?: Record<string, any> }
 
 import { brandAuthActionLink, getPublicAppOrigin } from "../_shared/authConfirmLink.ts";
 
@@ -206,6 +206,43 @@ function transferReceiptBody(d: Record<string, any>) {
         <td style="padding:12px 16px;font-family:ui-monospace,monospace;color:#0f172a;font-size:13px">${d.reference || d.id || ""}</td>
       </tr>
     </table>
+  `;
+}
+
+/** Apology + confirmation after a delayed payout was completed manually / via failover. */
+function transferApologyCompletedBody(d: Record<string, any>) {
+  const destAmt = d.target_amount && d.target_currency
+    ? `${Number(d.target_amount).toLocaleString("en-NG")} ${d.target_currency}`
+    : "";
+  return `
+    <h1 style="margin:0 0 12px;font-family:'Space Grotesk','Inter',sans-serif;font-size:24px;font-weight:700;color:#0f172a;letter-spacing:-0.02em">Sorry for the delay — your transfer is complete</h1>
+    <p style="margin:0 0 16px;line-height:1.6;color:#334155">
+      We're sorry for the inconvenience earlier. A payout partner briefly couldn't complete the send.
+      <strong style="color:#0f172a">Your transfer has now been completed successfully.</strong>
+    </p>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;margin:8px 0 20px;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden">
+      <tr>
+        <td style="padding:12px 16px;color:#64748b;font-size:12px;text-transform:uppercase;letter-spacing:0.05em;background:#f8fafc;border-bottom:1px solid #e2e8f0;width:40%">Recipient</td>
+        <td style="padding:12px 16px;border-bottom:1px solid #e2e8f0;font-weight:600;color:#0f172a">${d.recipient_name || "—"}</td>
+      </tr>
+      <tr>
+        <td style="padding:12px 16px;color:#64748b;font-size:12px;text-transform:uppercase;letter-spacing:0.05em;background:#f8fafc;border-bottom:1px solid #e2e8f0">You sent</td>
+        <td style="padding:12px 16px;border-bottom:1px solid #e2e8f0;font-weight:700;color:#0f172a">${d.source_amount} ${d.source_currency}</td>
+      </tr>
+      ${destAmt ? `<tr>
+        <td style="padding:12px 16px;color:#64748b;font-size:12px;text-transform:uppercase;letter-spacing:0.05em;background:#f8fafc;border-bottom:1px solid #e2e8f0">Recipient received</td>
+        <td style="padding:12px 16px;border-bottom:1px solid #e2e8f0;font-weight:700;color:#0f172a">${destAmt}</td>
+      </tr>` : ""}
+      <tr>
+        <td style="padding:12px 16px;color:#64748b;font-size:12px;text-transform:uppercase;letter-spacing:0.05em;background:#f8fafc;border-bottom:1px solid #e2e8f0">Bank / account</td>
+        <td style="padding:12px 16px;border-bottom:1px solid #e2e8f0;color:#0f172a">${d.bank_name || "OPay"} · ${d.account_number || ""}</td>
+      </tr>
+      <tr>
+        <td style="padding:12px 16px;color:#64748b;font-size:12px;text-transform:uppercase;letter-spacing:0.05em;background:#f8fafc">Reference</td>
+        <td style="padding:12px 16px;font-family:ui-monospace,monospace;color:#0f172a;font-size:13px">${d.reference || d.id || ""}</td>
+      </tr>
+    </table>
+    <p style="margin:0;line-height:1.6;color:#334155">Thank you for your patience. If anything looks off on the recipient account, reply to this email and we'll sort it immediately.</p>
   `;
 }
 
@@ -471,6 +508,10 @@ Deno.serve(async (req) => {
       subject = `Transfer to ${data.recipient_name || "recipient"} completed`;
       preheader = `${data.source_amount} ${data.source_currency} sent.`;
       bodyHtml = transferReceiptBody(data);
+    } else if (type === "transfer_apology_completed") {
+      subject = `Sorry for the delay — transfer to ${data.recipient_name || "recipient"} is complete`;
+      preheader = `Your ${data.source_amount} ${data.source_currency} transfer has been completed.`;
+      bodyHtml = transferApologyCompletedBody(data);
     } else if (type === "payment_link") {
       const amt = `${data.currency || ""} ${Number(data.amount || 0).toFixed(2)}`.trim();
       subject = `${data.sender_name || "Someone"} sent you ${amt}`;

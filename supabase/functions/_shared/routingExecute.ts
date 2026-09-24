@@ -34,7 +34,7 @@ const NON_RETRYABLE = [
   "kyc",
   "duplicate",
   "already processed",
-  "insufficient balance",
+  // Note: provider float / insufficient balance IS retryable on the next rail.
 ];
 
 /** An ambiguous provider response may mean funds moved — never fail over. */

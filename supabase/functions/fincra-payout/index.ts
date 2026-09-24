@@ -354,21 +354,26 @@ function fundingCandidates(preferred: string, dest: string): string[] {
       : allowed;
     return list;
   }
-  // Same-currency NGN bank payouts: stay on NGN only. Wandering into USD/GHS/KES
-  // produced "Quote HTTP 404" and masked the real NGN bank failure.
+  // NGN bank: prefer NGN float, then CAD (treasury often sits there), then USD.
+  // Avoid GHS/KES/etc — those quotes 404 and mask the real bank failure.
   if (dest === "NGN") {
-    const list = [preferred === "NGN" ? "NGN" : preferred, "NGN", ...extras.filter((c) => c === "USD")];
+    const allowed = ["NGN", "CAD", "USD"];
+    const list = [
+      preferred,
+      "NGN",
+      "CAD",
+      ...extras.filter((c) => allowed.includes(c)),
+      "USD",
+    ];
     const seen = new Set<string>();
     const out: string[] = [];
     for (const c of list) {
       if (!c || seen.has(c)) continue;
-      // Only allow NGN (and optional USD if explicitly in extras / preferred)
-      if (c !== "NGN" && c !== "USD") continue;
-      if (c === "USD" && preferred !== "USD" && !extras.includes("USD")) continue;
+      if (!allowed.includes(c)) continue;
       seen.add(c);
       out.push(c);
     }
-    return out.length ? out : ["NGN"];
+    return out.length ? out : ["NGN", "CAD"];
   }
   // MoMo corridors: prefer NGN float, then CAD (treasury often sits there), then USD.
   const defaults = ["KES", "GHS"].includes(dest)
