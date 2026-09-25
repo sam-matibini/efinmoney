@@ -36,16 +36,33 @@ import {
   resolveCollectMethodPreference,
 } from "@/lib/corridorRails";
 import { usePaymentPartners } from "@/hooks/usePartnerNetwork";
-import CadCollectionPanel from "@/components/topup/CadCollectionPanel";
 import UsdBankCheckout from "@/components/payments/UsdBankCheckout";
 import WiseInteracInvoiceCheckout from "@/components/payments/WiseInteracInvoiceCheckout";
+import BankPicker from "@/components/payments/BankPicker";
+import { readRememberedBank, rememberInteracBank } from "@/components/payments/checkoutStrings";
+
+function CadInteracBankField() {
+  const [bank, setBank] = useState(readRememberedBank);
+  return (
+    <div className="space-y-1.5">
+      <Label>Select your bank</Label>
+      <BankPicker
+        value={bank}
+        onChange={(next) => {
+          setBank(next);
+          rememberInteracBank(next);
+        }}
+      />
+      <p className="text-[11px] text-muted-foreground">Opened once, from the payment details.</p>
+    </div>
+  );
+}
 
 import GhanaTopUpCard from "@/components/payments/GhanaTopUpCard";
 import NombaTopUpCard from "@/components/payments/NombaTopUpCard";
 import LenhubFlutterTopUpCard from "@/components/payments/LenhubFlutterTopUpCard";
 import PaytotaTopUpCard from "@/components/payments/PaytotaTopUpCard";
 import DodoTopUpCard from "@/components/payments/DodoTopUpCard";
-import EpayTopUpCard from "@/components/payments/EpayTopUpCard";
 import SquareTopUpCard, { verifySquareCheckout } from "@/components/payments/SquareTopUpCard";
 import BamboraTopUpCard from "@/components/payments/BamboraTopUpCard";
 import PayPalTopUpCard from "@/components/payments/PayPalTopUpCard";
@@ -1106,21 +1123,6 @@ const TopUpPage = () => {
       });
     }
 
-    // ePay CAD test rail — always listed when feature on (staff / boss smoke test)
-    if (ccyUpper === "CAD" && productFeatures.epay) {
-      payMethods.push({
-        id: "epay",
-        tone: "card",
-        label: "ePay (test)",
-        description: "Asia",
-        content: (
-          <SectionBoundary name="EpayTopUp">
-            <EpayTopUpCard walletId={walletId} walletCurrency={currency} initialAmount={amount} embedded onComplete={invalidateWallets} />
-          </SectionBoundary>
-        ),
-      });
-    }
-
     if (showRail("nomba") && !forceNombaCard && productFeatures.nombaNigeria && isNombaTopupLive(currency)) {
       payMethods.push({
         id: "nomba",
@@ -1161,48 +1163,9 @@ const TopUpPage = () => {
 
     const isCadWallet = currency.toUpperCase() === "CAD";
 
-    if (showRail("plaid") && isCadWallet && productFeatures.plaid && !productFeatures.fincraInterac) {
-      payMethods.push({
-        id: "plaid",
-        tone: "bank",
-        label: "Bank",
-        description: "Nuvei EFT coming soon · Plaid / Loop",
-        content: (
-          <SectionBoundary name="CadCollection">
-            <div className="space-y-3">
-              <NuveiEftComingSoon />
-              <CadCollectionPanel
-                walletId={walletId}
-                walletCurrency={currency}
-                initialAmount={amount}
-                onComplete={invalidateWallets}
-                onExit={() => setSelectedMethodId("")}
-              />
-            </div>
-          </SectionBoundary>
-        ),
-      });
-    }
-
-    if (isCadWallet && !payMethods.some((m) => m.id === "nuvei_eft" || m.id === "plaid" || m.id === "nomba_eft")) {
-      payMethods.push({
-        id: "nuvei_eft",
-        tone: "bank",
-        label: "Bank",
-        description: "Coming soon — Nuvei Payment Middleware sandbox",
-        comingSoon: true,
-        content: (
-          <SectionBoundary name="NuveiEftComingSoon">
-            <NuveiEftComingSoon />
-          </SectionBoundary>
-        ),
-      });
-    }
-
     if (showRail("interac") && isCadWallet && (rails.has("interac") || productFeatures.fincraInterac)) {
       // CAD Interac via Fincra Autodeposit (`fincra-cad-interac`)
       const interacAmount = Number(amount);
-      const useFincraCad = productFeatures.fincraInterac;
       payMethods.push({
         id: "interac",
         tone: "bank",
@@ -1212,24 +1175,22 @@ const TopUpPage = () => {
           : "Use bank account to make payments",
         content: (
           <SectionBoundary name="CadInteracTopUp">
-            {useFincraCad || !(Number.isFinite(interacAmount) && interacAmount >= 1) ? (
-              <CadCollectionPanel
-                walletId={walletId}
-                walletCurrency={currency}
-                initialAmount={amount}
-                onComplete={invalidateWallets}
-                onExit={() => setSelectedMethodId("")}
-              />
-            ) : (
-              <WiseInteracInvoiceCheckout
-                walletId={walletId}
-                purpose="topup"
-                amount={interacAmount}
-                lineItem="eFinMoney CAD wallet top-up"
-                onComplete={invalidateWallets}
-                onExit={() => setSelectedMethodId("")}
-              />
-            )}
+            <div className="space-y-3">
+              <CadInteracBankField />
+              {Number.isFinite(interacAmount) && interacAmount >= 2 ? (
+                <WiseInteracInvoiceCheckout
+                  walletId={walletId}
+                  purpose="topup"
+                  amount={interacAmount}
+                  lineItem="eFinMoney CAD wallet top-up"
+                  payeeName="eFinMoney"
+                  onComplete={invalidateWallets}
+                  onExit={() => setSelectedMethodId("")}
+                />
+              ) : (
+                <p className="text-sm text-muted-foreground">Enter at least CAD 2.00 to open the Interac payment.</p>
+              )}
+            </div>
           </SectionBoundary>
         ),
       });
@@ -1367,6 +1328,11 @@ const TopUpPage = () => {
     ghana_pay: "ghana",
     elicate: "elicate",
   };
+  if (ccyUpper === "CAD") {
+    const cadOnly = payMethods.filter((m) => m.id === "nomba" || m.id === "interac");
+    payMethods.splice(0, payMethods.length, ...cadOnly);
+  }
+
   const forceNombaForWallet =
     productFeatures.nombaNigeria
     && isNombaTopupLive(currency.toUpperCase())

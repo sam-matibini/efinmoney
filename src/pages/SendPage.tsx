@@ -2465,15 +2465,6 @@ const SendPage = () => {
           tone: "bank" as const,
         }]
       : []),
-    {
-      id: "bank" as const,
-      label: "Bank",
-      sublabel: sourceCurrency === "CAD"
-        ? "Nuvei EFT coming soon · Plaid"
-        : "Link with Plaid or transfer from your bank",
-      icon: Landmark,
-      tone: "bank" as const,
-    },
   ];
 
   const fundingOptions = ([
@@ -2482,6 +2473,10 @@ const SendPage = () => {
       ? [{ v: "card" as const, icon: CreditCard, label: "Card" }]
       : []),
   ]);
+
+  useEffect(() => {
+    if (fundingSource === "bank") setFundingSource("wallet");
+  }, [fundingSource]);
 
   useEffect(() => {
     if (fundingSource === "card") {
