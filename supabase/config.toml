@@ -292,6 +292,9 @@ verify_jwt = false
 [functions.ops-settle]
 verify_jwt = false
 
+[functions.ops-intervene]
+verify_jwt = false
+
 [functions.ops-alert]
 verify_jwt = false
 

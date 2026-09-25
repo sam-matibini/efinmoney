@@ -221,6 +221,7 @@ const EDGE_FUNCTIONS: Array<{ name: string; description: string; jwt: boolean; c
   { name: "flovide-rates",              description: "FX rates via Flovide",                    jwt: true,  category: "Flovide" },
   { name: "flovide-reconcile",          description: "Poll Flovide txns to credit Interac top-ups", jwt: false, category: "Flovide" },
   { name: "ops-settle",                 description: "Admin retry/complete/refund pending_ops transfers", jwt: false, category: "Ops" },
+  { name: "ops-intervene",              description: "Ops retry, cancel, switch, complete, reverse, escalate", jwt: false, category: "Ops" },
   { name: "ops-alert",                  description: "Email ops alert (ukwenzyb@gmail.com)",     jwt: false, category: "Ops" },
   // Ghana
   { name: "ghana-collection",          description: "Ghana GHS collection initiation",         jwt: true,  category: "Ghana" },

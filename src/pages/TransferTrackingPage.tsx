@@ -184,7 +184,7 @@ const TransferTrackingPage = () => {
   const [notFound, setNotFound] = useState(false);
   const [verifying, setVerifying] = useState(false);
   const cancelTransfer = useCancelTransfer();
-  const canCancel = transfer && ["initiated", "funded", "processing", "pending_liquidity"].includes(transfer.status);
+  const canCancel = transfer && ["initiated", "funded", "processing", "pending_liquidity", "pending_ops"].includes(transfer.status);
   const isPending = transfer && ["initiated", "funded", "processing", "pending_liquidity", "pending_ops"].includes(transfer.status);
 
   // Poll Paysafe for the latest standalone credit status and update our DB.
@@ -356,6 +356,8 @@ const TransferTrackingPage = () => {
     if (!transfer) return;
     try {
       await cancelTransfer.mutateAsync(transfer.id);
+      const { data: fresh } = await supabase.from("transfers").select("*").eq("id", transfer.id).maybeSingle();
+      if (fresh) setTransfer(fresh as Transfer);
       toast.success("Transfer cancelled — funds returned to your wallet");
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Failed to cancel transfer");
@@ -514,6 +516,39 @@ const TransferTrackingPage = () => {
                 </div>
               </CardHeader>
             </Card>
+
+            {canCancel && (
+              <Card className="border-destructive/30">
+                <CardContent className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="font-medium">Cancel this transfer</p>
+                    <p className="text-sm text-muted-foreground">
+                      Stop the send and return the amount, including fees, to your wallet.
+                    </p>
+                  </div>
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button variant="destructive" className="gap-2" disabled={cancelTransfer.isPending}>
+                        {cancelTransfer.isPending ? <LoadingSpinner size={16} /> : <XCircle className="w-4 h-4" />}
+                        Cancel transfer
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Cancel this transfer?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          The full amount, including fees, will be refunded to your wallet immediately. This cannot be undone.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Keep transfer</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleCancel}>Yes, cancel & refund</AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                </CardContent>
+              </Card>
+            )}
 
             {/* Zambia MoMo payout — processing (no recipient USSD for Elicate sends) */}
             {((transfer.target_currency ?? "").toUpperCase() === "ZMW" ||

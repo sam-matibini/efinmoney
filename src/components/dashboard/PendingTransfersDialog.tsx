@@ -1,5 +1,6 @@
+import { useState } from "react";
 import { Link } from "react-router-dom";
-import { Loader2, ArrowUpRight } from "lucide-react";
+import { Loader2, ArrowUpRight, XCircle } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -7,8 +8,22 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import type { DashboardTransfer } from "@/hooks/useDashboardTransfers";
+import { useCancelTransfer } from "@/hooks/useTransfers";
 import { normalizeCountryCode } from "@/lib/flags";
+import { toast } from "sonner";
 
 const IN_FLIGHT = new Set([
   "initiated",
@@ -52,6 +67,20 @@ export default function PendingTransfersDialog({
   transfers: DashboardTransfer[] | undefined;
 }) {
   const pending = filterPendingTransfers(transfers);
+  const cancelTransfer = useCancelTransfer();
+  const [cancellingId, setCancellingId] = useState<string | null>(null);
+
+  const cancelOne = async (id: string) => {
+    setCancellingId(id);
+    try {
+      await cancelTransfer.mutateAsync(id);
+      toast.success("Transfer cancelled — funds returned to your wallet");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed to cancel transfer");
+    } finally {
+      setCancellingId(null);
+    }
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -111,6 +140,33 @@ export default function PendingTransfersDialog({
                         </span>
                       </span>
                     </Link>
+                    <div className="px-3 pb-2">
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 gap-1 text-destructive hover:text-destructive"
+                            disabled={cancellingId === t.id}
+                          >
+                            <XCircle className="h-3.5 w-3.5" />
+                            {cancellingId === t.id ? "Cancelling..." : "Cancel transfer"}
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Cancel this transfer?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              The amount sent to {t.recipient_name || "the recipient"} will be refunded to your wallet.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Keep transfer</AlertDialogCancel>
+                            <AlertDialogAction onClick={() => cancelOne(t.id)}>Yes, cancel & refund</AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </div>
                   </li>
                 );
               })}

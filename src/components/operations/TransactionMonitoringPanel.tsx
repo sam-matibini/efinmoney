@@ -6,7 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -25,6 +25,19 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
+
+const PROVIDERS = [
+  { value: "fincra", label: "Fincra" },
+  { value: "nomba", label: "Nomba" },
+  { value: "flovide", label: "Flovide" },
+  { value: "flutterwave", label: "Flutterwave" },
+  { value: "paytota", label: "Paytota" },
+  { value: "swychr", label: "Swychr" },
+  { value: "ghana_pay", label: "Ghana Pay" },
+  { value: "elicate", label: "Elicate" },
+  { value: "lenhub_flutter", label: "Lenhub" },
+  { value: "verto", label: "Verto" },
+];
 
 const statusConfig: Record<string, { icon: typeof Clock; color: string; label: string }> = {
   initiated: { icon: Clock, color: 'bg-blue-500/10 text-blue-600', label: 'Initiated' },
@@ -45,6 +58,7 @@ export const TransactionMonitoringPanel = () => {
   const [selectedTransfer, setSelectedTransfer] = useState<any>(null);
   const [interventionType, setInterventionType] = useState<string>('');
   const [interventionReason, setInterventionReason] = useState('');
+  const [provider, setProvider] = useState('');
   const [isInterventionOpen, setIsInterventionOpen] = useState(false);
 
   const { data: transfers = [], isLoading } = useQuery({
@@ -79,27 +93,44 @@ export const TransactionMonitoringPanel = () => {
   });
 
   const createIntervention = useMutation({
-    mutationFn: async ({ transferId, type, reason }: { transferId: string; type: string; reason: string }) => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Not authenticated');
+    mutationFn: async ({ transferId, type, reason, rail }: { transferId: string; type: string; reason: string; rail?: string }) => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) throw new Error('Not authenticated');
 
-      const { error } = await supabase.from('transaction_interventions').insert({
-        transfer_id: transferId,
-        intervention_type: type,
-        reason,
-        initiated_by: user.id,
+      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ops-intervene`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+          apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          transfer_id: transferId,
+          action: type,
+          reason,
+          provider: rail || undefined,
+        }),
       });
-      if (error) throw error;
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || json?.success === false) {
+        throw new Error(json?.result || json?.error || 'Intervention failed');
+      }
+      return json;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['transaction-interventions'] });
-      toast.success('Intervention created successfully');
+      queryClient.invalidateQueries({ queryKey: ['all-transfers'] });
+      toast.success(data?.result || 'Intervention applied');
       setIsInterventionOpen(false);
       setInterventionReason('');
       setInterventionType('');
+      setProvider('');
+      setSelectedTransfer(null);
     },
-    onError: (error: any) => toast.error(error.message),
+    onError: (error: Error) => toast.error(error.message),
   });
+
+  const needsProvider = interventionType === 'switch_provider' || interventionType === 'retry';
 
   const filteredTransfers = transfers.filter(t => 
     t.recipient_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -255,59 +286,19 @@ export const TransactionMonitoringPanel = () => {
                         {format(new Date(transfer.created_at), 'MMM dd, HH:mm')}
                       </TableCell>
                       <TableCell className="text-right">
-                        <Dialog open={isInterventionOpen && selectedTransfer?.id === transfer.id} onOpenChange={(open) => {
-                          setIsInterventionOpen(open);
-                          if (open) setSelectedTransfer(transfer);
-                        }}>
-                          <DialogTrigger asChild>
-                            <Button size="sm" variant="outline">Intervene</Button>
-                          </DialogTrigger>
-                          <DialogContent>
-                            <DialogHeader>
-                              <DialogTitle>Create Intervention</DialogTitle>
-                            </DialogHeader>
-                            <div className="space-y-4">
-                              <div className="space-y-2">
-                                <Label>Intervention Type</Label>
-                                <Select value={interventionType} onValueChange={setInterventionType}>
-                                  <SelectTrigger>
-                                    <SelectValue placeholder="Select type..." />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    <SelectItem value="retry">Retry Transfer</SelectItem>
-                                    <SelectItem value="cancel">Cancel Transfer</SelectItem>
-                                    <SelectItem value="switch_provider">Switch Provider</SelectItem>
-                                    <SelectItem value="manual_complete">Manual Complete</SelectItem>
-                                    <SelectItem value="reverse">Reverse</SelectItem>
-                                    <SelectItem value="escalate">Escalate</SelectItem>
-                                  </SelectContent>
-                                </Select>
-                              </div>
-                              <div className="space-y-2">
-                                <Label>Reason</Label>
-                                <Textarea
-                                  value={interventionReason}
-                                  onChange={(e) => setInterventionReason(e.target.value)}
-                                  placeholder="Explain the reason for this intervention..."
-                                  rows={3}
-                                />
-                              </div>
-                              <div className="flex justify-end gap-2">
-                                <Button variant="outline" onClick={() => setIsInterventionOpen(false)}>Cancel</Button>
-                                <Button
-                                  onClick={() => createIntervention.mutate({
-                                    transferId: transfer.id,
-                                    type: interventionType,
-                                    reason: interventionReason,
-                                  })}
-                                  disabled={!interventionType || !interventionReason || createIntervention.isPending}
-                                >
-                                  Create Intervention
-                                </Button>
-                              </div>
-                            </div>
-                          </DialogContent>
-                        </Dialog>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            setSelectedTransfer(transfer);
+                            setInterventionType('');
+                            setInterventionReason('');
+                            setProvider('');
+                            setIsInterventionOpen(true);
+                          }}
+                        >
+                          Intervene
+                        </Button>
                       </TableCell>
                     </TableRow>
                   );
@@ -317,6 +308,84 @@ export const TransactionMonitoringPanel = () => {
           </div>
         </CardContent>
       </Card>
+
+      <Dialog open={isInterventionOpen} onOpenChange={setIsInterventionOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Create Intervention</DialogTitle>
+            <DialogDescription>
+              {selectedTransfer
+                ? `${selectedTransfer.recipient_name} · ${selectedTransfer.source_amount} ${selectedTransfer.source_currency}`
+                : "Apply an operations action to this transfer."}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Intervention Type</Label>
+              <Select value={interventionType} onValueChange={setInterventionType}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select type..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="retry">Retry Transfer</SelectItem>
+                  <SelectItem value="cancel">Cancel Transfer</SelectItem>
+                  <SelectItem value="switch_provider">Switch Provider</SelectItem>
+                  <SelectItem value="manual_complete">Manual Complete</SelectItem>
+                  <SelectItem value="reverse">Reverse</SelectItem>
+                  <SelectItem value="escalate">Escalate</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            {needsProvider && (
+              <div className="space-y-2">
+                <Label>{interventionType === "switch_provider" ? "New provider" : "Provider"}</Label>
+                <Select value={provider} onValueChange={setProvider}>
+                  <SelectTrigger>
+                    <SelectValue placeholder={interventionType === "retry" ? "Same rail, or pick one..." : "Select provider..."} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {PROVIDERS.map((p) => (
+                      <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+            <div className="space-y-2">
+              <Label>Reason</Label>
+              <Textarea
+                value={interventionReason}
+                onChange={(e) => setInterventionReason(e.target.value)}
+                placeholder="Explain the reason for this intervention..."
+                rows={3}
+              />
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setIsInterventionOpen(false)}>Cancel</Button>
+              <Button
+                onClick={() => {
+                  if (!selectedTransfer) return;
+                  createIntervention.mutate({
+                    transferId: selectedTransfer.id,
+                    type: interventionType,
+                    reason: interventionReason,
+                    rail: provider || undefined,
+                  });
+                }}
+                disabled={
+                  !selectedTransfer
+                  || !interventionType
+                  || interventionReason.trim().length < 3
+                  || (interventionType === "switch_provider" && !provider)
+                  || createIntervention.isPending
+                }
+              >
+                {createIntervention.isPending ? "Applying..." : "Create Intervention"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

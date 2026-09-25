@@ -92,6 +92,8 @@ export const useCancelTransfer = () => {
       track('transfer_cancelled', { transfer_id });
       queryClient.invalidateQueries({ queryKey: ['transfers'] });
       queryClient.invalidateQueries({ queryKey: ['wallets'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-transfers'] });
+      queryClient.invalidateQueries({ queryKey: ['statement'] });
     },
   });
 };
