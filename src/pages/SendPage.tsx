@@ -2247,11 +2247,17 @@ const SendPage = () => {
    * after they explicitly click "Quick add new card".
    */
   const [showNewCardForm, setShowNewCardForm] = useState(false);
+  const addCardRequested = useRef(false);
   useEffect(() => {
-    if (savedCards.length === 0) setShowNewCardForm(true);
+    if (savedCards.length === 0) {
+      setShowNewCardForm(true);
+      return;
+    }
+    if (!addCardRequested.current) setShowNewCardForm(false);
   }, [savedCards.length]);
 
   const openNewCardForm = () => {
+    addCardRequested.current = true;
     setCardFields((prev) => ({
       ...prev,
       cardholderName: prev.cardholderName || activeSavedCard?.cardholder_name || "",
@@ -3318,7 +3324,7 @@ const SendPage = () => {
                                           exp_year: c.exp_year,
                                         }))}
                                         selectedCardId={activeSavedCard?.stripe_payment_method_id}
-                                        onCardChange={(id) => { setSelectedSavedCardId(id); setShowNewCardForm(false); }}
+                                        onCardChange={(id) => { addCardRequested.current = false; setSelectedSavedCardId(id); setShowNewCardForm(false); }}
                                         onAddCard={openNewCardForm}
 
                                         onAddWallet={() => createWalletTriggerRef.current?.click()}
@@ -3349,7 +3355,7 @@ const SendPage = () => {
                                         cardFields={cardFields}
                                         onCardFieldsChange={setCardFields}
                                         showCardForm={showNewCardForm}
-                                        onCancelCardForm={() => setShowNewCardForm(false)}
+                                        onCancelCardForm={() => { addCardRequested.current = false; setShowNewCardForm(false); }}
 
                                         insufficientBalance={insufficientFunds}
                                         onTopUp={() => navigate("/wallet/topup")}
