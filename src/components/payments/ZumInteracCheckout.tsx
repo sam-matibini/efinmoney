@@ -7,7 +7,6 @@ import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
 import { edgeFunctionErrorMessage } from "@/lib/invokeEdgeFunction";
 import InteracPayerForm, { emptyPayerForm, type PayerForm } from "@/components/payments/InteracPayerForm";
-import InteracCheckout from "@/components/payments/InteracCheckout";
 import { bankLink, type Lang } from "@/components/payments/checkoutStrings";
 import { FINCRA_CAD_INTERAC_ALIAS } from "@/lib/fincraCad";
 
@@ -20,11 +19,23 @@ interface Props {
   onComplete?: () => void;
 }
 
-type Phase = "form" | "bank" | "done" | "autodeposit";
+type Phase = "form" | "bank" | "done";
+
+const PAYER_MEMORY_KEY = "efm-cad-payer";
+
+function readRememberedPayer(): Partial<PayerForm> | null {
+  try {
+    const raw = localStorage.getItem(PAYER_MEMORY_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<PayerForm>;
+    return parsed && typeof parsed === "object" ? parsed : null;
+  } catch {
+    return null;
+  }
+}
 
 /**
- * Zum-style CAD pay-in: the sender approves Interac in their bank.
- * Autodeposit stays available if the bank link cannot be opened.
+ * CAD pay-in: the sender copies the details and completes Interac in their bank.
  */
 export default function ZumInteracCheckout({
   walletId,
@@ -46,6 +57,28 @@ export default function ZumInteracCheckout({
   const [efmReference, setEfmReference] = useState<string | null>(null);
   const [interacReference, setInteracReference] = useState<string | null>(null);
   const [bankRefDraft, setBankRefDraft] = useState("");
+
+  useEffect(() => {
+    const saved = readRememberedPayer();
+    if (!saved) return;
+    setForm((prev) => {
+      const next = { ...prev };
+      (Object.keys(saved) as Array<keyof PayerForm>).forEach((key) => {
+        const value = saved[key];
+        if (typeof value === "string" && value.trim()) next[key] = value as never;
+      });
+      return next;
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!form.bank && !form.email && !form.line1) return;
+    try {
+      localStorage.setItem(PAYER_MEMORY_KEY, JSON.stringify(form));
+    } catch {
+      /* private mode */
+    }
+  }, [form]);
 
   useEffect(() => {
     let cancelled = false;
@@ -167,19 +200,6 @@ export default function ZumInteracCheckout({
     };
   }, [phase, efmReference, fr, onComplete, qc]);
 
-  if (phase === "autodeposit") {
-    return (
-      <InteracCheckout
-        walletId={walletId}
-        purpose={purpose}
-        transferId={transferId}
-        fixedAmount={amount}
-        lang={lang}
-        onComplete={onComplete}
-      />
-    );
-  }
-
   if (phase === "done") {
     return (
       <div className="space-y-4 rounded-lg border p-4">
@@ -300,9 +320,6 @@ export default function ZumInteracCheckout({
         error={error}
         onSubmit={() => void startBankPay()}
       />
-      <Button type="button" variant="ghost" className="w-full" onClick={() => setPhase("autodeposit")}>
-        {fr ? "Envoyer un Autodeposit à la place" : "Send Autodeposit instead"}
-      </Button>
     </div>
   );
 }

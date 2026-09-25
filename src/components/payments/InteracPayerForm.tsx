@@ -197,10 +197,10 @@ export default function InteracPayerForm({
             </div>
           </div>
 
-          <div className="space-y-1.5">
+          <div className="space-y-1.5 rounded-xl border border-primary/15 bg-primary/5 p-3">
             <Label>{t.bank}</Label>
             <Select value={value.bank} onValueChange={(v) => set("bank", v)}>
-              <SelectTrigger>
+              <SelectTrigger className="h-11 bg-background">
                 <SelectValue placeholder={t.bank} />
               </SelectTrigger>
               <SelectContent>
@@ -209,40 +209,48 @@ export default function InteracPayerForm({
                     {b.name}
                   </SelectItem>
                 ))}
-                <SelectItem value="Other">Other</SelectItem>
+                <SelectItem value="Other">{lang === "fr" ? "Autre" : "Other"}</SelectItem>
               </SelectContent>
             </Select>
+            <p className="text-[12px] leading-relaxed text-muted-foreground">{t.bankHint}</p>
           </div>
 
-          <div className="space-y-3 pt-1">
-            <p className="text-sm font-medium">{t.billingAddress}</p>
-            <Input
-              aria-label={t.line1}
-              placeholder={t.line1}
-              autoComplete="address-line1"
-              maxLength={200}
-              value={value.line1}
-              onChange={(e) => set("line1", e.target.value)}
-            />
-            <Input
-              aria-label={t.line2}
-              placeholder={t.line2}
-              autoComplete="address-line2"
-              maxLength={200}
-              value={value.line2}
-              onChange={(e) => set("line2", e.target.value)}
-            />
-            <div className="grid gap-3 sm:grid-cols-4">
+          <div className="space-y-3 rounded-xl border bg-card p-3">
+            <p className="text-sm font-semibold">{t.billingAddress}</p>
+            <div className="space-y-1.5">
+              <Label htmlFor="etx-line1">{t.line1}</Label>
               <Input
-                aria-label={t.city}
-                placeholder={t.city}
+                id="etx-line1"
+                autoComplete="address-line1"
+                maxLength={200}
+                value={value.line1}
+                onChange={(e) => set("line1", e.target.value)}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="etx-line2">{t.line2}</Label>
+              <Input
+                id="etx-line2"
+                autoComplete="address-line2"
+                maxLength={200}
+                value={value.line2}
+                onChange={(e) => set("line2", e.target.value)}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="etx-city">{t.city}</Label>
+              <Input
+                id="etx-city"
                 autoComplete="address-level2"
                 maxLength={100}
                 value={value.city}
                 onChange={(e) => set("city", e.target.value)}
               />
+            </div>
+            <div className="space-y-1.5">
+              <Label>{t.province}</Label>
               <Select value={value.region} onValueChange={(v) => set("region", v)}>
-                <SelectTrigger aria-label={t.province}>
+                <SelectTrigger className="h-11 w-full">
                   <SelectValue placeholder={t.province} />
                 </SelectTrigger>
                 <SelectContent>
@@ -253,15 +261,22 @@ export default function InteracPayerForm({
                   ))}
                 </SelectContent>
               </Select>
-              <Input
-                aria-label={t.postal}
-                placeholder={t.postal}
-                autoComplete="postal-code"
-                maxLength={10}
-                value={value.postalCode}
-                onChange={(e) => set("postalCode", e.target.value)}
-              />
-              <Input aria-label={t.country} value="Canada" readOnly className="bg-muted/40" />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="min-w-0 space-y-1.5">
+                <Label htmlFor="etx-postal">{t.postal}</Label>
+                <Input
+                  id="etx-postal"
+                  autoComplete="postal-code"
+                  maxLength={10}
+                  value={value.postalCode}
+                  onChange={(e) => set("postalCode", e.target.value.toUpperCase())}
+                />
+              </div>
+              <div className="min-w-0 space-y-1.5">
+                <Label htmlFor="etx-country">{t.country}</Label>
+                <Input id="etx-country" value="Canada" readOnly className="bg-muted/50" />
+              </div>
             </div>
           </div>
         </>
