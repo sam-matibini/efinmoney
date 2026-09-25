@@ -9,6 +9,8 @@ import { usePlaidLink } from "react-plaid-link";
 import ContactsPickerModal from "@/components/modals/ContactsPickerModal";
 import AddBeneficiaryModal from "@/components/modals/AddBeneficiaryModal";
 import ContactQuickField from "@/components/send/ContactQuickField";
+import NetworkPicker from "@/components/send/NetworkPicker";
+import { networkIdForPhone } from "@/lib/payoutPartner";
 import AddCardModal from "@/components/modals/AddCardModal";
 import CreateWalletModal from "@/components/modals/CreateWalletModal";
 import TopUpModal from "@/components/modals/TopUpModal";
@@ -407,6 +409,18 @@ const SendPage = () => {
     : null;
   const effectivePayoutMethod = activeNetwork?.payout || targetCountry.payout;
   const effectiveMethodLabel = activeNetwork?.label || targetCountry.method;
+  const phoneNetworkId = networkIdForPhone(recipientPhone, targetCountry.code);
+  const visibleNetworks = availableNetworks
+    ? (phoneNetworkId
+      ? availableNetworks.filter((n) => n.id === phoneNetworkId)
+      : availableNetworks)
+    : [];
+
+  useEffect(() => {
+    if (!phoneNetworkId || !availableNetworks?.length) return;
+    const match = availableNetworks.find((n) => n.id === phoneNetworkId);
+    if (match && selectedNetworkId !== match.id) setSelectedNetworkId(match.id);
+  }, [phoneNetworkId, availableNetworks, selectedNetworkId]);
 
   // Reset network/bank fields only when the destination country actually changes.
   // Do not clear when pendingBeneficiary flips null after a contact apply — that
@@ -450,6 +464,7 @@ const SendPage = () => {
   const linkEligible = productFeatures.paymentLinks && isClaimCardCurrency(targetCountry.code) && !!linkWallet;
   const useLink = linkEligible && intlLinkMode;
   const isCanadaIntlPayout = targetCountry.code === "CAD" && !useLink;
+  const showMobileRecipient = !useLink && !isNGNBank && !isGhanaBank && !isCanadaIntlPayout;
   const cadInteracDest = useMemo(() => {
     if (!isCanadaIntlPayout || cadPayoutMode !== "interac") return null;
     return resolveCadInteracDestination({
@@ -2873,7 +2888,7 @@ const SendPage = () => {
                                         onChange={setRecipientName}
                                         onQuickAdd={() => setSaveModalOpen(true)}
                                       />
-                                      <div className="flex items-center justify-between gap-3">
+                                      <div className="space-y-3">
                                         <ContactQuickField
                                           label=""
                                           placeholder="Select contact"
@@ -2884,10 +2899,37 @@ const SendPage = () => {
                                         <button
                                           type="button"
                                           onClick={() => setPickerOpen(true)}
-                                          className="shrink-0 inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground"
+                                          className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground"
                                         >
                                           <Users className="w-3.5 h-3.5" /> All contacts
                                         </button>
+                                        {showMobileRecipient && visibleNetworks.length > 0 && (
+                                          <div className="space-y-1.5">
+                                            <Label>Network</Label>
+                                            <NetworkPicker
+                                              networks={visibleNetworks}
+                                              value={activeNetwork?.id || ""}
+                                              onChange={setSelectedNetworkId}
+                                            />
+                                          </div>
+                                        )}
+                                        {showMobileRecipient && (
+                                          <div className="space-y-1.5">
+                                            <Label>Phone number</Label>
+                                            <Input
+                                              placeholder={phonePlaceholder}
+                                              value={recipientPhone}
+                                              onChange={(e) => setRecipientPhone(e.target.value.replace(/[^\d+]/g, "").slice(0, 16))}
+                                              maxLength={16}
+                                              className="h-11 transition-shadow focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:shadow-[0_0_0_4px_hsl(var(--primary)/0.12)]"
+                                            />
+                                            <p className="text-sm text-muted-foreground">
+                                              {targetCountry.code === "ZMW"
+                                                ? `Use 260… or 07… (Airtel 77/97, MTN 76/96, Zamtel 75/95). Sent via ${effectiveMethodLabel}.`
+                                                : `Sent via ${effectiveMethodLabel} to this number.`}
+                                            </p>
+                                          </div>
+                                        )}
                                       </div>
                                     </motion.div>
 
@@ -3007,30 +3049,6 @@ const SendPage = () => {
                                               >
                                                 <span>{label}</span>
                                                 <span className="text-[10px] font-normal opacity-70">{sub}</span>
-                                              </button>
-                                            );
-                                          })}
-                                        </div>
-                                      </motion.div>
-                                    )}
-                                    {!useLink && availableNetworks && availableNetworks.length > 1 && !isGhanaBank && !isNGNBank && !isCanadaIntlPayout && (
-                                      <motion.div custom={1.5} variants={fieldVariants} initial="hidden" animate="show" className="space-y-2">
-                                        <Label>Network</Label>
-                                        <div className="grid grid-cols-3 gap-2">
-                                          {availableNetworks.map((n) => {
-                                            const active = (activeNetwork?.id === n.id);
-                                            return (
-                                              <button
-                                                key={n.id}
-                                                type="button"
-                                                onClick={() => setSelectedNetworkId(n.id)}
-                                                className={`rounded-md border px-3 py-2 text-sm font-medium transition-colors ${
-                                                  active
-                                                    ? "border-primary bg-primary/10 text-primary"
-                                                    : "border-border bg-card hover:bg-muted text-foreground"
-                                                }`}
-                                              >
-                                                {n.label}
                                               </button>
                                             );
                                           })}
@@ -3237,25 +3255,7 @@ const SendPage = () => {
                                           </motion.div>
                                         </>
                                       )
-                                    ) : (
-                                      <>
-                                      <motion.div custom={2} variants={fieldVariants} initial="hidden" animate="show" className="space-y-2">
-                                        <Label>Phone number</Label>
-                                        <Input
-                                          placeholder={phonePlaceholder}
-                                          value={recipientPhone}
-                                          onChange={(e) => setRecipientPhone(e.target.value.replace(/[^\d+]/g, "").slice(0, 16))}
-                                          maxLength={16}
-                                          className="transition-shadow focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:shadow-[0_0_0_4px_hsl(var(--primary)/0.12)]"
-                                        />
-                                        <p className="text-sm text-muted-foreground">
-                                          {targetCountry.code === "ZMW"
-                                            ? `Use 260… or 07… (Airtel 77/97, MTN 76/96, Zamtel 75/95). Sent via ${effectiveMethodLabel}.`
-                                            : `Sent via ${effectiveMethodLabel} to this number.`}
-                                        </p>
-                                      </motion.div>
-                                      </>
-                                    )}
+                                    ) : null}
 
 
                                     <motion.div custom={0} variants={fieldVariants} initial="hidden" animate="show">

@@ -84,12 +84,12 @@ const nationalDigits = (phone: string, dial: string): string => {
  * Keys are the national prefix after stripping the dial code and leading 0.
  */
 const PREFIX_MAPS: Record<string, { dial: string; prefixes: Record<string, string> }> = {
-  // Zambia: 76/96 Airtel, 77/97 MTN, 75/95 Zamtel
+  // Zambia: 76/96 MTN, 77/97 Airtel, 75/95 Zamtel
   ZMW: {
     dial: "260",
     prefixes: {
-      "76": "airtel", "96": "airtel",
-      "77": "mtn", "97": "mtn",
+      "76": "mtn", "96": "mtn",
+      "77": "airtel", "97": "airtel",
       "75": "zamtel", "95": "zamtel",
     },
   },
@@ -118,6 +118,11 @@ const currencyForCountry = (countryCode?: string | null): string | null => {
   if (!countryCode) return null;
   const c = COUNTRIES.find((x) => x.code === countryCode || x.id === countryCode);
   return c?.code ?? countryCode;
+};
+
+/** Operator id from a mobile number, or null until the prefix is long enough to match. */
+export const networkIdForPhone = (phone?: string | null, countryCode?: string | null): string | null => {
+  return inferFromPhone(phone, countryCode);
 };
 
 const inferFromPhone = (phone?: string | null, countryCode?: string | null): string | null => {
