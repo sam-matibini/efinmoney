@@ -5,6 +5,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { explainPayoutError, notifyOpsBrief } from "../_shared/ops-alert.ts";
 import { payoutFnForRail } from "../_shared/corridor-rails.ts";
 import { payoutMinAmount } from "../_shared/payoutMins.ts";
+import { resolvePayoutNetwork } from "../_shared/nomba-payout-corridors.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -209,7 +210,10 @@ Deno.serve(async (req) => {
       bank_code: transfer.recipient_bank_code,
       amount: payoutAmount,
       currency: transfer.target_currency ?? transfer.source_currency,
-      network: transfer.payout_method,
+      network: resolvePayoutNetwork(
+        transfer.payout_method,
+        String(transfer.target_currency ?? transfer.source_currency ?? ""),
+      ) || transfer.payout_method,
       recipient_name: transfer.recipient_name,
       skip_reversal: true,
     };

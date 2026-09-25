@@ -10,7 +10,7 @@ import { validatePayoutMin } from "../_shared/payoutMins.ts";
 import { nombaApiConfigured } from "../_shared/nomba-api.ts";
 import { requireCadInteracDestination } from "../_shared/cadInteracPayout.ts";
 import { canResumeExecuteTransfer } from "../_shared/executeTransferResume.ts";
-import { isCanadaCadPayout, isUsUsdBankPayout, resolvePayoutNetwork, availableCanadaCadPayoutRails, availableUsUsdPayoutRails } from "../_shared/nomba-payout-corridors.ts";
+import { isCanadaCadPayout, isUsUsdBankPayout, resolvePayoutNetwork, availableCanadaCadPayoutRails, availableUsUsdPayoutRails, sanitizePrimaryPayoutRails } from "../_shared/nomba-payout-corridors.ts";
 import { orderRailsByLeastCost } from "../_shared/routingEngine.ts";
 
 const corsHeaders = {
@@ -600,7 +600,13 @@ Deno.serve(async (req) => {
     );
     // Canada CAD: skip the generic policy loop (it can include Flutterwave).
     // Dedicated Interac/EFT chain below ranks Nomba + Fincra by least cost.
-    let policyRails = (isCanada || isUsUsd) ? [] : [...resolvedPolicyRails];
+    // All other corridors: Fincra → Nomba only (no Flutterwave / Flovide / Paytota).
+    let policyRails = (isCanada || isUsUsd)
+      ? []
+      : sanitizePrimaryPayoutRails([...resolvedPolicyRails], {
+        currency: targetCurrency,
+        country: recipientCountry || transfer.recipient_country,
+      });
     let policyRouted = false;
 
     const routeRequest = {
@@ -614,35 +620,32 @@ Deno.serve(async (req) => {
       amount: Number(transfer.source_amount) || 0,
     };
 
-    // Uganda: keep Fincra preferred (Nomba has no UGX FX pair from trade region NG).
-    // Nigeria NGN bank: force Fincra ahead of Nomba even if an old policy prefers Nomba.
+    // Uganda / Nigeria: force Fincra → Nomba (ignore old Flutterwave-heavy policies).
     if (isNigeriaBank && policyRails.length) {
-      const ngOrdered = ["fincra", "nomba", "flovide", "flutterwave", "swychr"];
-      const kept = policyRails.map((r) => r.toLowerCase());
-      policyRails = [
-        ...ngOrdered.filter((r) => kept.includes(r)),
-        ...kept.filter((r) => !ngOrdered.includes(r)),
-      ];
-      console.log("nigeria NGN payout rails (Fincra-first)", policyRails);
-    } else if (!isCanada && !isUganda && policyRails.length > 1) {
+      policyRails = sanitizePrimaryPayoutRails(policyRails, {
+        currency: targetCurrency,
+        country: recipientCountry || transfer.recipient_country,
+      });
+      console.log("nigeria NGN payout rails (Fincra→Nomba)", policyRails);
+    } else if (isUganda && policyRails.length) {
+      policyRails = sanitizePrimaryPayoutRails(policyRails, {
+        currency: targetCurrency,
+        country: recipientCountry || transfer.recipient_country,
+      });
+      console.log("uganda payout rails (Fincra→Nomba)", policyRails);
+    } else if (!isCanada && !isUganda && !isNigeriaBank && policyRails.length > 1) {
       try {
         const ranked = await resolveRoute(supabase, routeRequest);
         if (ranked.candidates.length) {
-          policyRails = orderRailsByLeastCost(policyRails, ranked.candidates);
+          policyRails = sanitizePrimaryPayoutRails(
+            orderRailsByLeastCost(policyRails, ranked.candidates),
+            { currency: targetCurrency, country: recipientCountry || transfer.recipient_country },
+          );
           console.log("least-cost payout rails", policyRails, "strategy", ranked.rule?.strategy);
         }
       } catch (e) {
         console.error("least-cost rail ranking failed, using policy order", e);
       }
-    } else if (isUganda && policyRails.length) {
-      // Force Fincra ahead of Nomba even if an old policy still prefers Nomba.
-      const ugOrdered = ["fincra", "flutterwave", "paytota", "flovide", "nomba"];
-      const kept = policyRails.map((r) => r.toLowerCase());
-      policyRails = [
-        ...ugOrdered.filter((r) => kept.includes(r)),
-        ...kept.filter((r) => !ugOrdered.includes(r)),
-      ];
-      console.log("uganda payout rails (Fincra-first)", policyRails);
     }
 
     let engineRouted = false;
@@ -1261,79 +1264,14 @@ Deno.serve(async (req) => {
           }
         };
 
-        if (isNigeriaBank) {
+        // Canonical payout chain: Fincra → Nomba only (no Flutterwave / Flovide / Paytota / Swychr).
+        // Ops email via holdPendingOps when both fail.
+        if (isNigeriaBank || zambiaMomo || fincraCapable) {
           await tryFincra();
-          await tryNomba();
+          if (!zambiaMomo) await tryNomba();
         } else {
           await tryNomba();
           await tryFincra();
-        }
-
-        // 2) Flovide — NGN bank / GHS bank / KES-GHS-UGX MoMo when earlier rails miss
-        if (
-          flovideKeys
-          && (isNigeriaBank || isGhanaBank || ["KES", "GHS", "UGX"].includes(targetCurrency))
-        ) {
-          await tryNext("flovide", async () => {
-            const fvRes = await fetch(
-              `${Deno.env.get("SUPABASE_URL")}/functions/v1/flovide-payout`,
-              {
-                method: "POST",
-                headers: internalHeaders,
-                body: JSON.stringify({ ...flwBody(), transfer_id }),
-              },
-            );
-            return fvRes.json().catch(() => ({
-              success: false,
-              error: `flovide-payout HTTP ${fvRes.status}`,
-              rail: "flovide",
-            }));
-          });
-        }
-
-        // 3) Flutterwave — never for Zambia ZMW (Fincra-only corridor).
-        if (!zambiaMomo && targetCurrency !== "ZMW") {
-          await tryNext("flutterwave", async () => {
-            const flwRes = await fetch(
-              `${Deno.env.get("SUPABASE_URL")}/functions/v1/flutterwave-payout`,
-              { method: "POST", headers: internalHeaders, body: JSON.stringify(flwBody()) },
-            );
-            return flwRes.json().catch(() => ({
-              success: false,
-              error: `flutterwave-payout HTTP ${flwRes.status}`,
-              rail: "flutterwave",
-            }));
-          });
-        }
-
-        // 4) Paytota (UGX/KES/RWF MoMo)
-        if (paytotaCapable) {
-          await tryNext("paytota", async () => {
-            const paytotaRes = await fetch(
-              `${Deno.env.get("SUPABASE_URL")}/functions/v1/paytota-payout`,
-              { method: "POST", headers: internalHeaders, body: JSON.stringify({ transfer_id }) },
-            );
-            return paytotaRes.json().catch(() => ({
-              success: false,
-              error: `paytota-payout HTTP ${paytotaRes.status}`,
-              rail: "paytota",
-            }));
-          });
-        }
-
-        // 5) Swychr (NGN bank when enabled)
-        if (isNigeriaBank && swychrEnabled) {
-          await tryNext("swychr", async () => {
-            const swychrRes = await fetch(
-              `${Deno.env.get("SUPABASE_URL")}/functions/v1/swychr-payout`,
-              { method: "POST", headers: internalHeaders, body: JSON.stringify({ transfer_id }) },
-            );
-            return swychrRes.json().catch(() => ({
-              success: false,
-              error: `swychr-payout HTTP ${swychrRes.status}`,
-              rail: "swychr",
-            }));
-          });
         }
 
         console.log("priority payout chain", attempts, "final", payoutResult?.rail, payoutResult?.success);
@@ -1361,16 +1299,52 @@ Deno.serve(async (req) => {
           error_class: "misroute",
         };
       } else {
-        // Other corridors → Flutterwave default
-        const res = await fetch(
-          `${Deno.env.get("SUPABASE_URL")}/functions/v1/flutterwave-payout`,
-          {
-            method: "POST",
-            headers: internalHeaders,
-            body: JSON.stringify(flwBody()),
-          },
-        );
-        payoutResult = await res.json();
+        // Catch-all: Fincra → Nomba (never Flutterwave).
+        if (fincraConfigured) {
+          const fincraRes = await fetch(
+            `${Deno.env.get("SUPABASE_URL")}/functions/v1/fincra-payout`,
+            {
+              method: "POST",
+              headers: internalHeaders,
+              body: JSON.stringify({ ...flwBody(), skip_reversal: true }),
+            },
+          );
+          payoutResult = await fincraRes.json().catch(() => ({
+            success: false,
+            error: `fincra-payout HTTP ${fincraRes.status}`,
+            rail: "fincra",
+          }));
+          payoutResult = { ...payoutResult, rail: payoutResult?.rail || "fincra" };
+        }
+        if (!payoutOk(payoutResult) && nombaApiConfigured()) {
+          const nombaRes = await fetch(
+            `${Deno.env.get("SUPABASE_URL")}/functions/v1/nomba-payout`,
+            { method: "POST", headers: internalHeaders, body: JSON.stringify({ transfer_id }) },
+          );
+          const nombaJson = await nombaRes.json().catch(() => ({
+            success: false,
+            error: `nomba-payout HTTP ${nombaRes.status}`,
+            rail: "nomba",
+          }));
+          if (payoutOk(nombaJson)) {
+            payoutResult = { ...nombaJson, rail: "nomba" };
+          } else if (!payoutOk(payoutResult)) {
+            payoutResult = {
+              ...nombaJson,
+              rail: "nomba",
+              error: String(nombaJson?.error || payoutResult?.error || "Payout failed"),
+              priority_chain: ["fincra", "nomba"],
+            };
+          }
+        }
+        if (!payoutOk(payoutResult) && !payoutResult) {
+          payoutResult = {
+            success: false,
+            error: "No payout rail configured (need Fincra or Nomba)",
+            rail: "none",
+            retryable: true,
+          };
+        }
       }
     } catch (e) {
       console.error("Payout trigger error:", e);

@@ -389,7 +389,8 @@ export function nombaPayoutSupported(params: {
 
 /**
  * Ordered payout rails when no admin corridor_rail_policies row exists.
- * Nomba first wherever it can pay; Zambia stays Fincra-only.
+ * Canonical: Fincra → Nomba. Zambia stays Fincra-only (Nomba has no ZMW).
+ * Flutterwave / Flovide / Paytota / Swychr are not used for payout.
  */
 export function defaultPayoutRails(params: {
   currency: string;
@@ -402,34 +403,41 @@ export function defaultPayoutRails(params: {
 
   if (ccy === "ZMW" || country === "ZM") return ["fincra"];
 
-  const fincraAfrica = ["fincra", "flovide", "flutterwave"];
-  // Uganda: Nomba has no tradable UGX pairs from trade region NG on our account —
-  // prefer Fincra (proven), then Flutterwave / Paytota / Flovide. Nomba last as optional try.
-  const ugandaRails = ["fincra", "flutterwave", "paytota", "flovide", "nomba"];
-  const eastAfrica = ["fincra", "flovide", "flutterwave", "paytota"];
+  const fincraNomba = ["fincra", "nomba"];
 
   switch (kind) {
     case "domestic_ngn":
-      // Fincra first (NGN + CAD float); Nomba failover when Fincra is short.
-      return ["fincra", "nomba", "flovide", "flutterwave", "swychr"];
+      return [...fincraNomba];
     case "global_momo":
-      if (ccy === "UGX" || country === "UG") return ugandaRails;
-      if (["KES", "RWF", "TZS"].includes(ccy)) return ["nomba", ...eastAfrica];
-      if (["GHS", "XOF", "XAF", "ETB", "CDF"].includes(ccy) || (ccy === "USD" && country === "CD")) {
-        return ["nomba", ...fincraAfrica];
-      }
-      return ["nomba", ...fincraAfrica];
+      return [...fincraNomba];
     case "global_interac":
       return [...CANADA_CAD_PAYOUT_RAILS];
     case "global_bank":
       if (ccy === "CAD") return [...CANADA_CAD_PAYOUT_RAILS];
       if (ccy === "USD" || country === "US") return [...US_USD_PAYOUT_RAILS];
-      if (ccy === "ZAR" || ccy === "AED") return ["nomba", "fincra", "flutterwave"];
-      if (ccy === "GBP" || ccy === "EUR") return ["nomba", "flutterwave"];
-      return ["nomba", "fincra", "flutterwave"];
+      return [...fincraNomba];
     default:
       return [];
   }
+}
+
+/** Drop Flutterwave and other retired payout rails — Fincra → Nomba only. */
+export function sanitizePrimaryPayoutRails(rails: string[], opts?: {
+  currency?: string | null;
+  country?: string | null;
+}): string[] {
+  const ccy = String(opts?.currency || "").toUpperCase();
+  const country = normalizeNombaCountry(opts?.country, ccy);
+  if (ccy === "ZMW" || country === "ZM") return ["fincra"];
+  if (ccy === "CAD" || country === "CA") return sanitizeCanadaPayoutRails(rails);
+  if (ccy === "USD" || country === "US") return sanitizeUsUsdPayoutRails(rails);
+
+  const kept = rails
+    .map((r) => r.trim().toLowerCase())
+    .filter((r) => r === "fincra" || r === "nomba");
+  const ordered = ["fincra", "nomba"].filter((r) => kept.includes(r));
+  if (ordered.length) return ordered;
+  return ["fincra", "nomba"];
 }
 
 /** Map our network token → Nomba provider search keys. */

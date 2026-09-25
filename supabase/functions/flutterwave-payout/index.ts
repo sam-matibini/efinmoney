@@ -37,6 +37,29 @@ const V3_MM_BANK: Record<string, string> = {
   "RWF:mtn": "MTN", "RWF:airtel": "ATL",
 };
 
+/** UI payout_method tokens → FLW lookup key (e.g. airtel_money → airtel). */
+function normalizeFlwMmNetwork(network: string): string {
+  const n = String(network || "").toLowerCase().trim();
+  const mapped: Record<string, string> = {
+    mtn_mobile: "mtn",
+    airtel_money: "airtel",
+    airteltigo_money: "airtel",
+    zamtel_money: "zamtel",
+    vodafone_cash: "vodafone",
+    vodafone_money: "vodafone",
+    tigo_pesa: "tigo",
+    orange_money: "orange",
+    m_pesa: "mpesa",
+    "m-pesa": "mpesa",
+  };
+  if (mapped[n]) return mapped[n];
+  return n
+    .replace(/_money$/i, "")
+    .replace(/_mobile$/i, "")
+    .replace(/_cash$/i, "")
+    .replace(/_pesa$/i, "");
+}
+
 const V3_BRANCH_CODES: Record<string, string> = {
   "UGX:MTN": "UG010101",
   "UGX:ATL": "UG020202",
@@ -300,7 +323,8 @@ Deno.serve(async (req) => {
       const branch = V3_BRANCH_CODES[`${currency}:${String(bank_code)}`];
       if (branch) (payload as Record<string, unknown>).destination_branch_code = branch;
     } else {
-      const bank = V3_MM_BANK[`${currency}:${network.toLowerCase()}`];
+      const netKey = normalizeFlwMmNetwork(network || "");
+      const bank = V3_MM_BANK[`${currency}:${netKey}`] || V3_MM_BANK[`${currency}:${String(network || "").toLowerCase()}`];
       if (!bank) {
         const reason = `Unsupported network ${network} for ${currency}`;
         const rev = await reverseTransferLedger(supabase, transfer_id);

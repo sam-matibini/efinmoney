@@ -104,6 +104,40 @@ const currencySymbol = (code: string) => {
   return map[code] || code + " ";
 };
 
+/** Match edge resolvePayoutNetwork — UI methods like airtel_money → airtel. */
+const resolveClientPayoutNetwork = (payoutMethod: string | null | undefined, currency: string): string => {
+  const ccy = String(currency || "").toUpperCase();
+  if (ccy === "CAD") {
+    const m = String(payoutMethod || "").toLowerCase();
+    if (m === "eft" || m === "bank") return "eft";
+    return "interac";
+  }
+  const map: Record<string, string> = {
+    mtn_mobile: "mtn",
+    airtel_money: "airtel",
+    airteltigo_money: "airtel",
+    zamtel_money: "zamtel",
+    vodafone_cash: "vodafone",
+    vodafone_money: "vodafone",
+    tigo_pesa: "tigo",
+    mpesa: "mpesa",
+    orange_money: "orange",
+    bank: "bank",
+    eft: "eft",
+    interac: "interac",
+  };
+  const raw = String(payoutMethod || "").toLowerCase().trim();
+  if (map[raw]) return map[raw];
+  if (["mtn", "airtel", "zamtel", "mpesa", "vodafone", "tigo", "orange", "wave", "moov"].includes(raw)) {
+    return raw;
+  }
+  const stripped = raw.replace(/_money$/i, "").replace(/_mobile$/i, "").replace(/_cash$/i, "").replace(/_pesa$/i, "");
+  if (stripped) return stripped;
+  if (ccy === "ZMW") return "mtn";
+  if (ccy === "KES") return "mpesa";
+  return raw || "bank";
+};
+
 const statusMeta = (status: string) => {
   switch (status) {
     case "completed":
@@ -200,7 +234,16 @@ const TransferTrackingPage = () => {
         transfer.target_currency === "NGN"
         && (transfer.payout_method === "bank" || transfer.transfer_type === "bank")
         && !!transfer.recipient_bank_code;
-      const looksFincra = /^STUB-FINCRA/i.test(String(transfer.provider_reference || ""))
+      const isZambiaMomo =
+        (transfer.target_currency ?? "").toUpperCase() === "ZMW"
+        || (transfer.recipient_country ?? "").toUpperCase() === "ZM"
+        || (transfer.recipient_country ?? "").toUpperCase() === "ZAMBIA";
+      const payoutNetwork = resolveClientPayoutNetwork(
+        transfer.payout_method,
+        transfer.target_currency ?? transfer.source_currency,
+      );
+      const looksFincra = isZambiaMomo
+        || /^STUB-FINCRA/i.test(String(transfer.provider_reference || ""))
         || /^FINCRA-PENDING/i.test(String(transfer.provider_reference || ""))
         || /fincra/i.test(String(transfer.provider_reference || ""))
         || /fincra/i.test(String(transfer.failure_reason || ""))
@@ -226,7 +269,7 @@ const TransferTrackingPage = () => {
         const stubRef = !transfer.provider_reference
           || /^STUB-/i.test(String(transfer.provider_reference))
           || /^FINCRA-PENDING/i.test(String(transfer.provider_reference));
-        if (stubRef && ["funded", "processing", "initiated"].includes(transfer.status)) {
+        if (stubRef && ["funded", "processing", "initiated", "failed"].includes(transfer.status)) {
           const { data: payData, error: payErr } = await supabase.functions.invoke("fincra-payout", {
             body: {
               transfer_id: id,
@@ -235,8 +278,11 @@ const TransferTrackingPage = () => {
               bank_code: transfer.recipient_bank_code,
               amount: Number(transfer.target_amount ?? transfer.source_amount),
               currency: transfer.target_currency ?? transfer.source_currency,
-              network: transfer.payout_method === "bank" ? "bank" : (transfer.payout_method || "bank"),
+              source_currency: transfer.source_currency,
+              network: payoutNetwork === "bank" ? "bank" : payoutNetwork,
               recipient_name: transfer.recipient_name,
+              force_retry: transfer.status === "failed",
+              skip_reversal: transfer.status === "failed",
             },
           });
           const { data: fresh } = await supabase.from("transfers").select("*").eq("id", id).maybeSingle();
@@ -275,18 +321,16 @@ const TransferTrackingPage = () => {
         return;
       }
       // Prefer Nomba verify only when a Nomba payout row exists — NGN bank can also go via Flutterwave.
-      // Stuck funded/processing with no real provider ref — call payout directly so
-      // the provider's error is written to the transfer (works even before flw-verify deploy).
-      // Never auto-route Fincra-intended transfers onto Flutterwave.
+      // Stuck funded/processing with no real provider ref — retry via Fincra (never Flutterwave).
       const stubRef = !transfer.provider_reference || /^STUB-/i.test(String(transfer.provider_reference));
       if (
         stubRef &&
-        ["funded", "processing", "initiated"].includes(transfer.status) &&
+        ["funded", "processing", "initiated", "failed"].includes(transfer.status) &&
         !nombaPayout &&
         !swychrPayout &&
         !looksFincra
       ) {
-        const { data: payData, error: payErr } = await supabase.functions.invoke("flutterwave-payout", {
+        const { data: payData, error: payErr } = await supabase.functions.invoke("fincra-payout", {
           body: {
             transfer_id: id,
             phone_number: transfer.recipient_phone,
@@ -294,8 +338,11 @@ const TransferTrackingPage = () => {
             bank_code: transfer.recipient_bank_code,
             amount: Number(transfer.target_amount ?? transfer.source_amount),
             currency: transfer.target_currency ?? transfer.source_currency,
-            network: transfer.payout_method === "bank" ? "bank" : (transfer.payout_method || "bank"),
+            source_currency: transfer.source_currency,
+            network: payoutNetwork === "bank" ? "bank" : payoutNetwork,
             recipient_name: transfer.recipient_name,
+            force_retry: transfer.status === "failed",
+            skip_reversal: transfer.status === "failed",
           },
         });
         const { data: fresh } = await supabase.from("transfers").select("*").eq("id", id).maybeSingle();

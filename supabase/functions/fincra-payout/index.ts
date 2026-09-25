@@ -145,6 +145,29 @@ const FINCRA_MM_CODE: Record<string, string> = {
   "XAF:orange": "ORANGE",
 };
 
+/** UI payout_method tokens → Fincra lookup key (e.g. airtel_money → airtel). */
+function normalizeFincraMmNetwork(network: string): string {
+  const n = String(network || "").toLowerCase().trim();
+  const mapped: Record<string, string> = {
+    mtn_mobile: "mtn",
+    airtel_money: "airtel",
+    airteltigo_money: "airtel",
+    zamtel_money: "zamtel",
+    vodafone_cash: "vodafone",
+    vodafone_money: "vodafone",
+    tigo_pesa: "tigo",
+    orange_money: "orange",
+    m_pesa: "mpesa",
+    "m-pesa": "mpesa",
+  };
+  if (mapped[n]) return mapped[n];
+  return n
+    .replace(/_money$/i, "")
+    .replace(/_mobile$/i, "")
+    .replace(/_cash$/i, "")
+    .replace(/_pesa$/i, "");
+}
+
 /** Currencies we will try as Fincra funding wallets (after preferred). */
 const DEFAULT_FUNDING_FALLBACKS = ["NGN", "CAD", "USD", "GHS", "KES", "ZMW"];
 
@@ -1236,7 +1259,8 @@ Deno.serve(async (req) => {
       // by expanding bankCode on each funding attempt below when payout fails.
       (beneficiaryBase as Record<string, unknown>)._bankCodeVariants = codeVariants;
     } else {
-      mmCode = FINCRA_MM_CODE[`${ccy}:${network.toLowerCase()}`] || null;
+      const netKey = normalizeFincraMmNetwork(network || "");
+      mmCode = FINCRA_MM_CODE[`${ccy}:${netKey}`] || FINCRA_MM_CODE[`${ccy}:${String(network || "").toLowerCase()}`] || null;
       if (!mmCode) {
         const reason = `Unsupported network ${network} for ${ccy} on Fincra`;
         const rev = await reverseTransferLedger(supabase, transfer_id);

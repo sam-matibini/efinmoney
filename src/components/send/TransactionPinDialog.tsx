@@ -13,11 +13,18 @@ interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   /** Called once the PIN is successfully set or verified. Receives the PIN for server-side checks. */
-  onVerified: (pin: string) => void;
+  onVerified: (pin: string) => void | Promise<void>;
   /** Optional context shown in the header (e.g. amount being sent). */
   amountLabel?: string;
   /** Override the verify-mode subtitle (e.g. viewing card details). */
   verifyDescription?: string;
+  /**
+   * When true, keeps the dialog open and shows a full processing animation
+   * (after PIN success). Parent should clear this when the transfer action finishes.
+   */
+  processing?: boolean;
+  /** Label under the spinner while processing. */
+  processingLabel?: string;
 }
 
 const PIN_LENGTH = 4;
@@ -27,11 +34,20 @@ const PIN_LENGTH = 4;
  * create a PIN (first send) or enter their existing one, and only calls
  * onVerified() once the server confirms the PIN.
  */
-const TransactionPinDialog = ({ open, onOpenChange, onVerified, amountLabel, verifyDescription }: Props) => {
+const TransactionPinDialog = ({
+  open,
+  onOpenChange,
+  onVerified,
+  amountLabel,
+  verifyDescription,
+  processing = false,
+  processingLabel = "Processing your transfer…",
+}: Props) => {
   const [mode, setMode] = useState<Mode>("loading");
   const [pin, setPin] = useState("");
   const [firstPin, setFirstPin] = useState("");
   const [busy, setBusy] = useState(false);
+  const [postVerifyProcessing, setPostVerifyProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [resetEmail, setResetEmail] = useState("");
   const [attemptsLeft, setAttemptsLeft] = useState<number | null>(null);
@@ -47,6 +63,7 @@ const TransactionPinDialog = ({ open, onOpenChange, onVerified, amountLabel, ver
     setPin("");
     setFirstPin("");
     setError(null);
+    setPostVerifyProcessing(false);
     submitLockRef.current = false;
     completedRef.current = false;
   }, []);
@@ -72,15 +89,25 @@ const TransactionPinDialog = ({ open, onOpenChange, onVerified, amountLabel, ver
     setShakeKey(shakeRef.current);
   };
 
-  const finishVerified = (verifiedPin: string, opts?: { created?: boolean }) => {
+  const finishVerified = async (verifiedPin: string, opts?: { created?: boolean }) => {
     if (completedRef.current) return;
     completedRef.current = true;
     setPin("");
+    setPostVerifyProcessing(true);
     if (opts?.created) {
       toast.success("Transaction PIN created");
     }
-    onVerifiedRef.current(verifiedPin);
+    setBusy(true);
+    try {
+      await onVerifiedRef.current(verifiedPin);
+    } finally {
+      setBusy(false);
+      setPostVerifyProcessing(false);
+    }
   };
+
+  const showTransferProcessing = processing || postVerifyProcessing;
+  const canDismiss = !busy && !showTransferProcessing && !completedRef.current;
 
   const submitSet = async (finalPin: string) => {
     if (submitLockRef.current || busy || completedRef.current) return;
@@ -89,8 +116,8 @@ const TransactionPinDialog = ({ open, onOpenChange, onVerified, amountLabel, ver
     setError(null);
     setPin("");
     const { data, error: rpcErr } = await supabase.rpc("set_transaction_pin" as any, { p_pin: finalPin });
-    setBusy(false);
     if (rpcErr || !data) {
+      setBusy(false);
       submitLockRef.current = false;
       setError(rpcErr?.message?.includes("Not authenticated")
         ? "Session expired — please sign in again."
@@ -100,7 +127,7 @@ const TransactionPinDialog = ({ open, onOpenChange, onVerified, amountLabel, ver
       setFirstPin("");
       return;
     }
-    finishVerified(finalPin, { created: true });
+    await finishVerified(finalPin, { created: true });
   };
 
   const submitForgot = async () => {
@@ -123,21 +150,22 @@ const TransactionPinDialog = ({ open, onOpenChange, onVerified, amountLabel, ver
     setError(null);
     setPin("");
     const { data, error: rpcErr } = await supabase.rpc("verify_transaction_pin" as any, { p_pin: finalPin });
-    setBusy(false);
     const res = (data ?? {}) as {
       ok?: boolean; locked?: boolean; no_pin?: boolean;
       attempts_left?: number; locked_until?: string;
     };
     if (rpcErr) {
+      setBusy(false);
       submitLockRef.current = false;
       setError("Verification failed. Please try again.");
       triggerShake();
       return;
     }
     if (res.ok) {
-      finishVerified(finalPin);
+      await finishVerified(finalPin);
       return;
     }
+    setBusy(false);
     submitLockRef.current = false;
     if (res.no_pin) {
       setMode("set");
@@ -209,8 +237,12 @@ const TransactionPinDialog = ({ open, onOpenChange, onVerified, amountLabel, ver
         : "Enter your 4-digit PIN to authorize this transfer.");
 
   return (
-    <Dialog open={open} onOpenChange={(o) => { if (!busy && !completedRef.current) onOpenChange(o); }}>
-      <DialogContent className="sm:max-w-sm overflow-hidden">
+    <Dialog open={open} onOpenChange={(o) => { if (canDismiss) onOpenChange(o); }}>
+      <DialogContent
+        className="sm:max-w-sm overflow-hidden"
+        onPointerDownOutside={(e) => { if (!canDismiss) e.preventDefault(); }}
+        onEscapeKeyDown={(e) => { if (!canDismiss) e.preventDefault(); }}
+      >
         <DialogHeader className="items-center text-center">
           <motion.div
             initial={{ scale: 0, rotate: -20 }}
@@ -218,17 +250,37 @@ const TransactionPinDialog = ({ open, onOpenChange, onVerified, amountLabel, ver
             transition={{ type: "spring", stiffness: 320, damping: 18 }}
             className="mx-auto mb-1 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-primary/20 to-accent/20 ring-1 ring-primary/30"
           >
-            {mode === "locked"
+            {showTransferProcessing
+              ? <Loader2 className="h-7 w-7 animate-spin text-primary" />
+              : mode === "locked"
               ? <Lock className="h-7 w-7 text-destructive" />
               : mode === "forgot-sent"
               ? <Mail className="h-7 w-7 text-primary" />
               : <ShieldCheck className="h-7 w-7 text-primary" />}
           </motion.div>
-          <DialogTitle className="font-display text-xl">{title}</DialogTitle>
-          <DialogDescription>{subtitle}</DialogDescription>
+          <DialogTitle className="font-display text-xl">
+            {showTransferProcessing ? "Almost there" : title}
+          </DialogTitle>
+          <DialogDescription>
+            {showTransferProcessing ? processingLabel : subtitle}
+          </DialogDescription>
         </DialogHeader>
 
-        {mode === "loading" ? (
+        {showTransferProcessing ? (
+          <div className="flex flex-col items-center gap-4 py-8">
+            <motion.div
+              className="relative flex h-16 w-16 items-center justify-center"
+              animate={{ rotate: 360 }}
+              transition={{ duration: 1.2, repeat: Infinity, ease: "linear" }}
+            >
+              <span className="absolute inset-0 rounded-full border-[3px] border-primary/20" />
+              <span className="absolute inset-0 rounded-full border-[3px] border-transparent border-t-primary" />
+            </motion.div>
+            <p className="text-center text-sm text-muted-foreground">
+              Please wait — don’t close this window.
+            </p>
+          </div>
+        ) : mode === "loading" ? (
           <div className="flex justify-center py-10">
             <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
           </div>

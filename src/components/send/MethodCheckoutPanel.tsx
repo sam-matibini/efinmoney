@@ -211,32 +211,57 @@ const MethodCheckoutPanel = ({
   cardTitle,
   showChargeSummary = true,
 }: Props) => {
-  const walletSelect = (label: string, helper?: string) => (
-    <div className="space-y-2">
-      <Label>{label}</Label>
-      <Select value={selectedWalletId || wallets[0]?.wallet_id} onValueChange={onWalletChange}>
-        <SelectTrigger className="h-12 text-base"><SelectValue placeholder="Select wallet" /></SelectTrigger>
-        <SelectContent>
-          {wallets.map((w) => {
-            const cards = linkedCardCount[w.wallet_id] ?? 0;
-            return (
-              <SelectItem key={w.wallet_id} value={w.wallet_id}>
-                <span className="flex items-center gap-2">
-                  <CurrencyFlag code={w.currency_code} /> {w.currency_code} — {w.symbol}{money(Number(w.balance))}
-                  {cards > 0 && (
-                    <span className="flex items-center gap-0.5 text-[10px] text-muted-foreground ml-auto">
-                      <CreditCard className="w-3 h-3" />{cards}
-                    </span>
-                  )}
-                </span>
-              </SelectItem>
-            );
-          })}
-        </SelectContent>
-      </Select>
-      {helper && <p className="text-sm text-muted-foreground">{helper}</p>}
-    </div>
-  );
+  const selectedWallet =
+    wallets.find((w) => w.wallet_id === (selectedWalletId || wallets[0]?.wallet_id)) || wallets[0];
+
+  const walletSelect = (opts?: { prominent?: boolean }) => {
+    const prominent = opts?.prominent ?? false;
+    return (
+      <div className="space-y-2">
+        <div className="flex items-baseline justify-between gap-2">
+          <Label className={cn(prominent && "text-sm font-semibold text-foreground")}>
+            Paying from currency
+          </Label>
+          {selectedWallet && (
+            <span className="text-[11px] font-semibold tabular-nums text-pay-wallet">
+              {selectedWallet.currency_code}
+            </span>
+          )}
+        </div>
+        <Select value={selectedWalletId || wallets[0]?.wallet_id} onValueChange={onWalletChange}>
+          <SelectTrigger
+            className={cn(
+              "h-12 text-base",
+              prominent &&
+                "h-14 border-2 border-pay-wallet/50 bg-background font-semibold shadow-sm ring-2 ring-pay-wallet/15",
+            )}
+          >
+            <SelectValue placeholder="Select wallet currency" />
+          </SelectTrigger>
+          <SelectContent>
+            {wallets.map((w) => {
+              const cards = linkedCardCount[w.wallet_id] ?? 0;
+              return (
+                <SelectItem key={w.wallet_id} value={w.wallet_id}>
+                  <span className="flex items-center gap-2">
+                    <CurrencyFlag code={w.currency_code} /> {w.currency_code} — {w.symbol}{money(Number(w.balance))}
+                    {cards > 0 && (
+                      <span className="flex items-center gap-0.5 text-[10px] text-muted-foreground ml-auto">
+                        <CreditCard className="w-3 h-3" />{cards}
+                      </span>
+                    )}
+                  </span>
+                </SelectItem>
+              );
+            })}
+          </SelectContent>
+        </Select>
+        <p className="text-sm leading-snug text-muted-foreground">
+          Changing this wallet switches the currency you send and pay with.
+        </p>
+      </div>
+    );
+  };
 
   if (method === "interac") {
     return <InteracAutodepositPanel
@@ -427,9 +452,16 @@ const MethodCheckoutPanel = ({
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-2">
-        <PayMethodMark kind="wallet" className="h-9 w-9" />
-        <p className="text-base font-semibold">Pay from wallet balance</p>
+      <div className="flex items-start gap-2.5">
+        <PayMethodMark kind="wallet" className="h-9 w-9 shrink-0" />
+        <div className="min-w-0">
+          <p className="text-base font-semibold leading-tight">Pay from wallet balance</p>
+          <p className="mt-0.5 text-sm text-muted-foreground">
+            {selectedWallet
+              ? `Sending in ${selectedWallet.currency_code} from your ${selectedWallet.currency_code} wallet`
+              : "Pick which currency wallet to debit"}
+          </p>
+        </div>
       </div>
       {wallets.length === 0 ? (
         <div className="space-y-2 rounded-lg border border-dashed border-border bg-muted/40 p-3">
@@ -438,12 +470,12 @@ const MethodCheckoutPanel = ({
         </div>
       ) : (
         <>
-          {walletSelect("From wallet")}
+          {walletSelect({ prominent: true })}
           {onAddWallet && <QuickAddRow tone="wallet" label="Quick add wallet" onClick={onAddWallet} />}
           {showChargeSummary && (
           <ChargeSummary
             amount={amount} fee={fee} total={total} currency={currency} symbol={symbol}
-            debitLabel="Debited from wallet"
+            debitLabel={`Debited from ${currency} wallet`}
           />
           )}
           {insufficientBalance && (

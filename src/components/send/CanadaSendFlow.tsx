@@ -923,7 +923,7 @@ const CanadaSendFlow = () => {
 
   const renderFundingCheckout = () => (
     <div className="overflow-hidden rounded-xl border border-border bg-card">
-      <div className="grid min-h-[22rem] sm:grid-cols-[minmax(12.5rem,15rem)_minmax(0,1fr)]">
+      <div className="grid sm:grid-cols-[minmax(12.5rem,15rem)_minmax(0,1fr)]">
         <aside className="border-b border-border bg-muted/20 sm:border-b-0 sm:border-r">
           <PaymentMethodRow
             options={cadFundingOptions}
@@ -931,7 +931,7 @@ const CanadaSendFlow = () => {
             onChange={(v) => setFunding(v)}
           />
         </aside>
-        <div className="min-w-0 p-5 sm:p-6">
+        <div className="min-w-0 p-4 sm:p-5">
           {funding === "wise" ? (
             (selectedWallet || (fallbackWallet && isWisePayCurrency(fallbackWallet.currency_code))) ? (
               <WisePayLinkCard
@@ -1568,6 +1568,14 @@ const CanadaSendFlow = () => {
             </div>
 
             <div className="space-y-3">
+              <Label>How will you pay?</Label>
+              <p className="text-xs text-muted-foreground -mt-1">
+                Wallet currency is the currency you send — changing it updates the amount currency.
+              </p>
+              {renderFundingCheckout()}
+            </div>
+
+            <div className="space-y-3">
               <Label>How should they receive it?</Label>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {deliveryOptions.map((opt) => {
@@ -1604,11 +1612,6 @@ const CanadaSendFlow = () => {
                   );
                 })}
               </div>
-            </div>
-
-            <div className="space-y-3">
-              <Label>How will you pay?</Label>
-              {renderFundingCheckout()}
             </div>
 
             <div className="rounded-xl bg-gradient-to-br from-primary/8 via-background to-primary/5 border border-primary/20 p-5">
@@ -1662,6 +1665,14 @@ const CanadaSendFlow = () => {
                   {parsedAmount <= 0 && " · enter how much to send"}
                 </p>
               )}
+            </div>
+
+            <div className="space-y-3">
+              <Label>How will you pay?</Label>
+              <p className="text-xs text-muted-foreground -mt-1">
+                Wallet currency is the currency you send — changing it updates the amount currency.
+              </p>
+              {renderFundingCheckout()}
             </div>
 
             {method !== "stripe_connect" && method !== "paylink" && (
@@ -1828,11 +1839,6 @@ const CanadaSendFlow = () => {
               )}
             </div>
 
-            <div className="space-y-3">
-              <Label>How will you pay?</Label>
-              {renderFundingCheckout()}
-            </div>
-
             <div className="flex gap-3 pt-2">
               <Button variant="outline" className="flex-1" onClick={() => setStep(1)}>Back</Button>
               <Button className="flex-1 gap-2" onClick={() => {
@@ -1898,7 +1904,22 @@ const CanadaSendFlow = () => {
               <Button variant="outline" className="flex-1" onClick={() => setStep(2)}>Back</Button>
               <Button
                 className="flex-1"
-                onClick={() => method === "paylink" ? handleSubmit() : requirePin(handleSubmit, `C$${parsedAmount.toFixed(2)}`)}
+                onClick={() => method === "paylink"
+                  ? handleSubmit()
+                  : requirePin(
+                    handleSubmit,
+                    `C$${parsedAmount.toFixed(2)}`,
+                    undefined,
+                    {
+                      processingLabel: funding === "interac"
+                        ? "Starting Interac Autodeposit…"
+                        : funding === "bank"
+                          ? "Starting bank EFT…"
+                          : funding === "card"
+                            ? "Starting card checkout…"
+                            : "Processing your transfer…",
+                    },
+                  )}
                 disabled={!isStep3Valid || createTransfer.isPending || cardSubmitting || paylinkSubmitting}
               >
                 {(createTransfer.isPending || cardSubmitting || paylinkSubmitting)
