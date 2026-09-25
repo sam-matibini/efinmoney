@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { ExternalLink, Loader2 } from "lucide-react";
 import { initializeFlwPayment, minAmount, validateMinAmount, type FlwMethod } from "@/lib/flutterwave";
 import { currencySymbol } from "@/lib/currency";
+import { CheckoutActionRow } from "@/components/payments/CheckoutActionRow";
 
 interface Props {
   walletId: string;
@@ -127,6 +128,7 @@ export default function FlutterwaveHostedTopUpCard({
             </p>
           </div>
         )}
+        <CheckoutActionRow>
         <Button className="w-full h-11" disabled={!amountOk || loading} onClick={() => void handlePay()}>
           {loading ? (
             <>
@@ -140,6 +142,7 @@ export default function FlutterwaveHostedTopUpCard({
             </>
           )}
         </Button>
+        </CheckoutActionRow>
       </CardContent>
     </Card>
   );

@@ -20,6 +20,7 @@ import {
   savePendingNombaTxn,
 } from "@/lib/nombaPay";
 import { quoteCadNombaTopup, quoteDirectNombaTopup } from "@/lib/nombaTopupQuote";
+import { CheckoutActionRow } from "@/components/payments/CheckoutActionRow";
 
 interface Props {
   walletId: string;
@@ -250,6 +251,7 @@ export default function NombaTopUpCard({
             onChange={(e) => setEmail(e.target.value)}
           />
         </div>
+        <CheckoutActionRow>
         <Button className="w-full" onClick={handleSubmit} disabled={loading || (isCadViaUsd && !quote)}>
           {loading ? (
             <>
@@ -263,6 +265,7 @@ export default function NombaTopUpCard({
             </>
           )}
         </Button>
+        </CheckoutActionRow>
       </CardContent>
     </Card>
   );

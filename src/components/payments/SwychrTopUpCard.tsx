@@ -13,6 +13,7 @@ import {
   readPendingSwychrTxn,
   savePendingSwychrTxn,
 } from "@/lib/swychrPay";
+import { CheckoutActionRow } from "@/components/payments/CheckoutActionRow";
 
 interface Props {
   initialAmount?: string;
@@ -127,6 +128,7 @@ export default function SwychrTopUpCard({ walletId, walletCurrency, onComplete, 
           <Label>Email for receipt</Label>
           <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
         </div>
+        <CheckoutActionRow>
         <Button className="w-full" onClick={handleSubmit} disabled={loading || !(Number(amount) > 0)}>
           {loading ? (
             <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Opening checkout…</>
@@ -134,6 +136,7 @@ export default function SwychrTopUpCard({ walletId, walletCurrency, onComplete, 
             <><ExternalLink className="h-4 w-4 mr-2" />Continue</>
           )}
         </Button>
+        </CheckoutActionRow>
         <p className="text-xs text-muted-foreground flex items-center gap-1">
           <CreditCard className="h-3 w-3" /> Card &amp; local payment methods where supported
         </p>

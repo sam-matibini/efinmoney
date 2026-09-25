@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { ExternalLink, Loader2 } from "lucide-react";
 import { currencySymbol } from "@/lib/currency";
+import { CheckoutActionRow } from "@/components/payments/CheckoutActionRow";
 import {
   dodoMinAmount,
   initiateDodoCheckout,
@@ -95,10 +96,12 @@ export default function DodoTopUpCard({
             />
           </div>
         )}
+        <CheckoutActionRow>
         <Button className="w-full" disabled={loading} onClick={() => void onPay()}>
           {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <ExternalLink className="h-4 w-4 mr-2" />}
           Continue
         </Button>
+        </CheckoutActionRow>
       </CardContent>
     </Card>
   );

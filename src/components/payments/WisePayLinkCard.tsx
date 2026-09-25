@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { CheckCircle2, Copy, ExternalLink, Loader2, Wallet } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { buildWisePayUrl } from "@/lib/wisePayLink";
+import { CheckoutActionRow } from "@/components/payments/CheckoutActionRow";
 
 interface Props {
   walletId: string;
@@ -168,10 +169,12 @@ export default function WisePayLinkCard({
                 disabled={lockAmount}
               />
             </div>
+            <CheckoutActionRow>
             <Button className="w-full" size="lg" onClick={() => void start()} disabled={loading}>
               {loading ? "Preparing…" : "Continue to Wise"}
               {!loading && <ExternalLink className="ml-2 h-4 w-4" />}
             </Button>
+            </CheckoutActionRow>
           </>
         )}
 

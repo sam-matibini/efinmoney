@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Loader2, CreditCard, ExternalLink } from "lucide-react";
 import { toast } from "sonner";
+import { CheckoutActionRow } from "@/components/payments/CheckoutActionRow";
 import { supabase } from "@/integrations/supabase/client";
 
 type Props = {
@@ -110,11 +111,13 @@ export default function SquareTopUpCard({
           Paying <span className="font-medium text-foreground">{ccy} {amount || "—"}</span>
         </p>
       )}
+      <CheckoutActionRow>
       <Button className="w-full" onClick={pay} disabled={busy || !amount}>
         {busy ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <CreditCard className="w-4 h-4 mr-2" />}
         {busy ? "Opening checkout…" : `Pay ${amount ? `${ccy} ${amount}` : "with card"}`}
         {!busy && <ExternalLink className="w-3.5 h-3.5 ml-2 opacity-70" />}
       </Button>
+      </CheckoutActionRow>
       <p className="text-[11px] text-muted-foreground text-center">
         You’ll complete payment on a secure page, then return here automatically.
       </p>

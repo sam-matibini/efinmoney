@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { ExternalLink, FileText, Loader2, Smartphone } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
+import { CheckoutActionRow } from "@/components/payments/CheckoutActionRow";
 import {
   clearPendingPaytotaTxn,
   confirmPaytotaPayment,
@@ -308,6 +309,7 @@ export default function PaytotaTopUpCard({ walletId, walletCurrency, onComplete,
           </div>
         )}
 
+        <CheckoutActionRow>
         <Button className="w-full" onClick={handleConfirm} disabled={loading || !quote || awaitingPhone || !(Number(amount) > 0)}>
           {loading ? (
             <>
@@ -323,6 +325,7 @@ export default function PaytotaTopUpCard({ walletId, walletCurrency, onComplete,
             </>
           )}
         </Button>
+        </CheckoutActionRow>
       </CardContent>
     </Card>
   );

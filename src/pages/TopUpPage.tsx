@@ -4,6 +4,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import { Link, useSearchParams } from "react-router-dom";
 import BackToDashboard from "@/components/layout/BackToDashboard";
+import { CheckoutActionRow } from "@/components/payments/CheckoutActionRow";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -1235,6 +1236,7 @@ const TopUpPage = () => {
             <p className="text-sm text-muted-foreground">
               You’ll be redirected to a secure checkout to complete this payment.
             </p>
+            <CheckoutActionRow>
             <Button
               className="w-full"
               size="lg"
@@ -1243,6 +1245,7 @@ const TopUpPage = () => {
             >
               {loading ? "Opening checkout…" : "Continue to checkout"}
             </Button>
+            </CheckoutActionRow>
           </div>
         ),
       });
