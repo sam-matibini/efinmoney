@@ -1128,7 +1128,7 @@ const TopUpPage = () => {
         label: ccyUpper === "CAD" ? "Instant Debit Visa/Mastercard" : "Card",
         description:
           ccyUpper === "CAD"
-            ? "Direct Visa/Mastercard"
+            ? ""
             : "Card or bank transfer",
         content: (
           <SectionBoundary name="NombaTopUp">

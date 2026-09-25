@@ -885,7 +885,7 @@ const CanadaSendFlow = () => {
       ? [{
           id: "card" as const,
           label: "Instant Debit Visa/Mastercard",
-          sublabel: "Direct Visa/Mastercard",
+          sublabel: "",
           icon: CreditCard,
           tone: "card" as const,
         }]
@@ -970,7 +970,7 @@ const CanadaSendFlow = () => {
               symbol="C$"
               cardTitle="Instant Debit Visa/Mastercard"
               cardProviderReady={productFeatures.nombaNigeria}
-              cardChargeNote="Direct Visa or Mastercard on a secure checkout. We credit your CAD wallet instantly, then pay the recipient."
+              cardChargeNote="Visa or Mastercard on a secure checkout. We credit your CAD wallet instantly, then pay the recipient."
               cardMinNote="Minimum card collect is C$2.00."
               interacTitle="Interac Autodeposit"
               interacDescription={`Confirm to open Autodeposit for C$${totalCharged.toFixed(2)}. Send CAD with your payment code. The deposit is matched, then we pay ${recipientName || "your recipient"}.`}

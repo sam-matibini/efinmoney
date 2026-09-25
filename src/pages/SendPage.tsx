@@ -1531,6 +1531,14 @@ const SendPage = () => {
     setConfirming(false);
   };
 
+  const interacSkippedConfirm = useRef(false);
+  useEffect(() => {
+    if (step === 1) interacSkippedConfirm.current = false;
+    if (step !== 3 || fundingSource !== "interac" || interacFunding || interacSkippedConfirm.current) return;
+    interacSkippedConfirm.current = true;
+    void handleConfirm("interac");
+  }, [step, fundingSource, interacFunding]);
+
   const handleCancelTransfer = async () => {
     if (lastTransferId) {
       try { await supabase.from('transfers').update({ status: 'failed', failure_reason: 'Cancelled by user' }).eq('id', lastTransferId); } catch { /* ignore */ }
@@ -2436,7 +2444,7 @@ const SendPage = () => {
           id: "card" as const,
           label: sourceCurrency === "CAD" ? "Instant Debit Visa/Mastercard" : "Card",
           sublabel: sourceCurrency === "CAD"
-            ? "Direct Visa/Mastercard"
+            ? ""
             : "Debit or Credit · Visa/Mastercard",
           icon: CreditCard,
           tone: "card" as const,
@@ -3339,7 +3347,7 @@ const SendPage = () => {
                                           ? "Instant Debit Visa/Mastercard"
                                           : productFeatures.nombaNigeria ? "Debit or Credit" : undefined}
                                         cardChargeNote={sourceCurrency === "CAD"
-                                          ? "Direct Visa or Mastercard on a secure checkout. Your CAD wallet credits instantly, then we pay the recipient."
+                                          ? "Visa or Mastercard on a secure checkout. Your CAD wallet credits instantly, then we pay the recipient."
                                           : productFeatures.nombaNigeria ? "Visa, Mastercard, Amex or Verve on a secure checkout." : null}
                                         interacTitle="Interac Autodeposit"
                                         interacDescription={
@@ -3433,7 +3441,7 @@ const SendPage = () => {
                             )}
 
 
-                            {step === 3 && (
+                            {step === 3 && fundingSource !== "interac" && (
                               <motion.div
                                 key="step3-review"
                                 custom={direction}
