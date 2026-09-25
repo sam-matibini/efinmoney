@@ -40,24 +40,6 @@ import UsdBankCheckout from "@/components/payments/UsdBankCheckout";
 import WiseInteracInvoiceCheckout from "@/components/payments/WiseInteracInvoiceCheckout";
 import BankPicker from "@/components/payments/BankPicker";
 import { readRememberedBank, rememberInteracBank } from "@/components/payments/checkoutStrings";
-
-function CadInteracBankField() {
-  const [bank, setBank] = useState(readRememberedBank);
-  return (
-    <div className="space-y-1.5">
-      <Label>Select your bank</Label>
-      <BankPicker
-        value={bank}
-        onChange={(next) => {
-          setBank(next);
-          rememberInteracBank(next);
-        }}
-      />
-      <p className="text-[11px] text-muted-foreground">Opened once, from the payment details.</p>
-    </div>
-  );
-}
-
 import GhanaTopUpCard from "@/components/payments/GhanaTopUpCard";
 import NombaTopUpCard from "@/components/payments/NombaTopUpCard";
 import LenhubFlutterTopUpCard from "@/components/payments/LenhubFlutterTopUpCard";
@@ -244,6 +226,23 @@ const FLW_METHODS_BY_CCY: Record<string, FlwMethod[]> = {
   USD: ["card"],
   CAD: ["card", "banktransfer"],
 };
+
+function CadInteracBankField() {
+  const [bank, setBank] = useState(readRememberedBank);
+  return (
+    <div className="space-y-1.5">
+      <Label>Select your bank</Label>
+      <BankPicker
+        value={bank}
+        onChange={(next) => {
+          setBank(next);
+          rememberInteracBank(next);
+        }}
+      />
+      <p className="text-[11px] text-muted-foreground">Opened once, from the payment details.</p>
+    </div>
+  );
+}
 
 const TopUpPage = () => {
   const [params, setSearchParams] = useSearchParams();
