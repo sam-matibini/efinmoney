@@ -1,10 +1,106 @@
+import {
+  endOfMonth,
+  endOfQuarter,
+  endOfWeek,
+  endOfYear,
+  format,
+  startOfMonth,
+  startOfQuarter,
+  startOfWeek,
+  startOfYear,
+  subDays,
+  subMonths,
+  subWeeks,
+} from "date-fns";
 import type { StatementRow } from "@/hooks/useStatement";
+
+export type DatePreset =
+  | "all"
+  | "today"
+  | "yesterday"
+  | "this_week"
+  | "last_week"
+  | "this_month"
+  | "last_month"
+  | "this_quarter"
+  | "this_year"
+  | "custom";
+
+export type StatementSortKey =
+  | "date"
+  | "description"
+  | "reference"
+  | "payee"
+  | "purpose"
+  | "status"
+  | "moneyOut"
+  | "moneyIn";
+
+export const DATE_PRESETS: { id: DatePreset; label: string }[] = [
+  { id: "all", label: "All dates" },
+  { id: "today", label: "Today" },
+  { id: "yesterday", label: "Yesterday" },
+  { id: "this_week", label: "This week" },
+  { id: "last_week", label: "Previous week" },
+  { id: "this_month", label: "This month" },
+  { id: "last_month", label: "Previous month" },
+  { id: "this_quarter", label: "This quarter" },
+  { id: "this_year", label: "This year" },
+  { id: "custom", label: "Custom range" },
+];
+
+export const STATUS_FILTERS = [
+  { id: "all", label: "Any status" },
+  { id: "completed", label: "Completed" },
+  { id: "pending", label: "Pending" },
+  { id: "processing", label: "Processing" },
+  { id: "failed", label: "Failed" },
+  { id: "reversed", label: "Reversed" },
+] as const;
+
+const iso = (d: Date) => format(d, "yyyy-MM-dd");
+const week = { weekStartsOn: 1 as const };
+
+export function rangeForPreset(preset: DatePreset, now = new Date()): { from: string; to: string } {
+  if (preset === "all" || preset === "custom") return { from: "", to: "" };
+  if (preset === "today") return { from: iso(now), to: iso(now) };
+  if (preset === "yesterday") {
+    const d = subDays(now, 1);
+    return { from: iso(d), to: iso(d) };
+  }
+  if (preset === "this_week") return { from: iso(startOfWeek(now, week)), to: iso(endOfWeek(now, week)) };
+  if (preset === "last_week") {
+    const d = subWeeks(now, 1);
+    return { from: iso(startOfWeek(d, week)), to: iso(endOfWeek(d, week)) };
+  }
+  if (preset === "this_month") return { from: iso(startOfMonth(now)), to: iso(endOfMonth(now)) };
+  if (preset === "last_month") {
+    const d = subMonths(now, 1);
+    return { from: iso(startOfMonth(d)), to: iso(endOfMonth(d)) };
+  }
+  if (preset === "this_quarter") return { from: iso(startOfQuarter(now)), to: iso(endOfQuarter(now)) };
+  return { from: iso(startOfYear(now)), to: iso(endOfYear(now)) };
+}
+
+export function presetLabel(preset: DatePreset, from: string, to: string): string {
+  if (preset === "custom" && (from || to)) {
+    return `${from || "Start"} – ${to || "Today"}`;
+  }
+  return DATE_PRESETS.find((p) => p.id === preset)?.label ?? "All dates";
+}
 
 export interface StatementFilterOptions {
   direction?: "all" | "in" | "out";
   search?: string;
   from?: string;
   to?: string;
+  status?: string;
+  purpose?: string;
+}
+
+export interface StatementSort {
+  key: StatementSortKey;
+  dir: "asc" | "desc";
 }
 
 const safe = (v: unknown) => (v == null ? "" : String(v));
@@ -47,9 +143,11 @@ export const matchesStatementSearch = (row: StatementRow, query: string): boolea
   return false;
 };
 
+const pendingStatuses = new Set(["funded", "pending_liquidity", "pending_ops", "initiated"]);
+
 export const filterStatementRows = (
   rows: StatementRow[],
-  { direction = "all", search = "", from = "", to = "" }: StatementFilterOptions,
+  { direction = "all", search = "", from = "", to = "", status = "all", purpose = "" }: StatementFilterOptions,
 ): StatementRow[] => {
   let items = rows;
 
@@ -58,6 +156,18 @@ export const filterStatementRows = (
 
   if (search.trim()) {
     items = items.filter((r) => matchesStatementSearch(r, search));
+  }
+
+  if (status && status !== "all") {
+    items = items.filter((r) => {
+      if (status === "pending") return pendingStatuses.has(r.status);
+      return r.status === status;
+    });
+  }
+
+  if (purpose.trim()) {
+    const q = purpose.trim().toLowerCase();
+    items = items.filter((r) => r.purpose.toLowerCase().includes(q));
   }
 
   if (from) {
@@ -73,5 +183,47 @@ export const filterStatementRows = (
   return items;
 };
 
+export const sortStatementRows = (rows: StatementRow[], sort: StatementSort): StatementRow[] => {
+  const dir = sort.dir === "asc" ? 1 : -1;
+  const text = (v: string) => v.toLowerCase();
+  return [...rows].sort((a, b) => {
+    let cmp = 0;
+    switch (sort.key) {
+      case "date":
+        cmp = new Date(a.date).getTime() - new Date(b.date).getTime();
+        break;
+      case "description":
+        cmp = text(a.description).localeCompare(text(b.description));
+        break;
+      case "reference":
+        cmp = text(a.reference).localeCompare(text(b.reference));
+        break;
+      case "payee":
+        cmp = text(a.payee).localeCompare(text(b.payee));
+        break;
+      case "purpose":
+        cmp = text(a.purpose).localeCompare(text(b.purpose));
+        break;
+      case "status":
+        cmp = text(a.status).localeCompare(text(b.status));
+        break;
+      case "moneyOut":
+        cmp = a.moneyOut - b.moneyOut;
+        break;
+      case "moneyIn":
+        cmp = a.moneyIn - b.moneyIn;
+        break;
+    }
+    return cmp * dir;
+  });
+};
+
 export const hasStatementFilters = (opts: StatementFilterOptions): boolean =>
-  !!(opts.search?.trim() || opts.from || opts.to || (opts.direction && opts.direction !== "all"));
+  !!(
+    opts.search?.trim()
+    || opts.from
+    || opts.to
+    || opts.purpose?.trim()
+    || (opts.status && opts.status !== "all")
+    || (opts.direction && opts.direction !== "all")
+  );

@@ -6,6 +6,8 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
 import type { StatementRow } from "@/hooks/useStatement";
+import type { StatementSortKey } from "@/lib/statementFilters";
+import { ArrowDown, ArrowUp } from "lucide-react";
 
 const fmt = (n: number) =>
   n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -60,9 +62,21 @@ interface Props {
   showBalance?: boolean;
   filtered?: boolean;
   searchQuery?: string;
+  sortKey?: StatementSortKey;
+  sortDir?: "asc" | "desc";
+  onSort?: (key: StatementSortKey) => void;
 }
 
-export const StatementTable = ({ rows, loading, showBalance = true, filtered = false, searchQuery = "" }: Props) => {
+export const StatementTable = ({
+  rows,
+  loading,
+  showBalance = true,
+  filtered = false,
+  searchQuery = "",
+  sortKey = "date",
+  sortDir = "desc",
+  onSort,
+}: Props) => {
   if (loading) {
     return (
       <div className="space-y-2">
@@ -88,34 +102,50 @@ export const StatementTable = ({ rows, loading, showBalance = true, filtered = f
   }
 
 
-  // group by date
+  const groupByDate = sortKey === "date";
   const groups: Record<string, StatementRow[]> = {};
-  for (const r of rows) {
-    const k = dateGroupLabel(r.date);
-    (groups[k] ||= []).push(r);
+  if (groupByDate) {
+    for (const r of rows) {
+      const k = dateGroupLabel(r.date);
+      (groups[k] ||= []).push(r);
+    }
+  } else {
+    groups.Results = rows;
   }
+
+  const SortHead = ({ label, column, align = "left" }: { label: string; column: StatementSortKey; align?: "left" | "right" }) => (
+    <button
+      type="button"
+      onClick={() => onSort?.(column)}
+      className={`inline-flex items-center gap-1 uppercase tracking-wider hover:text-foreground ${align === "right" ? "ml-auto" : ""}`}
+    >
+      {label}
+      {sortKey === column && (sortDir === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />)}
+    </button>
+  );
 
   return (
     <div className="rounded-xl border border-border overflow-hidden">
-      {/* Header */}
-      <div className={`hidden lg:grid ${headerCols(showBalance)} gap-3 px-4 py-2.5 text-[10px] uppercase tracking-wider text-muted-foreground font-semibold bg-muted/40 border-b border-border`}>
-        <div>Date</div>
-        <div>Description</div>
-        <div>Reference</div>
-        <div>Sender / Payee</div>
-        <div>Purpose</div>
-        <div>Status</div>
-        <div className="text-right">Money Out</div>
-        <div className="text-right">Money In</div>
-        {showBalance && <div className="text-right">Balance</div>}
+      <div className={`hidden lg:grid ${headerCols(showBalance)} gap-3 px-4 py-2.5 text-[10px] text-muted-foreground font-semibold bg-muted/40 border-b border-border`}>
+        <SortHead label="Date" column="date" />
+        <SortHead label="Description" column="description" />
+        <SortHead label="Reference" column="reference" />
+        <SortHead label="Sender / Payee" column="payee" />
+        <SortHead label="Purpose" column="purpose" />
+        <SortHead label="Status" column="status" />
+        <div className="flex justify-end"><SortHead label="Money Out" column="moneyOut" /></div>
+        <div className="flex justify-end"><SortHead label="Money In" column="moneyIn" /></div>
+        {showBalance && <div className="text-right uppercase tracking-wider">Balance</div>}
         <div></div>
       </div>
 
       {Object.entries(groups).map(([label, rs]) => (
         <div key={label}>
+          {groupByDate && (
           <div className="px-4 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground bg-muted/20">
             {label}
           </div>
+          )}
           <div className="divide-y divide-border/60">
             {rs.map((r, i) => {
               const isIn = r.moneyIn > 0;

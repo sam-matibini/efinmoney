@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, PlusCircle, Wallet } from "lucide-react";
-import { filterStatementRows, hasStatementFilters } from "@/lib/statementFilters";
+import { filterStatementRows, hasStatementFilters, rangeForPreset, sortStatementRows, type DatePreset, type StatementSort, type StatementSortKey } from "@/lib/statementFilters";
 import { StatementFilters } from "@/components/statement/StatementFilters";
 import { useAuth } from "@/hooks/useAuth";
 import { useWallets } from "@/hooks/useWallets";
@@ -32,15 +32,22 @@ const WalletStatementPage = () => {
   const [search, setSearch] = useState("");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
+  const [preset, setPreset] = useState<DatePreset>("all");
+  const [status, setStatus] = useState("all");
+  const [purpose, setPurpose] = useState("");
+  const [sort, setSort] = useState<StatementSort>({ key: "date", dir: "desc" });
 
   const { data: rowsAll, isLoading } = useStatement(walletId || null, 1000);
 
   const rows = useMemo(
-    () => filterStatementRows(rowsAll ?? [], { direction, search, from, to }),
-    [rowsAll, direction, search, from, to],
+    () => sortStatementRows(
+      filterStatementRows(rowsAll ?? [], { direction, search, from, to, status, purpose }),
+      sort,
+    ),
+    [rowsAll, direction, search, from, to, status, purpose, sort],
   );
 
-  const filtersActive = hasStatementFilters({ direction, search, from, to });
+  const filtersActive = hasStatementFilters({ direction, search, from, to, status, purpose });
   const totalCount = rowsAll?.length ?? 0;
 
   // Balance totals span the entire wallet history (not the filtered view).
@@ -149,9 +156,22 @@ const WalletStatementPage = () => {
               search={search}
               onSearchChange={setSearch}
               from={from}
-              onFromChange={setFrom}
+              onFromChange={(value) => { setPreset("custom"); setFrom(value); }}
               to={to}
-              onToChange={setTo}
+              onToChange={(value) => { setPreset("custom"); setTo(value); }}
+              preset={preset}
+              onPresetChange={(next) => {
+                setPreset(next);
+                const range = rangeForPreset(next);
+                setFrom(range.from);
+                setTo(range.to);
+              }}
+              status={status}
+              onStatusChange={setStatus}
+              purpose={purpose}
+              onPurposeChange={setPurpose}
+              sort={sort}
+              onSortChange={setSort}
               resultCount={rows.length}
               totalCount={totalCount}
             />
@@ -163,6 +183,15 @@ const WalletStatementPage = () => {
               showBalance
               filtered={filtersActive}
               searchQuery={search}
+              sortKey={sort.key}
+              sortDir={sort.dir}
+              onSort={(key: StatementSortKey) => {
+                setSort((prev) => (
+                  prev.key === key
+                    ? { key, dir: prev.dir === "asc" ? "desc" : "asc" }
+                    : { key, dir: key === "date" ? "desc" : "asc" }
+                ));
+              }}
             />
           </CardContent>
         </Card>
