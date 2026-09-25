@@ -2816,18 +2816,6 @@ const SendPage = () => {
                                       onChange={setTargetCountryId}
                                     />
                                   }
-
-                                  footer={
-                                    <div className="space-y-3">
-                                      <button
-                                        type="button"
-                                        onClick={() => navigate('/dashboard')}
-                                        className="block mx-auto text-sm text-muted-foreground hover:text-foreground transition-colors underline-offset-4 hover:underline"
-                                      >
-                                        Cancel
-                                      </button>
-                                    </div>
-                                  }
                                 >
 
                                     {!isLiveSendCountryId(targetCountryId) ? (
@@ -3314,8 +3302,9 @@ const SendPage = () => {
                                         showChargeSummary={false}
                                       />
                                       )}
+                                        <div className="flex items-center gap-3">
                                         <Button
-                                      className="h-12 w-full rounded-full text-base font-semibold"
+                                      className="h-12 flex-1 rounded-full text-base font-semibold"
                                       size="lg"
                                       onClick={() => {
                                         if (!canContinue) {
@@ -3341,6 +3330,15 @@ const SendPage = () => {
                                           ? fundingSource === "interac" ? "Continue to pay" : "Continue to send"
                                           : continueBlockers[0] || "Complete required fields"}
                                         </Button>
+                                        <Button
+                                          type="button"
+                                          variant="outline"
+                                          className="h-12 shrink-0 rounded-full px-5 text-base font-semibold"
+                                          onClick={() => navigate("/dashboard")}
+                                        >
+                                          Cancel
+                                        </Button>
+                                        </div>
                                       </div>
                                     </CheckoutShell>
 
