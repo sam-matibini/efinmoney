@@ -1327,7 +1327,7 @@ const TopUpPage = () => {
     ghana_pay: "ghana",
     elicate: "elicate",
   };
-  if (ccyUpper === "CAD") {
+  if (currency.toUpperCase() === "CAD") {
     const cadOnly = payMethods.filter((m) => m.id === "nomba" || m.id === "interac");
     payMethods.splice(0, payMethods.length, ...cadOnly);
   }
