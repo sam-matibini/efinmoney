@@ -1561,6 +1561,7 @@ const SendPage = () => {
     }
     setCancelOpen(false);
     setLastTransferId(null);
+    setInteracFunding(null);
     navigate('/dashboard');
   };
 
@@ -3662,6 +3663,14 @@ const SendPage = () => {
                                       }}
                                       onComplete={() => setInteracFunding(null)}
                                     />
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      className="mt-3 w-full border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                                      onClick={() => setCancelOpen(true)}
+                                    >
+                                      Cancel Transfer
+                                    </Button>
                                   </SectionBoundary>
                                 ) : wiseFunding ? (
                                   <SectionBoundary name="WiseSendCheckout">
