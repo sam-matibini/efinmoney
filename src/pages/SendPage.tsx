@@ -79,6 +79,7 @@ import { createPaymentLink, PaymentLinkSuccess, type PaymentLinkResult } from "@
 import { isClaimCardCurrency } from "@/lib/stripeCorridors";
 import TransactionPinDialog from "@/components/send/TransactionPinDialog";
 import LiveFxCalculator from "@/components/fx/LiveFxCalculator";
+import { RecentSends, SendCorridorStrip } from "@/components/send/SendHomeExtras";
 import { parseAmount } from "@/components/fx/liveFxUtils";
 import SectionBoundary from "@/components/common/SectionBoundary";
 import { clearSendHandoff, readSendHandoff } from "@/lib/sendHandoff";
@@ -2802,7 +2803,7 @@ const SendPage = () => {
                                 transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
                               >
                                 <MoneyFlowShell
-                                  className="max-w-3xl"
+                                  className="max-w-lg"
                                   steps={[
                                     { n: 1, label: "Details" },
                                     { n: 2, label: fundingSource === "interac" ? "Pay" : "Confirm" },
@@ -2818,51 +2819,6 @@ const SendPage = () => {
 
                                   footer={
                                     <div className="space-y-3">
-                                      <motion.div
-                                        whileTap={canContinue ? { scale: 0.97 } : undefined}
-                                        animate={canContinue ? { boxShadow: [
-                                          "0 0 0 0 hsl(var(--primary) / 0)",
-                                          "0 0 0 6px hsl(var(--primary) / 0.15)",
-                                          "0 0 0 0 hsl(var(--primary) / 0)",
-                                        ] } : { boxShadow: "0 0 0 0 hsl(var(--primary) / 0)" }}
-                                        transition={canContinue ? { duration: 1.8, repeat: Infinity, ease: "easeInOut" } : { duration: 0.2 }}
-                                        className="rounded-md"
-                                      >
-                                        <Button
-                                          className="w-full"
-                                          size="lg"
-                                          onClick={() => {
-                                            if (!canContinue) {
-                                              toast.error(continueBlockers[0] || "Complete the form to continue");
-                                              return;
-                                            }
-                                            if (fundingSource === "interac" && !readRememberedBank()) {
-                                              toast.error("Select your bank, then continue to pay.");
-                                              return;
-                                            }
-                                            if (fundingSource === "interac") {
-                                              void handleConfirm("interac");
-                                              return;
-                                            }
-                                            goToStep(3);
-                                          }}
-                                          disabled={!canContinue || (confirming && fundingSource === "interac")}
-                                          title={!canContinue ? continueBlockers.join(" · ") : undefined}
-                                        >
-                                          {confirming && fundingSource === "interac"
-                                            ? "Processing..."
-                                            : canContinue
-                                              ? fundingSource === "interac" ? "Continue to pay" : "Continue"
-                                              : continueBlockers[0] || "Complete required fields"}
-                                        </Button>
-                                      </motion.div>
-                                      {!canContinue && continueBlockers.length > 1 && (
-                                        <ul className="space-y-1 px-1 text-center text-xs text-muted-foreground">
-                                          {continueBlockers.slice(1, 4).map((reason) => (
-                                            <li key={reason}>{reason}</li>
-                                          ))}
-                                        </ul>
-                                      )}
                                       <button
                                         type="button"
                                         onClick={() => navigate('/dashboard')}
@@ -2882,7 +2838,7 @@ const SendPage = () => {
                                       />
                                     ) : (
                                     <>
-                                    <motion.div custom={0} variants={fieldVariants} initial="hidden" animate="show" className="space-y-2">
+                                    <motion.div custom={0} variants={fieldVariants} initial="hidden" animate="show" className="space-y-3 rounded-xl border border-border bg-background p-3">
                                       <RecipientQuickBox
                                         value={recipientName}
                                         onChange={setRecipientName}
@@ -2931,42 +2887,6 @@ const SendPage = () => {
                                           </div>
                                         )}
                                       </div>
-                                    </motion.div>
-
-                                    <motion.div custom={1} variants={fieldVariants} initial="hidden" animate="show">
-                                      <SectionBoundary name="LiveFxCalculator"><LiveFxCalculator
-                                        variant="app"
-                                        pairLayout
-                                        showDisclaimer={false}
-                                        className="max-w-none w-full"
-                                        from={sourceCurrency}
-                                        to={targetCountry.code}
-                                        sendAmount={amount}
-                                        onFromChange={handleCalcFromChange}
-                                        onToChange={handleCalcToChange}
-                                        onSendAmountChange={(v) => setAmount(v)}
-                                        fromCurrencyFilter={
-                                          fundingSource === "wallet" ? walletCurrencyCodes
-                                          : fundingSource === "card" ? cardWalletCodes
-                                          : undefined
-                                        }
-                                        toCurrencyFilter={
-                                          fundingSource === "card" ? cardPayoutCodes : payoutCurrencyCodes
-                                        }
-                                        priorityCodes={PRIORITY_SEND_CURRENCIES}
-                                        quoteRecipient={rateAvailable ? calcQuoteRecipient : undefined}
-                                        quoteSend={rateAvailable ? calcQuoteSend : undefined}
-                                        displayRate={rateAvailable ? effectiveRate : null}
-                                        feeLabel={feeDisplayLabel}
-                                        feeNote={feeNote}
-                                        walletBalance={
-                                          fundingSource === "wallet" && selectedWallet
-                                            ? Number(selectedWallet.balance)
-                                            : null
-                                        }
-                                        walletSymbol={selectedWallet?.symbol}
-                                        showActions={false}
-                                      /></SectionBoundary>
                                     </motion.div>
 
                                     {linkEligible && (
@@ -3256,8 +3176,75 @@ const SendPage = () => {
                                         </>
                                       )
                                     ) : null}
+                                    <motion.div custom={1} variants={fieldVariants} initial="hidden" animate="show">
+                                      <SectionBoundary name="LiveFxCalculator"><LiveFxCalculator
+                                        variant="app"
+                                        pairLayout
+                                        showDisclaimer={false}
+                                        className="max-w-none w-full"
+                                        from={sourceCurrency}
+                                        to={targetCountry.code}
+                                        sendAmount={amount}
+                                        onFromChange={handleCalcFromChange}
+                                        onToChange={handleCalcToChange}
+                                        onSendAmountChange={(v) => setAmount(v)}
+                                        fromCurrencyFilter={
+                                          fundingSource === "wallet" ? walletCurrencyCodes
+                                          : fundingSource === "card" ? cardWalletCodes
+                                          : undefined
+                                        }
+                                        toCurrencyFilter={
+                                          fundingSource === "card" ? cardPayoutCodes : payoutCurrencyCodes
+                                        }
+                                        priorityCodes={PRIORITY_SEND_CURRENCIES}
+                                        quoteRecipient={rateAvailable ? calcQuoteRecipient : undefined}
+                                        quoteSend={rateAvailable ? calcQuoteSend : undefined}
+                                        displayRate={rateAvailable ? effectiveRate : null}
+                                        feeLabel={feeDisplayLabel}
+                                        feeNote={feeNote}
+                                        walletBalance={
+                                          fundingSource === "wallet" && selectedWallet
+                                            ? Number(selectedWallet.balance)
+                                            : null
+                                        }
+                                        walletSymbol={selectedWallet?.symbol}
+                                        showActions={false}
+                                      /></SectionBoundary>
+                                    </motion.div>
 
+                                    <Button
+                                      className="h-12 w-full rounded-full text-base font-semibold"
+                                      size="lg"
+                                      onClick={() => {
+                                        if (!canContinue) {
+                                          toast.error(continueBlockers[0] || "Complete the form to continue");
+                                          return;
+                                        }
+                                        if (fundingSource === "interac" && !readRememberedBank()) {
+                                          toast.error("Select your bank, then continue to pay.");
+                                          return;
+                                        }
+                                        if (fundingSource === "interac") {
+                                          void handleConfirm("interac");
+                                          return;
+                                        }
+                                        goToStep(3);
+                                      }}
+                                      disabled={!canContinue || (confirming && fundingSource === "interac")}
+                                      title={!canContinue ? continueBlockers.join(" · ") : undefined}
+                                    >
+                                      {confirming && fundingSource === "interac"
+                                        ? "Processing..."
+                                        : canContinue
+                                          ? fundingSource === "interac" ? "Continue to pay" : "Continue to send"
+                                          : continueBlockers[0] || "Complete required fields"}
+                                    </Button>
 
+                                    <SendCorridorStrip currency={targetCountry.code} />
+                                    <RecentSends />
+
+                                    <details className="rounded-xl border border-border bg-card">
+                                      <summary className="cursor-pointer list-none px-4 py-3 text-sm font-semibold">Payment method</summary>
                                     <motion.div custom={0} variants={fieldVariants} initial="hidden" animate="show">
                                       <div
                                         id="send-pay-with"
@@ -3360,11 +3347,7 @@ const SendPage = () => {
                                         </div>
                                       </div>
                                     </motion.div>
-
-
-
-
-
+                                    </details>
 
                                     {fundingSource === "card" && cardSendProvider && parsedAmount > 0
                                       && parsedAmount < cardSendMinAmount(cardSendProvider, sourceCurrency) && (

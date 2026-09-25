@@ -368,35 +368,28 @@ const LiveFxCalculator = ({
   if (pairLayout) {
     return (
       <div className={`w-full ${className}`}>
-        <div className="grid grid-cols-[1fr_auto] items-stretch rounded-xl border border-border bg-background overflow-hidden">
-          <div className="grid grid-cols-2 divide-x divide-border">
-            <div className="px-3 py-2.5">
-              <div className="mb-1 text-[9.5px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">You send</div>
-              <div className="flex items-center gap-1.5">
-                <Flag code={from} size={18} />
-                <span className="text-base font-bold text-muted-foreground">{from}</span>
-
-                <input
-                  inputMode="decimal"
-                  value={sendAmtFormatted}
-                  onChange={(e) => onSendChange(e.target.value)}
-                  placeholder={isLoading ? "…" : "0.00"}
-                  className="min-w-0 flex-1 border-0 bg-transparent text-lg font-bold tabular-nums text-foreground outline-none placeholder:text-muted-foreground/60"
-                />
-              </div>
-            </div>
-            <div className="px-3 py-2.5">
-              <div className="mb-1 text-[9.5px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">They receive</div>
-              <input
-                inputMode="decimal"
-                value={recvAmt}
-                onChange={(e) => onRecvChange(e.target.value)}
-                placeholder={isLoading ? "…" : "0.00"}
-                className="w-full border-0 bg-transparent text-lg font-bold tabular-nums text-foreground outline-none placeholder:text-muted-foreground/60"
-              />
-            </div>
+        <div className="grid grid-cols-[1fr_1fr_auto] items-stretch divide-x divide-border rounded-xl border border-border bg-background overflow-hidden">
+          <div className="px-3 py-3">
+            <div className="mb-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">You send</div>
+            <input
+              inputMode="decimal"
+              value={sendAmtFormatted}
+              onChange={(e) => onSendChange(e.target.value)}
+              placeholder={isLoading ? "…" : "0"}
+              className="w-full border-0 bg-transparent text-2xl font-bold tabular-nums text-foreground outline-none placeholder:text-muted-foreground/50"
+            />
           </div>
-          <div className="flex items-center border-l border-border px-2">
+          <div className="px-3 py-3">
+            <div className="mb-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">They receive</div>
+            <input
+              inputMode="decimal"
+              value={recvAmt}
+              onChange={(e) => onRecvChange(e.target.value)}
+              placeholder={isLoading ? "…" : "0"}
+              className="w-full border-0 bg-transparent text-2xl font-bold tabular-nums text-foreground outline-none placeholder:text-muted-foreground/50"
+            />
+          </div>
+          <div className="flex min-w-[4.5rem] items-center justify-center px-2">
             <CurrencyPicker
               value={to}
               onChange={setTo}
@@ -407,7 +400,7 @@ const LiveFxCalculator = ({
           </div>
         </div>
 
-        <div className="mt-2 space-y-0.5 text-center text-xs text-muted-foreground">
+        <div className="mt-3 space-y-0.5 text-center text-sm text-muted-foreground">
           {rateUnavailable ? (
             <p>Rate unavailable for {from} → {to}</p>
           ) : (
