@@ -3200,36 +3200,6 @@ const SendPage = () => {
                                       /></SectionBoundary>
                                     </motion.div>
 
-                                    <Button
-                                      className="h-12 w-full rounded-full text-base font-semibold"
-                                      size="lg"
-                                      onClick={() => {
-                                        if (!canContinue) {
-                                          toast.error(continueBlockers[0] || "Complete the form to continue");
-                                          return;
-                                        }
-                                        if (fundingSource === "interac" && !readRememberedBank()) {
-                                          toast.error("Select your bank, then continue to pay.");
-                                          return;
-                                        }
-                                        if (fundingSource === "interac") {
-                                          void handleConfirm("interac");
-                                          return;
-                                        }
-                                        goToStep(3);
-                                      }}
-                                      disabled={!canContinue || (confirming && fundingSource === "interac")}
-                                      title={!canContinue ? continueBlockers.join(" · ") : undefined}
-                                    >
-                                      {confirming && fundingSource === "interac"
-                                        ? "Processing..."
-                                        : canContinue
-                                          ? fundingSource === "interac" ? "Continue to pay" : "Continue to send"
-                                          : continueBlockers[0] || "Complete required fields"}
-                                    </Button>
-
-                                    <SendCorridorStrip currency={targetCountry.code} />
-
                                     <details className="rounded-xl border border-border bg-card" open>
                                       <summary className="cursor-pointer list-none px-4 py-3 text-sm font-semibold">Payment method</summary>
                                     <motion.div custom={0} variants={fieldVariants} initial="hidden" animate="show">
@@ -3335,6 +3305,37 @@ const SendPage = () => {
                                       </div>
                                     </motion.div>
                                     </details>
+
+                                    <Button
+                                      className="h-12 w-full rounded-full text-base font-semibold"
+                                      size="lg"
+                                      onClick={() => {
+                                        if (!canContinue) {
+                                          toast.error(continueBlockers[0] || "Complete the form to continue");
+                                          return;
+                                        }
+                                        if (fundingSource === "interac" && !readRememberedBank()) {
+                                          toast.error("Select your bank, then continue to pay.");
+                                          return;
+                                        }
+                                        if (fundingSource === "interac") {
+                                          void handleConfirm("interac");
+                                          return;
+                                        }
+                                        goToStep(3);
+                                      }}
+                                      disabled={!canContinue || (confirming && fundingSource === "interac")}
+                                      title={!canContinue ? continueBlockers.join(" · ") : undefined}
+                                    >
+                                      {confirming && fundingSource === "interac"
+                                        ? "Processing..."
+                                        : canContinue
+                                          ? fundingSource === "interac" ? "Continue to pay" : "Continue to send"
+                                          : continueBlockers[0] || "Complete required fields"}
+                                    </Button>
+
+                                    <SendCorridorStrip currency={targetCountry.code} />
+
 
                                     {fundingSource === "card" && cardSendProvider && parsedAmount > 0
                                       && parsedAmount < cardSendMinAmount(cardSendProvider, sourceCurrency) && (

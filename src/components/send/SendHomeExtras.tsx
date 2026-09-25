@@ -1,17 +1,71 @@
 import { Link } from "react-router-dom";
 import { useTransfers, type Transfer } from "@/hooks/useTransfers";
 
+type Brand = { name: string; bg: string; fg: string; mark: string };
+
+const BRANDS: Record<string, Brand> = {
+  mpesa: { name: "M-PESA", bg: "#4CAF00", fg: "#fff", mark: "M-PESA" },
+  mtn: { name: "MTN", bg: "#FFCC00", fg: "#111", mark: "MTN" },
+  airtel: { name: "airtel", bg: "#ED1C24", fg: "#fff", mark: "airtel" },
+  vodafone: { name: "vodafone", bg: "#E60000", fg: "#fff", mark: "vodafone" },
+  airteltigo: { name: "AirtelTigo", bg: "#ED1C24", fg: "#fff", mark: "at" },
+  zamtel: { name: "Zamtel", bg: "#007A33", fg: "#fff", mark: "Zamtel" },
+  opay: { name: "OPay", bg: "#00B15D", fg: "#fff", mark: "OPay" },
+  moniepoint: { name: "Moniepoint", bg: "#0033A0", fg: "#fff", mark: "M" },
+  paga: { name: "Paga", bg: "#0057FF", fg: "#fff", mark: "Paga" },
+  palmpay: { name: "PalmPay", bg: "#6C2BD9", fg: "#fff", mark: "PalmPay" },
+  access: { name: "Access", bg: "#F58220", fg: "#fff", mark: "access" },
+  firstbank: { name: "FirstBank", bg: "#00205B", fg: "#F5C518", mark: "FirstBank" },
+  zenith: { name: "Zenith", bg: "#E10600", fg: "#fff", mark: "Zenith" },
+  gtbank: { name: "GTBank", bg: "#FF6600", fg: "#fff", mark: "GTBank" },
+  uba: { name: "UBA", bg: "#E4002B", fg: "#fff", mark: "UBA" },
+  equity: { name: "Equity", bg: "#8B1E3F", fg: "#fff", mark: "Equity" },
+  kcb: { name: "KCB", bg: "#78BE20", fg: "#163A1A", mark: "KCB" },
+  gcb: { name: "GCB", bg: "#0033A0", fg: "#fff", mark: "GCB" },
+  ecobank: { name: "Ecobank", bg: "#0055A5", fg: "#fff", mark: "Ecobank" },
+  interac: { name: "Interac", bg: "#FFD200", fg: "#111", mark: "INTERAC" },
+  rbc: { name: "RBC", bg: "#0051A5", fg: "#FFD200", mark: "RBC" },
+  td: { name: "TD", bg: "#008A00", fg: "#fff", mark: "TD" },
+  scotiabank: { name: "Scotiabank", bg: "#EC111A", fg: "#fff", mark: "Scotia" },
+  visa: { name: "Visa", bg: "#1A1F71", fg: "#fff", mark: "VISA" },
+  mastercard: { name: "Mastercard", bg: "#fff", fg: "#111", mark: "●●" },
+};
+
 const RAILS: Record<string, { wallets: string[]; banks: string[] }> = {
   NGN: {
-    wallets: ["Moniepoint", "OPay", "Paga", "PalmPay"],
-    banks: ["Access", "FirstBank", "Zenith", "GTBank", "UBA"],
+    wallets: ["moniepoint", "opay", "paga", "palmpay"],
+    banks: ["access", "firstbank", "zenith", "gtbank", "uba"],
   },
-  GHS: { wallets: ["MTN", "Vodafone", "AirtelTigo"], banks: ["Bank deposit"] },
-  ZMW: { wallets: ["MTN", "Airtel", "Zamtel"], banks: [] },
-  KES: { wallets: ["M-Pesa"], banks: ["Bank deposit"] },
-  CAD: { wallets: ["Interac e-Transfer"], banks: ["Bank deposit"] },
-  USD: { wallets: [], banks: ["Bank deposit", "Card"] },
+  GHS: { wallets: ["mtn", "vodafone", "airteltigo"], banks: ["gcb", "ecobank"] },
+  ZMW: { wallets: ["mtn", "airtel", "zamtel"], banks: [] },
+  KES: { wallets: ["mpesa"], banks: ["equity", "kcb"] },
+  CAD: { wallets: ["interac"], banks: ["rbc", "td", "scotiabank"] },
+  USD: { wallets: ["visa", "mastercard"], banks: [] },
 };
+
+function LogoTile({ id }: { id: string }) {
+  const brand = BRANDS[id];
+  if (!brand) return null;
+  const light = brand.bg === "#fff" || brand.bg === "#FFCC00" || brand.bg === "#FFD200";
+  return (
+    <span
+      title={brand.name}
+      className="inline-flex h-10 min-w-[4.75rem] items-center justify-center rounded-lg px-2.5 shadow-sm ring-1 ring-black/10"
+      style={{ background: brand.bg, color: brand.fg }}
+    >
+      {id === "mastercard" ? (
+        <span className="relative inline-flex h-5 w-8" aria-label="Mastercard">
+          <span className="absolute left-0 top-0 h-5 w-5 rounded-full bg-[#EB001B]" />
+          <span className="absolute right-0 top-0 h-5 w-5 rounded-full bg-[#F79E1B] mix-blend-multiply" />
+        </span>
+      ) : (
+        <span className={`truncate text-[11px] font-black tracking-tight ${light ? "" : "drop-shadow-sm"}`}>
+          {brand.mark}
+        </span>
+      )}
+    </span>
+  );
+}
 
 function statusLabel(status: Transfer["status"]): string {
   if (status === "completed") return "Delivered";
@@ -26,18 +80,22 @@ export function SendCorridorStrip({ currency }: { currency: string }) {
       <p className="text-center text-base font-semibold text-foreground">Rapid, secure transfer</p>
       <div className="mt-3 grid grid-cols-2 gap-3 text-xs">
         <div>
-          <p className="mb-2 font-medium text-muted-foreground">Mobile wallets</p>
+          <p className="mb-2 font-medium text-muted-foreground">
+            {currency.toUpperCase() === "USD" ? "Cards" : currency.toUpperCase() === "CAD" ? "e-Transfer" : "Mobile wallets"}
+          </p>
           <div className="flex flex-wrap gap-1.5">
-            {(rail.wallets.length ? rail.wallets : ["—"]).map((name) => (
-              <span key={name} className="rounded-md bg-background px-2 py-1 font-medium text-foreground ring-1 ring-border">{name}</span>
+            {rail.wallets.map((id) => (
+              <LogoTile key={id} id={id} />
             ))}
           </div>
         </div>
         <div>
           <p className="mb-2 font-medium text-muted-foreground">Bank accounts {currency.toUpperCase()}</p>
           <div className="flex flex-wrap gap-1.5">
-            {(rail.banks.length ? rail.banks : ["—"]).map((name) => (
-              <span key={name} className="rounded-md bg-background px-2 py-1 font-medium text-foreground ring-1 ring-border">{name}</span>
+            {rail.banks.length === 0 ? (
+              <span className="text-xs text-muted-foreground">Mobile money only</span>
+            ) : rail.banks.map((id) => (
+              <LogoTile key={id} id={id} />
             ))}
           </div>
         </div>
