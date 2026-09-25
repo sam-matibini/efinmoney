@@ -1908,7 +1908,7 @@ const CanadaSendFlow = () => {
                     : funding === "card"
                       ? `Pay C$${totalCharged.toFixed(2)} with card`
                       : funding === "interac"
-                        ? "Confirm and open bank"
+                        ? "Confirm transfer"
                         : funding === "bank"
                           ? "Continue to bank EFT"
                           : funding === "wise"

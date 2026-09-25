@@ -184,7 +184,7 @@ function InteracAutodepositPanel({
           </SelectContent>
         </Select>
         <p className="text-[11px] leading-relaxed text-muted-foreground">
-          Choose the bank you will send from. Continue confirms the transfer, then we open that bank.
+          Choose the bank you will send from. You open it once, from the payment details.
         </p>
       </div>
     </div>

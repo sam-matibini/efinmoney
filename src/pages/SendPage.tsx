@@ -62,7 +62,7 @@ import { verifySquareCheckout } from "@/components/payments/SquareTopUpCard";
 
 import { isWisePayCurrency } from "@/lib/wisePayLink";
 import WiseInteracInvoiceCheckout from "@/components/payments/WiseInteracInvoiceCheckout";
-import { bankLink, readRememberedBank } from "@/components/payments/checkoutStrings";
+import { readRememberedBank } from "@/components/payments/checkoutStrings";
 import CadBankEftCheckout from "@/components/payments/CadBankEftCheckout";
 import { cadSendPayInCheckout } from "@/lib/cadCollectCheckout";
 import { toDbFundingSource } from "@/lib/transferFundingSource";
@@ -1085,8 +1085,6 @@ const SendPage = () => {
           sender_wallet_id: cadWallet.wallet_id,
         });
         setInteracFunding({ transferId: tid, walletId: cadWallet.wallet_id, amount: totalCharge });
-        const url = bankLink(payerBank);
-        if (url) window.open(url, "_blank", "noopener,noreferrer");
         goToStep(4);
       } catch (e: any) {
         toast.error(e?.message || 'Could not start bank pay-in');
@@ -3476,7 +3474,7 @@ const SendPage = () => {
                                             ) : (
                                               <span className="inline-flex items-center gap-2">
                                                 {fundingSource === "card" ? <CreditCard className="w-4 h-4" /> : fundingSource === "interac" ? <Banknote className="w-4 h-4" /> : fundingSource === "bank" ? <Landmark className="w-4 h-4" /> : fundingSource === "wise" ? <Wallet className="w-4 h-4" /> : <Shield className="w-4 h-4" />}
-                                                {useLink ? "Send secure link" : fundingSource === "card" ? (sourceCurrency === "CAD" ? "Pay with Visa/Mastercard" : "Pay with card") : fundingSource === "interac" ? "Confirm and open bank" : fundingSource === "bank" ? "Pay from bank" : fundingSource === "wise" ? "Pay with Wise" : "Confirm Transfer"}
+                                                {useLink ? "Send secure link" : fundingSource === "card" ? (sourceCurrency === "CAD" ? "Pay with Visa/Mastercard" : "Pay with card") : fundingSource === "interac" ? "Confirm transfer" : fundingSource === "bank" ? "Pay from bank" : fundingSource === "wise" ? "Pay with Wise" : "Confirm Transfer"}
                                               </span>
                                             )}
                                           </Button>
