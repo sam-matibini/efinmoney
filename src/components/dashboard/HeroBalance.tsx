@@ -1,5 +1,5 @@
 import { motion, useMotionValue, useSpring, useTransform, useMotionTemplate, useReducedMotion } from "framer-motion";
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState } from "react";
 import { AreaChart, Area, ResponsiveContainer, Tooltip } from "recharts";
 import { TrendingUp, TrendingDown, Wallet as WalletIcon, Activity, CreditCard, Eye, EyeOff } from "lucide-react";
 import { useWallets } from "@/hooks/useWallets";
@@ -14,6 +14,7 @@ import { useProfile } from "@/hooks/useProfile";
 import { getGreeting } from "@/lib/greeting";
 import { buildUsdRateMap } from "@/lib/fx";
 import { CurrencyFlag } from "@/components/ui/FlagImage";
+import { useHideBalance } from "@/hooks/useHideBalance";
 
 const HeroBalance = () => {
   const reduceMotion = useReducedMotion();
@@ -23,13 +24,7 @@ const HeroBalance = () => {
   const { totalLinkedCards } = useWalletCards();
   const { data: transfers } = useDashboardTransfers();
   const { data: fxRates } = useFxRates();
-  const [hidden, setHidden] = useState<boolean>(() => {
-    if (typeof window === "undefined") return false;
-    return localStorage.getItem("efm-hide-balance") === "1";
-  });
-  useEffect(() => {
-    localStorage.setItem("efm-hide-balance", hidden ? "1" : "0");
-  }, [hidden]);
+  const [hidden, setHidden] = useHideBalance();
 
   const firstName =
     user?.user_metadata?.full_name?.split(" ")[0] || user?.email?.split("@")[0] || "there";

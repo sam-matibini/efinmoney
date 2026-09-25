@@ -1,6 +1,7 @@
 import { motion, useMotionValue, useTransform } from "framer-motion";
 import { useRef, useState, useEffect } from "react";
-import { Plus, Send, Download, ArrowUpRight, CreditCard } from "lucide-react";
+import { Plus, Send, Download, ArrowUpRight, CreditCard, Eye, EyeOff } from "lucide-react";
+import { useHideBalance } from "@/hooks/useHideBalance";
 import { Link, useNavigate } from "react-router-dom";
 import { useWallets } from "@/hooks/useWallets";
 import { useWalletCards } from "@/hooks/useWalletCards";
@@ -44,6 +45,7 @@ const formatBalance = (value: number) =>
 
 const WalletCarousel = () => {
   const { data: wallets, isLoading } = useWallets();
+  const [hideBalance, setHideBalance] = useHideBalance();
   const { linkedCardCount } = useWalletCards();
   const scrollRef = useRef<HTMLDivElement>(null);
   const [activeIndex, setActiveIndex] = useState(0);
@@ -91,7 +93,18 @@ const WalletCarousel = () => {
   return (
     <section className="mb-8">
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-lg font-display font-semibold text-foreground">My Wallets</h2>
+        <div className="flex items-center gap-2">
+          <h2 className="text-lg font-display font-semibold text-foreground">My Wallets</h2>
+          <button
+            type="button"
+            aria-pressed={hideBalance}
+            aria-label={hideBalance ? "Show balances" : "Hide balances"}
+            onClick={() => setHideBalance((value) => !value)}
+            className="rounded-full p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          >
+            {hideBalance ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+          </button>
+        </div>
         <CreateWalletModal>
           <button className="flex items-center gap-1 text-sm text-primary hover:text-primary/80 font-medium transition-colors">
             <Plus className="w-4 h-4" />
@@ -162,7 +175,11 @@ const WalletCarousel = () => {
                 <div>
                   <p className="text-xs text-white/70 mb-1">Available Balance</p>
                   <h3 className="text-3xl font-display font-bold tracking-tight">
-                    <AnimatedNumber value={Number(w.balance)} prefix={w.symbol} decimals={2} duration={1100} />
+                    {hideBalance ? (
+                      <span className="tracking-widest">{w.symbol}••••</span>
+                    ) : (
+                      <AnimatedNumber value={Number(w.balance)} prefix={w.symbol} decimals={2} duration={1100} />
+                    )}
                   </h3>
                 </div>
 

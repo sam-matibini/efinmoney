@@ -44,6 +44,7 @@ interface WalletCardProps {
   onToggleFreeze?: (walletId: string, freeze: boolean) => void;
   onEdit?: (wallet: { walletId: string; currency: string; balance: number; symbol: string; flag?: string }) => void;
   onDelete?: (wallet: { walletId: string; currency: string; balance: number; symbol: string; flag?: string }) => void;
+  hideBalance?: boolean;
 }
 
 // SVG noise filter shared across cards
@@ -101,6 +102,7 @@ const WalletCard = ({
   onToggleFreeze,
   onEdit,
   onDelete,
+  hideBalance = false,
 }: WalletCardProps) => {
   const [receiveOpen, setReceiveOpen] = useState(false);
   const [showLinkedCards, setShowLinkedCards] = useState(false);
@@ -293,7 +295,11 @@ const WalletCard = ({
         <div className="flex-1 flex flex-col justify-center -mt-2">
           <p className="text-[11px] uppercase tracking-[0.18em] text-white/55 mb-1">Available Balance</p>
           <h2 className="text-3xl sm:text-[34px] font-display font-bold tracking-tight drop-shadow-[0_2px_10px_rgba(0,0,0,0.35)]">
-            <AnimatedNumber value={balance} prefix={symbol} decimals={2} duration={1100} />
+            {hideBalance ? (
+              <span className="tracking-widest">{symbol}••••</span>
+            ) : (
+              <AnimatedNumber value={balance} prefix={symbol} decimals={2} duration={1100} />
+            )}
           </h2>
           {change !== 0 && (
             <p

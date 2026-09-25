@@ -7,7 +7,8 @@ import { useWalletManagement } from "@/hooks/useWalletManagement";
 import { useFxRates } from "@/hooks/useFxRates";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
-import { Plus, Wallet, CreditCard, TrendingUp, AlertTriangle, ArrowRightLeft } from "lucide-react";
+import { Plus, Wallet, CreditCard, TrendingUp, AlertTriangle, ArrowRightLeft, Eye, EyeOff } from "lucide-react";
+import { useHideBalance } from "@/hooks/useHideBalance";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import CreateWalletModal from "@/components/modals/CreateWalletModal";
@@ -32,6 +33,7 @@ const WalletsPage = () => {
   const [editWallet, setEditWallet] = useState<WalletModalData>(null);
   const [deleteWallet, setDeleteWallet] = useState<WalletModalData>(null);
   const { setDefault, toggleFreeze, updateWallet, deleteWallet: deleteWalletFn } = useWalletManagement();
+  const [hideBalance, setHideBalance] = useHideBalance();
 
   const usdRateMap = useMemo(() => {
     const map = new Map<string, number>();
@@ -84,6 +86,16 @@ const WalletsPage = () => {
               <p className="text-muted-foreground">Manage your multi-currency wallets</p>
             </div>
             <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                aria-pressed={hideBalance}
+                aria-label={hideBalance ? "Show balances" : "Hide balances"}
+                onClick={() => setHideBalance((value) => !value)}
+              >
+                {hideBalance ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </Button>
               {(wallets?.length ?? 0) >= 2 ? (
                 <WalletTransferModal>
                   <Button variant="outline">
@@ -105,7 +117,7 @@ const WalletsPage = () => {
           <PageHeroBanner
             icon={Wallet}
             label="Total Balance (USD Equivalent)"
-            value={`$${totalUsd.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD`}
+            value={hideBalance ? "•••• USD" : `$${totalUsd.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD`}
             hint={excludedCount > 0 ? (
               <TooltipProvider>
                 <Tooltip>
@@ -156,6 +168,7 @@ const WalletsPage = () => {
                     onToggleFreeze={(id, freeze) => toggleFreeze({ walletId: id, freeze })}
                     onEdit={(w) => setEditWallet(w)}
                     onDelete={(w) => setDeleteWallet(w)}
+                    hideBalance={hideBalance}
                   />
                 </motion.div>
               ))}
