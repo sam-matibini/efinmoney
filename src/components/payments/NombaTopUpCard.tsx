@@ -155,7 +155,7 @@ export default function NombaTopUpCard({
 
   const title = isCadViaUsd
     ? wantsCard && wantsEft
-      ? "Card or Interac e-Transfer"
+      ? "Instant Debit Visa/Mastercard"
       : wantsEft
         ? "Interac e-Transfer"
         : "Card"
@@ -167,7 +167,7 @@ export default function NombaTopUpCard({
 
   const subtitle = isCadViaUsd
     ? wantsCard && wantsEft
-      ? "Enter how much CAD you want in your wallet. Pay by card or Interac e-Transfer — your wallet credits as soon as payment succeeds."
+      ? "Enter how much CAD you want in your wallet. Pay by Visa or Mastercard — your wallet credits as soon as payment succeeds."
       : wantsEft
         ? "Pay with Interac e-Transfer on the secure checkout page. Your CAD wallet credits as soon as payment succeeds."
         : "Enter how much CAD you want in your wallet. Pay securely by card — credits instantly."

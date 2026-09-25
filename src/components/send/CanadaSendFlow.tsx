@@ -34,6 +34,7 @@ import {
 import { downloadTransferReceipt } from "@/lib/receipt";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { readRememberedBank } from "@/components/payments/checkoutStrings";
 import { usePriceQuote } from "@/hooks/usePriceQuote";
 import { CheckCircle, Landmark, AlertCircle, Info, CreditCard, Wallet, Zap, Check, Building2, Link2, Copy, Share2, X, Users, ArrowRight, ChevronRight, Banknote } from "lucide-react";
 import { useStripeConnectedAccount, isConnectReady, getConnectReadiness } from "@/hooks/useStripeConnectedAccount";
@@ -883,8 +884,8 @@ const CanadaSendFlow = () => {
     ...(productFeatures.nombaNigeria
       ? [{
           id: "card" as const,
-          label: "Card or Interac e-Transfer",
-          sublabel: "Instant · Visa, Mastercard, or e-Transfer",
+          label: "Instant Debit Visa/Mastercard",
+          sublabel: "Direct Visa/Mastercard",
           icon: CreditCard,
           tone: "card" as const,
         }]
@@ -967,9 +968,9 @@ const CanadaSendFlow = () => {
               total={totalCharged}
               currency="CAD"
               symbol="C$"
-              cardTitle="Card or Interac e-Transfer"
+              cardTitle="Instant Debit Visa/Mastercard"
               cardProviderReady={productFeatures.nombaNigeria}
-              cardChargeNote="Visa, Mastercard, or Interac e-Transfer on a secure checkout. We credit your CAD wallet instantly, then pay the recipient."
+              cardChargeNote="Direct Visa or Mastercard on a secure checkout. We credit your CAD wallet instantly, then pay the recipient."
               cardMinNote="Minimum card collect is C$2.00."
               interacTitle="Interac Autodeposit"
               interacDescription={`Confirm to open Autodeposit for C$${totalCharged.toFixed(2)}. Send CAD with your payment code. The deposit is matched, then we pay ${recipientName || "your recipient"}.`}
@@ -1834,7 +1835,13 @@ const CanadaSendFlow = () => {
 
             <div className="flex gap-3 pt-2">
               <Button variant="outline" className="flex-1" onClick={() => setStep(1)}>Back</Button>
-              <Button className="flex-1 gap-2" onClick={() => setStep(3)} disabled={!isStep2Valid}>
+              <Button className="flex-1 gap-2" onClick={() => {
+                if (funding === "interac" && !readRememberedBank()) {
+                  toast.error("Select your bank, then continue to confirm the transfer.");
+                  return;
+                }
+                setStep(3);
+              }} disabled={!isStep2Valid}>
                 Review & confirm <ChevronRight className="w-4 h-4" />
               </Button>
             </div>
@@ -1855,7 +1862,7 @@ const CanadaSendFlow = () => {
               <ReviewRow
                 label="You pay with"
                 value={
-                  funding === "card" ? "Card or Interac e-Transfer · Instant"
+                  funding === "card" ? "Instant Debit Visa/Mastercard"
                     : funding === "interac" ? "Interac Autodeposit"
                     : funding === "bank" ? "Bank EFT · Nuvei coming soon"
                     : funding === "wise" ? "Wise"
@@ -1901,7 +1908,7 @@ const CanadaSendFlow = () => {
                     : funding === "card"
                       ? `Pay C$${totalCharged.toFixed(2)} with card`
                       : funding === "interac"
-                        ? "Continue to Interac"
+                        ? "Confirm and open bank"
                         : funding === "bank"
                           ? "Continue to bank EFT"
                           : funding === "wise"

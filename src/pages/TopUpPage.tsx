@@ -1125,10 +1125,10 @@ const TopUpPage = () => {
       payMethods.push({
         id: "nomba",
         tone: "card",
-        label: ccyUpper === "CAD" ? "Card or Interac e-Transfer" : "Card",
+        label: ccyUpper === "CAD" ? "Instant Debit Visa/Mastercard" : "Card",
         description:
           ccyUpper === "CAD"
-            ? "Instant · Visa, Mastercard, or e-Transfer"
+            ? "Direct Visa/Mastercard"
             : "Card or bank transfer",
         content: (
           <SectionBoundary name="NombaTopUp">

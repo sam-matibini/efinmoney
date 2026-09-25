@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { AlertCircle, CreditCard, Landmark, Lock, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -8,6 +9,7 @@ import { CardFieldsInputs, type CardFieldsValue } from "@/components/payments/ca
 import { productFeatures } from "@/lib/productFeatures";
 import PayMethodMark, { CardBrandMark } from "@/components/money/PayMethodMark";
 import NuveiEftComingSoon from "@/components/payments/NuveiEftComingSoon";
+import { BANK_ETRANSFER_LINKS, readRememberedBank, rememberInteracBank } from "@/components/payments/checkoutStrings";
 
 export interface PanelWallet {
   wallet_id: string;
@@ -129,6 +131,66 @@ const ChargeSummary = ({
   );
 };
 
+function InteracAutodepositPanel({
+  interacTitle,
+  interacDescription,
+  amount,
+  fee,
+  total,
+  currency,
+  symbol,
+}: {
+  interacTitle?: string;
+  interacDescription?: string;
+  amount: number;
+  fee: number;
+  total: number;
+  currency: string;
+  symbol: string;
+}) {
+  const fincraOn = productFeatures.fincraInterac;
+  const [bank, setBank] = useState(readRememberedBank);
+  return (
+    <div className="rounded-xl border-2 border-pay-bank/30 bg-pay-bank/5 p-4 space-y-3">
+      <div>
+        <div className="flex items-center gap-2">
+          <PayMethodMark kind="interac" className="h-8 w-8" />
+          <p className="text-sm font-semibold">{interacTitle || (fincraOn ? "Interac e-Transfer" : "Interac (CAD)")}</p>
+        </div>
+        <p className="mt-1 text-xs text-muted-foreground">
+          {interacDescription
+            || (fincraOn
+              ? `Confirm to open Interac checkout for ${symbol}${money(total)} ${currency}. Send CAD Auto-deposit with your payment code.`
+              : `Confirm to open checkout for ${symbol}${money(total)} ${currency}. Send Interac Auto-deposit — payout releases when the deposit matches.`)}
+        </p>
+      </div>
+      <ChargeSummary amount={amount} fee={fee} total={total} currency={currency} symbol={symbol} debitLabel="Interac from your bank" />
+      <div className="space-y-1.5">
+        <Label>Select your bank</Label>
+        <Select
+          value={bank || undefined}
+          onValueChange={(value) => {
+            setBank(value);
+            rememberInteracBank(value);
+          }}
+        >
+          <SelectTrigger className="h-11 bg-background">
+            <SelectValue placeholder="Select your bank" />
+          </SelectTrigger>
+          <SelectContent>
+            {BANK_ETRANSFER_LINKS.map((b) => (
+              <SelectItem key={b.name} value={b.name}>{b.name}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <p className="text-[11px] leading-relaxed text-muted-foreground">
+          Choose the bank you will send from. Continue confirms the transfer, then we open that bank.
+        </p>
+      </div>
+    </div>
+  );
+}
+
 /** Renders the checkout procedure that belongs to the selected payment method. */
 const MethodCheckoutPanel = ({
   method,
@@ -194,24 +256,15 @@ const MethodCheckoutPanel = ({
   );
 
   if (method === "interac") {
-    const fincraOn = productFeatures.fincraInterac;
-    return (
-      <div className="rounded-xl border-2 border-pay-bank/30 bg-pay-bank/5 p-4 space-y-3">
-        <div>
-          <div className="flex items-center gap-2">
-            <PayMethodMark kind="interac" className="h-8 w-8" />
-            <p className="text-sm font-semibold">{interacTitle || (fincraOn ? "Interac e-Transfer" : "Interac (CAD)")}</p>
-          </div>
-          <p className="mt-1 text-xs text-muted-foreground">
-            {interacDescription
-              || (fincraOn
-                ? `Confirm to open Interac checkout for ${symbol}${money(total)} ${currency}. Send CAD Auto-deposit with your payment code.`
-                : `Confirm to open checkout for ${symbol}${money(total)} ${currency}. Send Interac Auto-deposit — payout releases when the deposit matches.`)}
-          </p>
-        </div>
-        <ChargeSummary amount={amount} fee={fee} total={total} currency={currency} symbol={symbol} debitLabel="Interac from your bank" />
-      </div>
-    );
+    return <InteracAutodepositPanel
+      interacTitle={interacTitle}
+      interacDescription={interacDescription}
+      amount={amount}
+      fee={fee}
+      total={total}
+      currency={currency}
+      symbol={symbol}
+    />;
   }
 
 

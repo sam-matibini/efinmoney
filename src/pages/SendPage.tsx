@@ -62,6 +62,7 @@ import { verifySquareCheckout } from "@/components/payments/SquareTopUpCard";
 
 import { isWisePayCurrency } from "@/lib/wisePayLink";
 import WiseInteracInvoiceCheckout from "@/components/payments/WiseInteracInvoiceCheckout";
+import { bankLink, readRememberedBank } from "@/components/payments/checkoutStrings";
 import CadBankEftCheckout from "@/components/payments/CadBankEftCheckout";
 import { cadSendPayInCheckout } from "@/lib/cadCollectCheckout";
 import { toDbFundingSource } from "@/lib/transferFundingSource";
@@ -1072,12 +1073,20 @@ const SendPage = () => {
         setConfirming(false);
         return;
       }
+      const payerBank = readRememberedBank();
+      if (!payerBank) {
+        toast.error("Select your bank before you confirm.");
+        setConfirming(false);
+        return;
+      }
       try {
         const tid = await createTransferRecord({
           funding_source: "bank",
           sender_wallet_id: cadWallet.wallet_id,
         });
         setInteracFunding({ transferId: tid, walletId: cadWallet.wallet_id, amount: totalCharge });
+        const url = bankLink(payerBank);
+        if (url) window.open(url, "_blank", "noopener,noreferrer");
         goToStep(4);
       } catch (e: any) {
         toast.error(e?.message || 'Could not start bank pay-in');
@@ -2426,9 +2435,9 @@ const SendPage = () => {
     ...(cardFundingAvailable
       ? [{
           id: "card" as const,
-          label: sourceCurrency === "CAD" ? "Card or Interac e-Transfer" : "Card",
+          label: sourceCurrency === "CAD" ? "Instant Debit Visa/Mastercard" : "Card",
           sublabel: sourceCurrency === "CAD"
-            ? "Instant · Visa, Mastercard, or e-Transfer"
+            ? "Direct Visa/Mastercard"
             : "Debit or Credit · Visa/Mastercard",
           icon: CreditCard,
           tone: "card" as const,
@@ -2802,6 +2811,10 @@ const SendPage = () => {
                                           onClick={() => {
                                             if (!canContinue) {
                                               toast.error(continueBlockers[0] || "Complete the form to continue");
+                                              return;
+                                            }
+                                            if (fundingSource === "interac" && !readRememberedBank()) {
+                                              toast.error("Select your bank, then continue to confirm the transfer.");
                                               return;
                                             }
                                             goToStep(3);
@@ -3318,10 +3331,10 @@ const SendPage = () => {
                                         symbol={sourceSymbol}
                                         cardProviderReady={!!cardSendProvider}
                                         cardTitle={sourceCurrency === "CAD"
-                                          ? "Card or Interac e-Transfer"
+                                          ? "Instant Debit Visa/Mastercard"
                                           : productFeatures.nombaNigeria ? "Debit or Credit" : undefined}
                                         cardChargeNote={sourceCurrency === "CAD"
-                                          ? "Visa, Mastercard, or Interac e-Transfer on a secure checkout. Your CAD wallet credits instantly, then we pay the recipient."
+                                          ? "Direct Visa or Mastercard on a secure checkout. Your CAD wallet credits instantly, then we pay the recipient."
                                           : productFeatures.nombaNigeria ? "Visa, Mastercard, Amex or Verve on a secure checkout." : null}
                                         interacTitle="Interac Autodeposit"
                                         interacDescription={
@@ -3463,7 +3476,7 @@ const SendPage = () => {
                                             ) : (
                                               <span className="inline-flex items-center gap-2">
                                                 {fundingSource === "card" ? <CreditCard className="w-4 h-4" /> : fundingSource === "interac" ? <Banknote className="w-4 h-4" /> : fundingSource === "bank" ? <Landmark className="w-4 h-4" /> : fundingSource === "wise" ? <Wallet className="w-4 h-4" /> : <Shield className="w-4 h-4" />}
-                                                {useLink ? "Send secure link" : fundingSource === "card" ? (sourceCurrency === "CAD" ? "Pay with card or e-Transfer" : "Pay with card") : fundingSource === "interac" ? "Pay with Autodeposit" : fundingSource === "bank" ? "Pay from bank" : fundingSource === "wise" ? "Pay with Wise" : "Confirm Transfer"}
+                                                {useLink ? "Send secure link" : fundingSource === "card" ? (sourceCurrency === "CAD" ? "Pay with Visa/Mastercard" : "Pay with card") : fundingSource === "interac" ? "Confirm and open bank" : fundingSource === "bank" ? "Pay from bank" : fundingSource === "wise" ? "Pay with Wise" : "Confirm Transfer"}
                                               </span>
                                             )}
                                           </Button>
@@ -3520,7 +3533,7 @@ const SendPage = () => {
                                           {fundingSource === "interac"
                                             ? "Interac Autodeposit"
                                             : fundingSource === "card"
-                                              ? (sourceCurrency === "CAD" ? "Card or Interac e-Transfer" : "Card")
+                                              ? (sourceCurrency === "CAD" ? "Instant Debit Visa/Mastercard" : "Card")
                                               : fundingSource === "wise"
                                                 ? "Wise"
                                                 : fundingSource}

@@ -189,3 +189,26 @@ export function bankLink(bank?: string | null): string | null {
   const row = BANK_ETRANSFER_LINKS.find((b) => b.name.toLowerCase() === name);
   return row?.url || null;
 }
+
+const PAYER_MEMORY_KEY = "efm-cad-payer";
+
+export function readRememberedBank(): string {
+  try {
+    const raw = localStorage.getItem(PAYER_MEMORY_KEY);
+    if (!raw) return "";
+    const bank = String((JSON.parse(raw) as { bank?: string }).bank || "").trim();
+    return bank;
+  } catch {
+    return "";
+  }
+}
+
+export function rememberInteracBank(bank: string) {
+  try {
+    const raw = localStorage.getItem(PAYER_MEMORY_KEY);
+    const prev = raw ? (JSON.parse(raw) as Record<string, unknown>) : {};
+    localStorage.setItem(PAYER_MEMORY_KEY, JSON.stringify({ ...prev, bank }));
+  } catch {
+    /* private mode */
+  }
+}
