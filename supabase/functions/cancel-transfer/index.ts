@@ -42,14 +42,14 @@ Deno.serve(async (req) => {
 
     const cancellable = ["initiated", "funded", "processing", "pending_liquidity", "pending_ops"];
     if (!cancellable.includes(transfer.status)) {
-      return json({ error: `Cannot cancel a transfer that is ${transfer.status}` }, 400);
+      return json({ success: false, error: `Cannot cancel a transfer that is ${transfer.status}` });
     }
 
     // Idempotency: if a cancellation journal already exists, just ensure status is reversed
     const { data: existingCancel } = await supabase
       .from("ledger_entries")
       .select("id")
-      .eq("reference_type", "transfer_cancellation")
+      .in("reference_type", ["transfer_cancellation", "transfer_reversal"])
       .eq("reference_id", transfer_id)
       .limit(1);
 
@@ -62,8 +62,11 @@ Deno.serve(async (req) => {
       return json({ success: true, already_cancelled: true });
     }
 
-    // Best-effort: cancel upstream Flutterwave transfer if we have a reference
-    if (transfer.provider_reference) {
+    // Only Flutterwave payouts can be cancelled at Flutterwave. A Fincra or Nomba
+    // reference sent here comes back as an error that used to block the refund.
+    const rail = String(transfer.provider_charge_id || transfer.payout_method || "").toLowerCase();
+    const isFlutterwave = rail.includes("flutterwave") || rail.includes("flw") || rail === "rail:flutterwave";
+    if (isFlutterwave && transfer.provider_reference) {
       try {
         const flwKey = Deno.env.get("FLW_SECRET_KEY") || Deno.env.get("FLUTTERWAVE_SECRET_KEY");
         if (flwKey) {
@@ -73,8 +76,8 @@ Deno.serve(async (req) => {
           );
           const body = await r.json().catch(() => ({}));
           const msg = String(body?.message || "").toLowerCase();
-          if (!r.ok && (msg.includes("paid") || msg.includes("success") || msg.includes("completed"))) {
-            return json({ error: "Transfer has already been paid out and cannot be cancelled." }, 409);
+          if (!r.ok && (msg.includes("already been paid") || msg.includes("already paid") || msg.includes("already completed"))) {
+            return json({ success: false, error: "Transfer has already been paid out and cannot be cancelled." });
           }
         }
       } catch (e) {
@@ -91,29 +94,37 @@ Deno.serve(async (req) => {
 
     if (leErr) {
       console.error("Lookup ledger_entries error:", leErr);
-      return json({ error: "Failed to read ledger" }, 500);
+      return json({ success: false, error: "Failed to read ledger" });
     }
 
     if (originalEntries && originalEntries.length > 0) {
       const reversalJournalId = crypto.randomUUID();
       const refLabel = `EFM-${transfer_id.replace(/-/g, "").slice(0, 8).toUpperCase()}`;
-      const reversal = originalEntries.map((e: any) => ({
-        journal_id: reversalJournalId,
-        account_id: e.account_id,
-        wallet_id: e.wallet_id,
-        currency_code: e.currency_code,
-        debit_amount: Number(e.credit_amount) || 0,
-        credit_amount: Number(e.debit_amount) || 0,
-        description: `Cancellation refund for ${refLabel}`,
-        reference_type: "transfer_cancellation",
-        reference_id: transfer_id,
-        created_by: user.id,
-      }));
+      const reversal = originalEntries.flatMap((e: any) => {
+        const debit = Number(e.credit_amount) || 0;
+        const credit = Number(e.debit_amount) || 0;
+        const valid = (debit > 0 && credit === 0) || (credit > 0 && debit === 0);
+        if (!valid || !e.account_id || !e.currency_code) return [];
+        return [{
+          journal_id: reversalJournalId,
+          account_id: e.account_id,
+          wallet_id: e.wallet_id,
+          currency_code: e.currency_code,
+          debit_amount: debit,
+          credit_amount: credit,
+          description: `Cancellation refund for ${refLabel}`,
+          reference_type: "transfer_cancellation",
+          reference_id: transfer_id,
+          created_by: user.id,
+        }];
+      });
 
-      const { error: insErr } = await supabase.from("ledger_entries").insert(reversal);
-      if (insErr) {
-        console.error("Reversal insert error:", insErr);
-        return json({ error: "Failed to refund wallet" }, 500);
+      if (reversal.length > 0) {
+        const { error: insErr } = await supabase.from("ledger_entries").insert(reversal);
+        if (insErr) {
+          console.error("Reversal insert error:", insErr);
+          return json({ success: false, error: "Failed to refund wallet" });
+        }
       }
     }
 
@@ -125,7 +136,7 @@ Deno.serve(async (req) => {
 
     if (updErr) {
       console.error("Transfer update error:", updErr);
-      return json({ error: "Failed to update transfer status" }, 500);
+      return json({ success: false, error: "Failed to update transfer status" });
     }
 
     return json({ success: true });

@@ -316,6 +316,11 @@ verify_jwt = false
 [functions.fincra-verify-transfer]
 verify_jwt = false
 
+# Browser cancel: the function checks the user JWT itself. Gateway JWT checks
+# reject the request before that and the app only shows a non-2xx error.
+[functions.cancel-transfer]
+verify_jwt = false
+
 [functions.fincra-reconcile-transfers]
 verify_jwt = false
 

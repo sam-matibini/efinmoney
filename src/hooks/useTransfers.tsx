@@ -84,7 +84,19 @@ export const useCancelTransfer = () => {
       const { data, error } = await supabase.functions.invoke('cancel-transfer', {
         body: { transfer_id },
       });
-      if (error) throw new Error(error.message || 'Failed to cancel transfer');
+      if (error) {
+        let message = error.message || 'Failed to cancel transfer';
+        const context = (error as { context?: Response }).context;
+        if (context && typeof context.json === 'function') {
+          try {
+            const body = await context.json();
+            if (body?.error) message = String(body.error);
+          } catch {
+            // keep the invoke message
+          }
+        }
+        throw new Error(message);
+      }
       if (data?.error) throw new Error(data.error);
       return data;
     },
