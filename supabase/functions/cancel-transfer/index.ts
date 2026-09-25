@@ -40,9 +40,11 @@ Deno.serve(async (req) => {
 
     if (tErr || !transfer) return json({ error: "Transfer not found" }, 404);
 
-    const cancellable = ["initiated", "funded", "processing", "pending_liquidity", "pending_ops"];
-    if (!cancellable.includes(transfer.status)) {
-      return json({ success: false, error: `Cannot cancel a transfer that is ${transfer.status}` });
+    // The sender may cancel while ops has not acted. pending_ops is still their money.
+    const status = String(transfer.status || "").trim().toLowerCase();
+    const terminal = ["completed", "reversed", "expired", "failed"];
+    if (terminal.includes(status)) {
+      return json({ success: false, error: `Cannot cancel a transfer that is ${status}` });
     }
 
     // Idempotency: if a cancellation journal already exists, just ensure status is reversed
