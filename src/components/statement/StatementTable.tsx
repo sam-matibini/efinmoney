@@ -16,7 +16,7 @@ const dateGroupLabel = (iso: string) => {
   const d = new Date(iso);
   if (isToday(d)) return "Today";
   if (isYesterday(d)) return "Yesterday";
-  return format(d, "MMM d, yyyy");
+  return format(d, "yyyy-MM-dd");
 };
 
 /** Match TransferTrackingPage labels so list + detail stay consistent. */
@@ -48,13 +48,13 @@ const statusMeta = (status: string) => {
 
 const gridCols = (showBalance: boolean) =>
   showBalance
-    ? "lg:grid-cols-[120px_minmax(0,1.4fr)_100px_minmax(0,0.9fr)_minmax(0,0.8fr)_100px_110px_110px_120px_32px]"
-    : "lg:grid-cols-[120px_minmax(0,1.4fr)_100px_minmax(0,0.9fr)_minmax(0,0.8fr)_100px_110px_110px_32px]";
+    ? "lg:grid-cols-[148px_minmax(0,1.4fr)_100px_minmax(0,0.9fr)_minmax(0,0.8fr)_100px_110px_110px_120px_32px]"
+    : "lg:grid-cols-[148px_minmax(0,1.4fr)_100px_minmax(0,0.9fr)_minmax(0,0.8fr)_100px_110px_110px_32px]";
 
 const headerCols = (showBalance: boolean) =>
   showBalance
-    ? "grid-cols-[120px_minmax(0,1.4fr)_100px_minmax(0,0.9fr)_minmax(0,0.8fr)_100px_110px_110px_120px_32px]"
-    : "grid-cols-[120px_minmax(0,1.4fr)_100px_minmax(0,0.9fr)_minmax(0,0.8fr)_100px_110px_110px_32px]";
+    ? "grid-cols-[148px_minmax(0,1.4fr)_100px_minmax(0,0.9fr)_minmax(0,0.8fr)_100px_110px_110px_120px_32px]"
+    : "grid-cols-[148px_minmax(0,1.4fr)_100px_minmax(0,0.9fr)_minmax(0,0.8fr)_100px_110px_110px_32px]";
 
 interface Props {
   rows: StatementRow[];
@@ -168,7 +168,7 @@ export const StatementTable = ({
                   >
                     {/* Date - mobile shows icon, desktop column */}
                     <div className="hidden lg:block text-[12px] text-muted-foreground tabular-nums">
-                      <div>{format(new Date(r.date), "MMM d")}</div>
+                      <div className="tabular-nums">{format(new Date(r.date), "yyyy-MM-dd")}</div>
                       <div className="text-[10px]">{format(new Date(r.date), "h:mm a")}</div>
                     </div>
 
@@ -180,7 +180,7 @@ export const StatementTable = ({
                       <div className="min-w-0">
                         <p className="font-semibold text-foreground truncate text-sm">{r.description}</p>
                         <p className="text-[11px] text-muted-foreground truncate lg:hidden">
-                          {format(new Date(r.date), "MMM d, h:mm a")} · {r.reference}
+                          {format(new Date(r.date), "yyyy-MM-dd")} · {format(new Date(r.date), "h:mm a")} · {r.reference}
                         </p>
                         <p className="text-[11px] text-muted-foreground truncate hidden lg:block">{r.purpose}</p>
                       </div>

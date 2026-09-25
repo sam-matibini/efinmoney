@@ -135,7 +135,7 @@ export const generatePDFBlob = (rows: StatementRow[], meta: StatementMeta): Blob
   if (meta.periodFrom || meta.periodTo) {
     doc.text(`Period: ${meta.periodFrom || "—"}  to  ${meta.periodTo || "—"}`, margin, y); y += 14;
   }
-  doc.text(`Generated: ${format(new Date(), "PPpp")}`, margin, y); y += 8;
+  doc.text(`Generated: ${format(new Date(), "yyyy-MM-dd HH:mm")}`, margin, y); y += 8;
 
   const { out, inc } = totals(rows);
   const inStr = Object.entries(inc).map(([c, v]) => `+${currencySymbol(c)}${fmt(v)}`).join("  ");
