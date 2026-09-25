@@ -62,6 +62,7 @@ import { verifySquareCheckout } from "@/components/payments/SquareTopUpCard";
 
 import { isWisePayCurrency } from "@/lib/wisePayLink";
 import WiseInteracInvoiceCheckout from "@/components/payments/WiseInteracInvoiceCheckout";
+import InteracSenderDisclosure from "@/components/payments/InteracSenderDisclosure";
 import { readRememberedBank } from "@/components/payments/checkoutStrings";
 import CadBankEftCheckout from "@/components/payments/CadBankEftCheckout";
 import { cadSendPayInCheckout } from "@/lib/cadCollectCheckout";
@@ -2780,7 +2781,7 @@ const SendPage = () => {
                                   className="max-w-3xl"
                                   steps={[
                                     { n: 1, label: "Details" },
-                                    { n: 2, label: "Confirm" },
+                                    { n: 2, label: fundingSource === "interac" ? "Pay" : "Confirm" },
                                   ]}
                                   currentStep={1}
                                   title="Send money to"
@@ -2812,17 +2813,23 @@ const SendPage = () => {
                                               return;
                                             }
                                             if (fundingSource === "interac" && !readRememberedBank()) {
-                                              toast.error("Select your bank, then continue to confirm the transfer.");
+                                              toast.error("Select your bank, then continue to pay.");
+                                              return;
+                                            }
+                                            if (fundingSource === "interac") {
+                                              void handleConfirm("interac");
                                               return;
                                             }
                                             goToStep(3);
                                           }}
-                                          disabled={!canContinue}
+                                          disabled={!canContinue || (confirming && fundingSource === "interac")}
                                           title={!canContinue ? continueBlockers.join(" · ") : undefined}
                                         >
-                                          {canContinue
-                                            ? "Continue"
-                                            : continueBlockers[0] || "Complete required fields"}
+                                          {confirming && fundingSource === "interac"
+                                            ? "Processing..."
+                                            : canContinue
+                                              ? fundingSource === "interac" ? "Continue to pay" : "Continue"
+                                              : continueBlockers[0] || "Complete required fields"}
                                         </Button>
                                       </motion.div>
                                       {!canContinue && continueBlockers.length > 1 && (
@@ -3402,6 +3409,23 @@ const SendPage = () => {
                                         No FX rate for {sourceCurrency} → {targetCountry.code}. Try another pair or funding source.
                                       </p>
                                     )}
+                                    {fundingSource === "interac" && (
+                                      <InteracSenderDisclosure
+                                        senderName={profile?.full_name || user?.email || "You"}
+                                        recipientName={recipientName}
+                                        destination={`${targetCountry.flag} ${targetCountry.country}`}
+                                        phone={recipientPhone}
+                                        sendAmount={parsedAmount}
+                                        fee={fee}
+                                        total={totalCharge}
+                                        currency={sourceCurrency}
+                                        symbol={sourceSymbol}
+                                        receiveAmount={receivedAmount}
+                                        receiveSymbol={targetSymbol}
+                                        receiveCurrency={targetCountry.code}
+                                        rate={effectiveRate}
+                                      />
+                                    )}
                                     </>
                                     )}
                                 </MoneyFlowShell>
@@ -3625,6 +3649,26 @@ const SendPage = () => {
                               >
                                 {interacFunding ? (
                                   <SectionBoundary name="InteracSendCheckout">
+                                    <div className="mb-3 flex items-center justify-center gap-3 text-xs text-muted-foreground">
+                                      <span>1 Details</span>
+                                      <span className="font-medium text-foreground">2 Pay</span>
+                                    </div>
+                                    <InteracSenderDisclosure
+                                      senderName={profile?.full_name || user?.email || "You"}
+                                      recipientName={recipientName}
+                                      destination={`${targetCountry.flag} ${targetCountry.country}`}
+                                      phone={recipientPhone}
+                                      sendAmount={parsedAmount}
+                                      fee={fee}
+                                      total={interacFunding.amount}
+                                      currency={sourceCurrency}
+                                      symbol={sourceSymbol}
+                                      receiveAmount={receivedAmount}
+                                      receiveSymbol={targetSymbol}
+                                      receiveCurrency={targetCountry.code}
+                                        rate={effectiveRate}
+                                        referencePending="The message/code on this page"
+                                      />
                                     <WiseInteracInvoiceCheckout
                                       walletId={interacFunding.walletId}
                                       purpose="transfer"
@@ -3638,7 +3682,7 @@ const SendPage = () => {
                                       }`}
                                       onExit={() => {
                                         setInteracFunding(null);
-                                        goToStep(3);
+                                        goToStep(1);
                                       }}
                                       onComplete={() => setInteracFunding(null)}
                                     />
