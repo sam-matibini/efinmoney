@@ -97,25 +97,67 @@ export const TransactionMonitoringPanel = () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.access_token) throw new Error('Not authenticated');
 
-      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ops-intervene`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-          apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          transfer_id: transferId,
-          action: type,
-          reason,
-          provider: rail || undefined,
-        }),
-      });
-      const json = await res.json().catch(() => ({}));
-      if (!res.ok || json?.success === false) {
-        throw new Error(json?.result || json?.error || 'Intervention failed');
+      const settleAction =
+        type === 'manual_complete' ? 'complete'
+        : type === 'cancel' || type === 'reverse' ? 'refund'
+        : type === 'retry' || type === 'switch_provider' ? 'retry'
+        : null;
+
+      if ((type === 'retry' || type === 'switch_provider') && !rail) {
+        throw new Error('Choose a provider before retrying or switching.');
       }
-      return json;
+
+      let result = 'Intervention applied';
+      if (settleAction) {
+        const { data, error } = await supabase.functions.invoke('ops-settle', {
+          body: {
+            transfer_id: transferId,
+            action: settleAction,
+            rail: settleAction === 'retry' ? rail : undefined,
+            note: reason,
+          },
+        });
+        if (error) {
+          throw new Error(error.message === 'Failed to fetch'
+            ? 'Could not reach operations. Try again in a moment.'
+            : error.message);
+        }
+        if (data?.error || data?.success === false) {
+          throw new Error(data?.error || data?.payout?.error || 'Intervention failed');
+        }
+        result = settleAction === 'complete'
+          ? 'Transfer marked complete'
+          : settleAction === 'refund'
+          ? 'Transfer cancelled and wallet refunded'
+          : `Payout sent via ${rail}`;
+      } else {
+        const { error: disputeError } = await supabase.from('disputes').insert({
+          transaction_id: transferId,
+          dispute_type: 'service_issue',
+          status: 'escalated',
+          priority: 'high',
+          reason,
+          created_by: session.user.id,
+          assigned_to: session.user.id,
+        });
+        if (disputeError) throw new Error(disputeError.message);
+        result = 'Escalated to disputes';
+      }
+
+      await supabase.from('transaction_interventions').insert({
+        transfer_id: transferId,
+        intervention_type: type,
+        status: 'executed',
+        reason,
+        initiated_by: session.user.id,
+        approved_by: session.user.id,
+        approved_at: new Date().toISOString(),
+        executed_at: new Date().toISOString(),
+        result,
+        new_provider: rail || null,
+      });
+
+      return { result };
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['transaction-interventions'] });
