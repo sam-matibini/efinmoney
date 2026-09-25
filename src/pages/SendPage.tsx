@@ -50,7 +50,7 @@ import type { CorridorProviderQuote } from "@/lib/fxCorridorBenchmark";
 import { currencySymbol, countryToCurrency } from "@/lib/currency";
 import { useProfile } from "@/hooks/useProfile";
 import { toast } from "sonner";
-import { ArrowRight, CheckCircle, Wallet, CreditCard, AlertCircle, X, Search, Globe2, Lock, Loader2, Check, Shield, Banknote, Landmark } from "lucide-react";
+import { ArrowRight, CheckCircle, Wallet, CreditCard, AlertCircle, X, Search, Globe2, Lock, Loader2, Check, Shield, Banknote, Landmark, ChevronDown } from "lucide-react";
 import { BrandFlag, CountryFlag } from "@/components/ui/FlagImage";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import CanadaSendFlow from "@/components/send/CanadaSendFlow";
@@ -3200,8 +3200,11 @@ const SendPage = () => {
                                       /></SectionBoundary>
                                     </motion.div>
 
-                                    <details className="rounded-xl border border-border bg-card" open>
-                                      <summary className="cursor-pointer list-none px-4 py-3 text-sm font-semibold">Payment method</summary>
+                                    <details className="group rounded-xl border border-border bg-card" open>
+                                      <summary className="flex cursor-pointer list-none items-center justify-between px-4 py-3 text-sm font-semibold [&::-webkit-details-marker]:hidden">
+                                        <span>Payment method</span>
+                                        <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" aria-hidden />
+                                      </summary>
                                     <motion.div custom={0} variants={fieldVariants} initial="hidden" animate="show">
                                       <div
                                         id="send-pay-with"

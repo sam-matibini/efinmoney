@@ -1,34 +1,33 @@
 import { Link } from "react-router-dom";
 import { useTransfers, type Transfer } from "@/hooks/useTransfers";
 
-type Brand = { name: string; bg: string; fg: string; mark: string };
+type Brand = { name: string; src: string };
 
 const BRANDS: Record<string, Brand> = {
-  mpesa: { name: "M-PESA", bg: "#4CAF00", fg: "#fff", mark: "M-PESA" },
-  mtn: { name: "MTN", bg: "#FFCC00", fg: "#111", mark: "MTN" },
-  airtel: { name: "airtel", bg: "#ED1C24", fg: "#fff", mark: "airtel" },
-  vodafone: { name: "vodafone", bg: "#E60000", fg: "#fff", mark: "vodafone" },
-  airteltigo: { name: "AirtelTigo", bg: "#ED1C24", fg: "#fff", mark: "at" },
-  zamtel: { name: "Zamtel", bg: "#007A33", fg: "#fff", mark: "Zamtel" },
-  opay: { name: "OPay", bg: "#00B15D", fg: "#fff", mark: "OPay" },
-  moniepoint: { name: "Moniepoint", bg: "#0033A0", fg: "#fff", mark: "M" },
-  paga: { name: "Paga", bg: "#0057FF", fg: "#fff", mark: "Paga" },
-  palmpay: { name: "PalmPay", bg: "#6C2BD9", fg: "#fff", mark: "PalmPay" },
-  access: { name: "Access", bg: "#F58220", fg: "#fff", mark: "access" },
-  firstbank: { name: "FirstBank", bg: "#00205B", fg: "#F5C518", mark: "FirstBank" },
-  zenith: { name: "Zenith", bg: "#E10600", fg: "#fff", mark: "Zenith" },
-  gtbank: { name: "GTBank", bg: "#FF6600", fg: "#fff", mark: "GTBank" },
-  uba: { name: "UBA", bg: "#E4002B", fg: "#fff", mark: "UBA" },
-  equity: { name: "Equity", bg: "#8B1E3F", fg: "#fff", mark: "Equity" },
-  kcb: { name: "KCB", bg: "#78BE20", fg: "#163A1A", mark: "KCB" },
-  gcb: { name: "GCB", bg: "#0033A0", fg: "#fff", mark: "GCB" },
-  ecobank: { name: "Ecobank", bg: "#0055A5", fg: "#fff", mark: "Ecobank" },
-  interac: { name: "Interac", bg: "#FFD200", fg: "#111", mark: "INTERAC" },
-  rbc: { name: "RBC", bg: "#0051A5", fg: "#FFD200", mark: "RBC" },
-  td: { name: "TD", bg: "#008A00", fg: "#fff", mark: "TD" },
-  scotiabank: { name: "Scotiabank", bg: "#EC111A", fg: "#fff", mark: "Scotia" },
-  visa: { name: "Visa", bg: "#1A1F71", fg: "#fff", mark: "VISA" },
-  mastercard: { name: "Mastercard", bg: "#fff", fg: "#111", mark: "●●" },
+  mpesa: { name: "M-PESA", src: "/payout-logos/mpesa.svg" },
+  mtn: { name: "MTN", src: "/payout-logos/mtn.svg" },
+  airtel: { name: "airtel", src: "/payout-logos/airtel.svg" },
+  vodafone: { name: "vodafone", src: "/payout-logos/vodafone.svg" },
+  airteltigo: { name: "AT", src: "/payout-logos/airteltigo.png" },
+  zamtel: { name: "Zamtel", src: "/payout-logos/zamtel.png" },
+  opay: { name: "OPay", src: "/payout-logos/opay.png" },
+  moniepoint: { name: "Moniepoint", src: "/payout-logos/moniepoint.svg" },
+  paga: { name: "Paga", src: "/payout-logos/paga.png" },
+  palmpay: { name: "PalmPay", src: "/payout-logos/palmpay.png" },
+  access: { name: "Access Bank", src: "/payout-logos/access.png" },
+  firstbank: { name: "FirstBank", src: "/payout-logos/firstbank.png" },
+  zenith: { name: "Zenith Bank", src: "/payout-logos/zenith.svg" },
+  gtbank: { name: "GTBank", src: "/payout-logos/gtbank.svg" },
+  uba: { name: "UBA", src: "/payout-logos/uba.png" },
+  equity: { name: "Equity", src: "/payout-logos/equity.png" },
+  kcb: { name: "KCB", src: "/payout-logos/kcb.png" },
+  ecobank: { name: "Ecobank", src: "/payout-logos/ecobank.svg" },
+  interac: { name: "Interac", src: "/payout-logos/interac.svg" },
+  rbc: { name: "RBC", src: "/payout-logos/rbc.svg" },
+  td: { name: "TD", src: "/payout-logos/td.svg" },
+  scotiabank: { name: "Scotiabank", src: "/payout-logos/scotiabank.svg" },
+  visa: { name: "Visa", src: "/payout-logos/visa.svg" },
+  mastercard: { name: "Mastercard", src: "/payout-logos/mastercard.svg" },
 };
 
 const RAILS: Record<string, { wallets: string[]; banks: string[] }> = {
@@ -36,7 +35,7 @@ const RAILS: Record<string, { wallets: string[]; banks: string[] }> = {
     wallets: ["moniepoint", "opay", "paga", "palmpay"],
     banks: ["access", "firstbank", "zenith", "gtbank", "uba"],
   },
-  GHS: { wallets: ["mtn", "vodafone", "airteltigo"], banks: ["gcb", "ecobank"] },
+  GHS: { wallets: ["mtn", "vodafone", "airteltigo"], banks: ["ecobank"] },
   ZMW: { wallets: ["mtn", "airtel", "zamtel"], banks: [] },
   KES: { wallets: ["mpesa"], banks: ["equity", "kcb"] },
   CAD: { wallets: ["interac"], banks: ["rbc", "td", "scotiabank"] },
@@ -46,23 +45,12 @@ const RAILS: Record<string, { wallets: string[]; banks: string[] }> = {
 function LogoTile({ id }: { id: string }) {
   const brand = BRANDS[id];
   if (!brand) return null;
-  const light = brand.bg === "#fff" || brand.bg === "#FFCC00" || brand.bg === "#FFD200";
   return (
     <span
       title={brand.name}
-      className="inline-flex h-10 min-w-[4.75rem] items-center justify-center rounded-lg px-2.5 shadow-sm ring-1 ring-black/10"
-      style={{ background: brand.bg, color: brand.fg }}
+      className="inline-flex h-11 min-w-[4.75rem] items-center justify-center rounded-lg bg-white px-2 shadow-sm ring-1 ring-black/10"
     >
-      {id === "mastercard" ? (
-        <span className="relative inline-flex h-5 w-8" aria-label="Mastercard">
-          <span className="absolute left-0 top-0 h-5 w-5 rounded-full bg-[#EB001B]" />
-          <span className="absolute right-0 top-0 h-5 w-5 rounded-full bg-[#F79E1B] mix-blend-multiply" />
-        </span>
-      ) : (
-        <span className={`truncate text-[11px] font-black tracking-tight ${light ? "" : "drop-shadow-sm"}`}>
-          {brand.mark}
-        </span>
-      )}
+      <img src={brand.src} alt={brand.name} className="h-7 max-w-[6.5rem] object-contain" />
     </span>
   );
 }
