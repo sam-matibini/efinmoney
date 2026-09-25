@@ -24,7 +24,7 @@ export default function BankPicker({
           variant="outline"
           role="combobox"
           aria-expanded={open}
-          className="h-11 w-full justify-between bg-background px-3 font-normal"
+          className="h-12 w-full justify-between bg-background px-3 text-base font-normal"
         >
           <span className={cn("truncate", !value && "text-muted-foreground")}>{value || placeholder}</span>
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />

@@ -50,12 +50,13 @@ import type { CorridorProviderQuote } from "@/lib/fxCorridorBenchmark";
 import { currencySymbol, countryToCurrency } from "@/lib/currency";
 import { useProfile } from "@/hooks/useProfile";
 import { toast } from "sonner";
-import { ArrowRight, CheckCircle, Wallet, CreditCard, AlertCircle, X, Search, Globe2, Lock, Loader2, Check, Shield, Banknote, Landmark, ChevronDown } from "lucide-react";
+import { ArrowRight, CheckCircle, Wallet, CreditCard, AlertCircle, X, Search, Globe2, Lock, Loader2, Check, Shield, Banknote, Landmark } from "lucide-react";
 import { BrandFlag, CountryFlag } from "@/components/ui/FlagImage";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import CanadaSendFlow from "@/components/send/CanadaSendFlow";
 import EfinmoneyP2PFlow from "@/components/send/EfinmoneyP2PFlow";
 import MoneyFlowShell from "@/components/money/MoneyFlowShell";
+import CheckoutShell from "@/components/money/CheckoutShell";
 import PaymentMethodRow, { type PaymentMethodOption } from "@/components/money/PaymentMethodRow";
 import MethodCheckoutPanel from "@/components/send/MethodCheckoutPanel";
 import WisePayLinkCard from "@/components/payments/WisePayLinkCard";
@@ -2802,7 +2803,7 @@ const SendPage = () => {
                                 transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
                               >
                                 <MoneyFlowShell
-                                  className="max-w-lg"
+                                  className="max-w-5xl"
                                   steps={[
                                     { n: 1, label: "Details" },
                                     { n: 2, label: fundingSource === "interac" ? "Pay" : "Confirm" },
@@ -2837,6 +2838,7 @@ const SendPage = () => {
                                       />
                                     ) : (
                                     <>
+                                    <div className="mx-auto w-full max-w-lg space-y-5">
                                     <motion.div custom={0} variants={fieldVariants} initial="hidden" animate="show" className="space-y-3 rounded-xl border border-border bg-background p-3">
                                       <RecipientNamePicker
                                         name={recipientName}
@@ -3199,26 +3201,34 @@ const SendPage = () => {
                                         showActions={false}
                                       /></SectionBoundary>
                                     </motion.div>
+                                    </div>
 
-                                    <details className="group rounded-xl border border-border bg-card" open>
-                                      <summary className="flex cursor-pointer list-none items-center justify-between px-4 py-3 text-sm font-semibold [&::-webkit-details-marker]:hidden">
-                                        <span>Payment method</span>
-                                        <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" aria-hidden />
-                                      </summary>
-                                    <motion.div custom={0} variants={fieldVariants} initial="hidden" animate="show">
-                                      <div
-                                        id="send-pay-with"
-                                        className="scroll-mt-24 overflow-hidden rounded-xl border border-border bg-card"
-                                      >
-                                        <div className="grid min-h-[22rem] sm:grid-cols-[minmax(12.5rem,15rem)_minmax(0,1fr)]">
-                                          <aside className="border-b border-border bg-muted/20 sm:border-b-0 sm:border-r">
-                                            <PaymentMethodRow
-                                              options={fundingMethodOptions}
-                                              value={fundingSource}
-                                              onChange={(v) => setFundingSource(v)}
-                                            />
-                                          </aside>
-                                          <div className="min-w-0 p-5 sm:p-6">
+                                    <CheckoutShell
+                                      className="max-w-none"
+                                      payTo="Pay for this transfer"
+                                      amount={`${sourceSymbol}${totalCharge.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                                      amountNote={
+                                        fundingSource === "wallet" && selectedWallet
+                                          ? `${sourceCurrency} wallet · ${sourceSymbol}${Number(selectedWallet.balance).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} available`
+                                          : `${sourceCurrency} · fees included in the total`
+                                      }
+                                      lines={[
+                                        { label: "You send", sublabel: `${sourceCurrency} transfer`, value: `${sourceSymbol}${parsedAmount.toFixed(2)}` },
+                                        { label: "Fee", sublabel: "Added to the amount you pay", value: `${sourceSymbol}${fee.toFixed(2)}`, muted: true },
+                                      ]}
+                                      totals={[
+                                        { label: "Total to pay", value: `${sourceSymbol}${totalCharge.toFixed(2)}`, emphasis: true },
+                                      ]}
+                                      contactEmail={user?.email || null}
+                                      methodNav={
+                                        <PaymentMethodRow
+                                          options={fundingMethodOptions}
+                                          value={fundingSource}
+                                          onChange={(v) => setFundingSource(v)}
+                                        />
+                                      }
+                                    >
+                                      <div id="send-pay-with" className="scroll-mt-24 space-y-5">
                                       {fundingSource === "wise" ? (
                                         <SectionBoundary name="WisePayLinkSend">
                                           <WisePayLinkCard
@@ -3301,15 +3311,10 @@ const SendPage = () => {
 
                                         insufficientBalance={insufficientFunds}
                                         onTopUp={() => navigate("/wallet/topup")}
+                                        showChargeSummary={false}
                                       />
                                       )}
-                                          </div>
-                                        </div>
-                                      </div>
-                                    </motion.div>
-                                    </details>
-
-                                    <Button
+                                        <Button
                                       className="h-12 w-full rounded-full text-base font-semibold"
                                       size="lg"
                                       onClick={() => {
@@ -3335,9 +3340,13 @@ const SendPage = () => {
                                         : canContinue
                                           ? fundingSource === "interac" ? "Continue to pay" : "Continue to send"
                                           : continueBlockers[0] || "Complete required fields"}
-                                    </Button>
+                                        </Button>
+                                      </div>
+                                    </CheckoutShell>
 
-                                    <SendCorridorStrip currency={targetCountry.code} />
+                                    <div className="mx-auto w-full max-w-lg">
+                                      <SendCorridorStrip currency={targetCountry.code} />
+                                    </div>
 
 
                                     {fundingSource === "card" && cardSendProvider && parsedAmount > 0
