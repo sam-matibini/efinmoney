@@ -3229,9 +3229,8 @@ const SendPage = () => {
                                     </Button>
 
                                     <SendCorridorStrip currency={targetCountry.code} />
-                                    <RecentSends />
 
-                                    <details className="rounded-xl border border-border bg-card">
+                                    <details className="rounded-xl border border-border bg-card" open>
                                       <summary className="cursor-pointer list-none px-4 py-3 text-sm font-semibold">Payment method</summary>
                                     <motion.div custom={0} variants={fieldVariants} initial="hidden" animate="show">
                                       <div
@@ -3391,6 +3390,7 @@ const SendPage = () => {
                                         rate={effectiveRate}
                                       />
                                     )}
+                                    <RecentSends />
                                     </>
                                     )}
                                 </MoneyFlowShell>
