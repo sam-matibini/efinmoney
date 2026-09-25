@@ -10,11 +10,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
-  BANK_ETRANSFER_LINKS,
   CA_PROVINCES,
   CHECKOUT_STRINGS,
   type Lang,
 } from "@/components/payments/checkoutStrings";
+import BankPicker from "@/components/payments/BankPicker";
 
 export interface PayerForm {
   accountType: "personal" | "business";
@@ -199,19 +199,7 @@ export default function InteracPayerForm({
 
           <div className="space-y-1.5 rounded-xl border border-primary/15 bg-primary/5 p-3">
             <Label>{t.bank}</Label>
-            <Select value={value.bank} onValueChange={(v) => set("bank", v)}>
-              <SelectTrigger className="h-11 bg-background">
-                <SelectValue placeholder={t.bank} />
-              </SelectTrigger>
-              <SelectContent>
-                {BANK_ETRANSFER_LINKS.map((b) => (
-                  <SelectItem key={b.name} value={b.name}>
-                    {b.name}
-                  </SelectItem>
-                ))}
-                <SelectItem value="Other">{lang === "fr" ? "Autre" : "Other"}</SelectItem>
-              </SelectContent>
-            </Select>
+            <BankPicker value={value.bank} onChange={(v) => set("bank", v)} placeholder={t.bank} />
             <p className="text-[12px] leading-relaxed text-muted-foreground">{t.bankHint}</p>
           </div>
 

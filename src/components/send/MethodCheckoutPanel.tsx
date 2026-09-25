@@ -9,7 +9,8 @@ import { CardFieldsInputs, type CardFieldsValue } from "@/components/payments/ca
 import { productFeatures } from "@/lib/productFeatures";
 import PayMethodMark, { CardBrandMark } from "@/components/money/PayMethodMark";
 import NuveiEftComingSoon from "@/components/payments/NuveiEftComingSoon";
-import { BANK_ETRANSFER_LINKS, readRememberedBank, rememberInteracBank } from "@/components/payments/checkoutStrings";
+import { readRememberedBank, rememberInteracBank } from "@/components/payments/checkoutStrings";
+import BankPicker from "@/components/payments/BankPicker";
 
 export interface PanelWallet {
   wallet_id: string;
@@ -151,22 +152,13 @@ function InteracAutodepositPanel({
       </div>
       <div className="space-y-1.5">
         <Label>Select your bank</Label>
-        <Select
-          value={bank || undefined}
-          onValueChange={(value) => {
+        <BankPicker
+          value={bank}
+          onChange={(value) => {
             setBank(value);
             rememberInteracBank(value);
           }}
-        >
-          <SelectTrigger className="h-11 bg-background">
-            <SelectValue placeholder="Select your bank" />
-          </SelectTrigger>
-          <SelectContent>
-            {BANK_ETRANSFER_LINKS.map((b) => (
-              <SelectItem key={b.name} value={b.name}>{b.name}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        />
         <p className="text-[11px] leading-relaxed text-muted-foreground">
           Opened once, from the payment details.
         </p>
