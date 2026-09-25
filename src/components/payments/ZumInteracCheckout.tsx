@@ -124,7 +124,11 @@ export default function ZumInteracCheckout({
       setPhase("bank");
       if (url) {
         window.open(url, "_blank", "noopener,noreferrer");
-        toast.message(fr ? "Votre banque est ouverte. Envoyez l'Interac, puis entrez la référence." : "Your bank is open. Send the Interac, then enter the reference.");
+        toast.message(
+          fr
+            ? "Copiez le montant, le message et le courriel, puis terminez le virement dans votre banque."
+            : "Copy the amount, message, and email, then complete the transfer in your bank.",
+        );
       } else {
         toast.message(fr ? "Choisissez votre banque pour ouvrir Interac." : "Choose your bank to open Interac.");
       }
@@ -242,11 +246,13 @@ export default function ZumInteracCheckout({
   if (phase === "bank") {
     return (
       <div className="space-y-4">
-        <div className="flex items-center gap-2 rounded-lg border bg-muted/40 p-3 text-sm">
-          <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
-          {fr
-            ? "Votre banque est ouverte. Envoyez l'Interac à Fincra avec le message eFinMoney, puis entrez la référence de la banque."
-            : "Your bank is open. Send the Interac to Fincra with the eFinMoney message, then enter the bank reference."}
+        <div className="flex items-start gap-2 rounded-lg border bg-muted/40 p-3 text-sm">
+          <Loader2 className="mt-0.5 h-4 w-4 shrink-0 animate-spin" />
+          <p>
+            {fr
+              ? "Copiez les détails du virement ci-dessous : montant, message/code et courriel de virement Interac, puis terminez le virement dans votre compte bancaire."
+              : "Copy the transfer details below: amount, message/code, and e-Transfer email, and complete the transfer in your bank account."}
+          </p>
         </div>
         <dl className="grid grid-cols-2 gap-3 rounded-lg border p-3 text-sm">
           <div>
@@ -254,11 +260,11 @@ export default function ZumInteracCheckout({
             <dd className="font-semibold">CAD {amount.toFixed(2)}</dd>
           </div>
           <div>
-            <dt className="text-muted-foreground">{fr ? "Message" : "Message"}</dt>
+            <dt className="text-muted-foreground">{fr ? "Message / code" : "Message / code"}</dt>
             <dd className="font-mono text-xs">{efmReference}</dd>
           </div>
           <div className="col-span-2">
-            <dt className="text-muted-foreground">{fr ? "Envoyer à" : "Send to"}</dt>
+            <dt className="text-muted-foreground">{fr ? "Courriel de virement Interac" : "e-Transfer email"}</dt>
             <dd className="font-mono text-xs">{depositAlias}</dd>
           </div>
         </dl>
@@ -277,7 +283,7 @@ export default function ZumInteracCheckout({
         {error && <p className="text-sm text-destructive">{error}</p>}
         <Button type="button" className="w-full" disabled={starting} onClick={() => void finishWithBankReference()}>
           {starting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-          {fr ? "Terminer" : "Complete"}
+          {fr ? "Terminer avec la référence Interac" : "Complete with Interac reference"}
         </Button>
       </div>
     );
