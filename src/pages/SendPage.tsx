@@ -8,7 +8,6 @@ import { usePlaidLink } from "react-plaid-link";
 // flw-initialize-payment edge function.
 import ContactsPickerModal from "@/components/modals/ContactsPickerModal";
 import AddBeneficiaryModal from "@/components/modals/AddBeneficiaryModal";
-import ContactQuickField from "@/components/send/ContactQuickField";
 import NetworkPicker from "@/components/send/NetworkPicker";
 import { networkIdForPhone } from "@/lib/payoutPartner";
 import AddCardModal from "@/components/modals/AddCardModal";
@@ -51,7 +50,7 @@ import type { CorridorProviderQuote } from "@/lib/fxCorridorBenchmark";
 import { currencySymbol, countryToCurrency } from "@/lib/currency";
 import { useProfile } from "@/hooks/useProfile";
 import { toast } from "sonner";
-import { ArrowRight, CheckCircle, Wallet, CreditCard, AlertCircle, X, Search, Globe2, Lock, Loader2, Check, Shield, Users, UserPlus, ChevronDown, Banknote, Landmark } from "lucide-react";
+import { ArrowRight, CheckCircle, Wallet, CreditCard, AlertCircle, X, Search, Globe2, Lock, Loader2, Check, Shield, Banknote, Landmark } from "lucide-react";
 import { BrandFlag, CountryFlag } from "@/components/ui/FlagImage";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import CanadaSendFlow from "@/components/send/CanadaSendFlow";
@@ -70,7 +69,7 @@ import CadBankEftCheckout from "@/components/payments/CadBankEftCheckout";
 import { cadSendPayInCheckout } from "@/lib/cadCollectCheckout";
 import { toDbFundingSource } from "@/lib/transferFundingSource";
 import SendHeaderCountry from "@/components/send/SendHeaderCountry";
-import RecipientQuickBox from "@/components/send/RecipientQuickBox";
+import RecipientNamePicker from "@/components/send/RecipientNamePicker";
 import FlutterwaveCardForm from "@/components/payments/FlutterwaveCardForm";
 import { emptyCardFields, isCardFieldsValid, maskedCardLabel, type CardFieldsValue } from "@/components/payments/cardFields";
 
@@ -2839,26 +2838,15 @@ const SendPage = () => {
                                     ) : (
                                     <>
                                     <motion.div custom={0} variants={fieldVariants} initial="hidden" animate="show" className="space-y-3 rounded-xl border border-border bg-background p-3">
-                                      <RecipientQuickBox
-                                        value={recipientName}
-                                        onChange={setRecipientName}
+                                      <RecipientNamePicker
+                                        name={recipientName}
+                                        onNameChange={setRecipientName}
+                                        onSelect={applyBeneficiary}
+                                        onClear={pickedBeneficiaryId ? clearSelectedContact : undefined}
                                         onQuickAdd={() => setSaveModalOpen(true)}
+                                        selected={Boolean(pickedBeneficiaryId)}
                                       />
                                       <div className="space-y-3">
-                                        <ContactQuickField
-                                          label=""
-                                          placeholder="Select contact"
-                                          valueLabel={pickedBeneficiaryId ? recipientName : null}
-                                          onSelect={applyBeneficiary}
-                                          onClear={pickedBeneficiaryId ? clearSelectedContact : undefined}
-                                        />
-                                        <button
-                                          type="button"
-                                          onClick={() => setPickerOpen(true)}
-                                          className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground"
-                                        >
-                                          <Users className="w-3.5 h-3.5" /> All contacts
-                                        </button>
                                         {showMobileRecipient && visibleNetworks.length > 0 && (
                                           <div className="space-y-1.5">
                                             <Label>Network</Label>
