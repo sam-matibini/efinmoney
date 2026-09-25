@@ -167,25 +167,23 @@ export const CA_PROVINCES = [
   { code: "YT", name: "Yukon" },
 ];
 
-/**
- * Bank names for the Interac payer form only.
- * We intentionally do NOT deep-link to bank login pages — those URLs 404 or
- * route to "call us" blocks (RBC dig/sign-in, Scotiabank, etc.).
- */
+/** Online banking entry points so CAD pay-in can open the sender's bank. */
 export const BANK_ETRANSFER_LINKS: Array<{ name: string; url: string }> = [
-  { name: "RBC", url: "" },
-  { name: "TD", url: "" },
-  { name: "Scotiabank", url: "" },
-  { name: "BMO", url: "" },
-  { name: "CIBC", url: "" },
-  { name: "National Bank", url: "" },
-  { name: "Desjardins", url: "" },
-  { name: "Tangerine", url: "" },
-  { name: "Simplii", url: "" },
-  { name: "EQ Bank", url: "" },
+  { name: "RBC", url: "https://www.rbcroyalbank.com/ways-to-bank/online-banking/index.html" },
+  { name: "TD", url: "https://easyweb.td.com/waw/idp/login.htm" },
+  { name: "Scotiabank", url: "https://www.scotiaonline.scotiabank.com/online/authentication/authentication.bns" },
+  { name: "BMO", url: "https://www1.bmo.com/banking/digital/login" },
+  { name: "CIBC", url: "https://www.cibc.com/en/personal-banking/ways-to-bank/online-banking.html" },
+  { name: "National Bank", url: "https://www.nbc.ca" },
+  { name: "Desjardins", url: "https://accweb.mouv.desjardins.com/identifiantunique/identification" },
+  { name: "Tangerine", url: "https://www.tangerine.ca/app/#/login" },
+  { name: "Simplii", url: "https://online.simplii.com/ebm-resources/public/client/web/index.html" },
+  { name: "EQ Bank", url: "https://secure.eqbank.ca/login" },
 ];
 
-/** Always null — bank login deep-links are unreliable; use Plaid or copy details. */
-export function bankLink(_bank?: string | null): string | null {
-  return null;
+export function bankLink(bank?: string | null): string | null {
+  const name = String(bank || "").trim().toLowerCase();
+  if (!name) return null;
+  const row = BANK_ETRANSFER_LINKS.find((b) => b.name.toLowerCase() === name);
+  return row?.url || null;
 }

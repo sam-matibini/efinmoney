@@ -3,11 +3,13 @@ import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { CheckCircle2, ExternalLink, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
 import { edgeFunctionErrorMessage } from "@/lib/invokeEdgeFunction";
 import InteracPayerForm, { emptyPayerForm, type PayerForm } from "@/components/payments/InteracPayerForm";
 import InteracCheckout from "@/components/payments/InteracCheckout";
-import type { Lang } from "@/components/payments/checkoutStrings";
+import { bankLink, type Lang } from "@/components/payments/checkoutStrings";
+import { FINCRA_CAD_INTERAC_ALIAS } from "@/lib/fincraCad";
 
 interface Props {
   walletId: string;
@@ -39,8 +41,11 @@ export default function ZumInteracCheckout({
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hostedUrl, setHostedUrl] = useState<string | null>(null);
+  const [depositAlias, setDepositAlias] = useState<string | null>(null);
+  const [intentId, setIntentId] = useState<string | null>(null);
   const [efmReference, setEfmReference] = useState<string | null>(null);
   const [interacReference, setInteracReference] = useState<string | null>(null);
+  const [bankRefDraft, setBankRefDraft] = useState("");
 
   useEffect(() => {
     let cancelled = false;
@@ -85,35 +90,43 @@ export default function ZumInteracCheckout({
     setStarting(true);
     setError(null);
     try {
-      const { data, error: invokeErr } = await supabase.functions.invoke("vopay-interac-request", {
+      const { data, error: invokeErr } = await supabase.functions.invoke("fincra-cad-interac", {
         body: {
+          action: "create",
+          amount: Math.round(amount * 100) / 100,
           wallet_id: walletId,
-          amount_cad: Math.round(amount * 100) / 100,
           purpose,
           transfer_id: transferId || undefined,
-          email: form.email.trim(),
-          recipient_name: `${form.firstName} ${form.lastName}`.trim(),
-          phone: form.phone || undefined,
-          language: lang,
+          sender_name: `${form.firstName} ${form.lastName}`.trim(),
+          sender_email: form.email.trim(),
+          sender_phone: form.phone || undefined,
+          sender_bank: form.bank || undefined,
+          sender_account_type: form.accountType,
+          sender_address_line1: form.line1 || undefined,
+          sender_address_line2: form.line2 || undefined,
+          sender_city: form.city || undefined,
+          sender_region: form.region || undefined,
+          sender_postal_code: form.postalCode || undefined,
+          sender_country: "CA",
         },
       });
       if (invokeErr) throw new Error(await edgeFunctionErrorMessage(invokeErr));
       if (data?.error) throw new Error(String(data.error));
-      const reference = String(data?.reference || data?.intent?.reference || "");
-      const url = typeof data?.hosted_url === "string" ? data.hosted_url : null;
+      const intent = (data?.intent ?? {}) as { id?: string; reference?: string; public_id?: string };
+      const reference = String(intent.public_id || intent.reference || data?.reference || "");
+      const url = typeof data?.hosted_url === "string" && data.hosted_url ? data.hosted_url : bankLink(form.bank);
+      const alias = String(data?.alias || FINCRA_CAD_INTERAC_ALIAS);
       if (!reference) throw new Error(fr ? "Référence manquante." : "Missing payment reference.");
+      setIntentId(intent.id || null);
       setEfmReference(reference);
+      setDepositAlias(alias);
       setHostedUrl(url);
       setPhase("bank");
       if (url) {
         window.open(url, "_blank", "noopener,noreferrer");
-        toast.message(fr ? "Approuvez le paiement dans votre banque." : "Approve the payment in your bank.");
+        toast.message(fr ? "Votre banque est ouverte. Envoyez l'Interac, puis entrez la référence." : "Your bank is open. Send the Interac, then enter the reference.");
       } else {
-        toast.message(
-          fr
-            ? "Ouvrez la demande Interac envoyée à votre courriel."
-            : "Open the Interac request sent to your email.",
-        );
+        toast.message(fr ? "Choisissez votre banque pour ouvrir Interac." : "Choose your bank to open Interac.");
       }
     } catch (e) {
       const message = e instanceof Error ? e.message : "Could not start Interac";
@@ -122,7 +135,7 @@ export default function ZumInteracCheckout({
     } finally {
       setStarting(false);
     }
-  }, [amount, form, fr, lang, purpose, transferId, walletId]);
+  }, [amount, form, fr, purpose, transferId, walletId]);
 
   useEffect(() => {
     if (phase !== "bank" || !efmReference) return;
@@ -188,14 +201,52 @@ export default function ZumInteracCheckout({
     );
   }
 
+  const finishWithBankReference = async () => {
+    const ref = bankRefDraft.trim();
+    if (!intentId || !/^[A-Za-z0-9][A-Za-z0-9-]{3,31}$/.test(ref)) {
+      const message = fr
+        ? "Entrez la référence Interac de votre banque (par exemple C1AyEQZbS2vE)."
+        : "Enter the Interac reference from your bank (for example C1AyEQZbS2vE).";
+      setError(message);
+      toast.error(message);
+      return;
+    }
+    setStarting(true);
+    setError(null);
+    try {
+      const { data, error: invokeErr } = await supabase.functions.invoke("fincra-cad-interac", {
+        body: {
+          action: "complete",
+          intent_id: intentId,
+          interac_reference: ref,
+          amount_transferred: Math.round(amount * 100) / 100,
+          qty: 1,
+        },
+      });
+      if (invokeErr) throw new Error(await edgeFunctionErrorMessage(invokeErr));
+      if (data?.error) throw new Error(String(data.error));
+      setInteracReference(ref);
+      setPhase("done");
+      void qc.invalidateQueries({ queryKey: ["wallets"] });
+      toast.success(fr ? "Paiement reçu." : "Payment received.");
+      onComplete?.();
+    } catch (e) {
+      const message = e instanceof Error ? e.message : "Could not complete the payment";
+      setError(message);
+      toast.error(message);
+    } finally {
+      setStarting(false);
+    }
+  };
+
   if (phase === "bank") {
     return (
       <div className="space-y-4">
         <div className="flex items-center gap-2 rounded-lg border bg-muted/40 p-3 text-sm">
           <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
           {fr
-            ? "Ouvrez votre banque et approuvez la demande Interac. Nous enregistrons les deux références quand c'est payé."
-            : "Open your bank and approve the Interac request. We save both references when it is paid."}
+            ? "Votre banque est ouverte. Envoyez l'Interac à Fincra avec le message eFinMoney, puis entrez la référence de la banque."
+            : "Your bank is open. Send the Interac to Fincra with the eFinMoney message, then enter the bank reference."}
         </div>
         <dl className="grid grid-cols-2 gap-3 rounded-lg border p-3 text-sm">
           <div>
@@ -203,18 +254,30 @@ export default function ZumInteracCheckout({
             <dd className="font-semibold">CAD {amount.toFixed(2)}</dd>
           </div>
           <div>
-            <dt className="text-muted-foreground">eFinMoney</dt>
+            <dt className="text-muted-foreground">{fr ? "Message" : "Message"}</dt>
             <dd className="font-mono text-xs">{efmReference}</dd>
+          </div>
+          <div className="col-span-2">
+            <dt className="text-muted-foreground">{fr ? "Envoyer à" : "Send to"}</dt>
+            <dd className="font-mono text-xs">{depositAlias}</dd>
           </div>
         </dl>
         {hostedUrl && (
           <Button type="button" className="w-full" onClick={() => window.open(hostedUrl, "_blank", "noopener,noreferrer")}>
             <ExternalLink className="mr-2 h-4 w-4" />
-            {fr ? "Ouvrir Interac" : "Open Interac"}
+            {fr ? "Ouvrir la banque" : "Open bank"}
           </Button>
         )}
-        <Button type="button" variant="ghost" className="w-full" onClick={() => setPhase("autodeposit")}>
-          {fr ? "Envoyer un Autodeposit à la place" : "Send Autodeposit instead"}
+        <Input
+          value={bankRefDraft}
+          onChange={(e) => setBankRefDraft(e.target.value)}
+          placeholder={fr ? "Référence Interac" : "Interac reference"}
+          autoComplete="off"
+        />
+        {error && <p className="text-sm text-destructive">{error}</p>}
+        <Button type="button" className="w-full" disabled={starting} onClick={() => void finishWithBankReference()}>
+          {starting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+          {fr ? "Terminer" : "Complete"}
         </Button>
       </div>
     );

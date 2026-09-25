@@ -199,6 +199,7 @@ export async function settleFincraCadInteracIntent(
     .update({
       status: "settled",
       provider_reference: providerReference || intent.provider_reference || null,
+      wise_transaction_id: providerReference || null,
       credited_at: nowIso,
       confirmed_at: nowIso,
       received_at: nowIso,
