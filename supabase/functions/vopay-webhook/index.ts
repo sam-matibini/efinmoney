@@ -10,6 +10,25 @@ import { getVoPayConfig, voPayPost, voPayValidationKey } from "../_shared/vopay.
 
 const SUCCESS = new Set(["successful", "success", "completed", "fulfilled", "received"]);
 
+/** Bank confirmation number, distinct from the eFinMoney EFM- reference. */
+function extractInteracReference(payload: Record<string, unknown>, clientRef: string): string {
+  const keys = [
+    "InteracReferenceNumber",
+    "InteracReference",
+    "InteracRef",
+    "ReferenceNumber",
+    "BankReference",
+    "ConfirmationNumber",
+    "TransactionReferenceNumber",
+  ];
+  for (const key of keys) {
+    const value = String(payload[key] ?? "").trim();
+    if (!value || value === clientRef || value.toUpperCase().startsWith("EFM-")) continue;
+    if (/^[A-Za-z0-9][A-Za-z0-9-]{3,40}$/.test(value)) return value;
+  }
+  return "";
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return corsPreflightResponse();
 
@@ -29,6 +48,8 @@ Deno.serve(async (req) => {
       payload.TransactionID || payload.ID || payload.Id || payload.id || "",
     ).trim();
     const clientRef = String(payload.ClientReferenceNumber || payload.clientReferenceNumber || "").trim();
+    const interacReference = extractInteracReference(payload, clientRef);
+    const paidAmount = Number(payload.Amount ?? payload.amount ?? NaN);
     const validationKey = String(payload.ValidationKey || payload.validationKey || "");
 
     if (transactionId && validationKey) {
@@ -87,6 +108,10 @@ Deno.serve(async (req) => {
 
     const nowIso = new Date().toISOString();
     const amount = Number(intent.amount);
+    if (Number.isFinite(paidAmount) && Math.round(paidAmount * 100) !== Math.round(amount * 100)) {
+      console.error("vopay-webhook: amount mismatch", { paidAmount, expected: amount, reference: intent.reference });
+      return jsonResponse({ error: "amount_mismatch" }, 409);
+    }
     const creditIdem = `vopay-rfm-${intent.id}-${transactionId || intent.reference}`;
 
     try {
@@ -112,6 +137,8 @@ Deno.serve(async (req) => {
     await supabase.from("fincra_cad_interac_intents").update({
       status: "settled",
       provider_reference: transactionId || intent.provider_reference,
+      // Bank Interac confirmation (for example C1AyEQZbS2vE). EFM reference stays on `reference`.
+      wise_transaction_id: interacReference || null,
       credited_at: nowIso,
       received_at: nowIso,
       matched_at: nowIso,
@@ -174,7 +201,12 @@ Deno.serve(async (req) => {
       }
     }
 
-    return jsonResponse({ ok: true, credited: true, reference: intent.reference });
+    return jsonResponse({
+      ok: true,
+      credited: true,
+      reference: intent.reference,
+      interac_reference: interacReference || null,
+    });
   } catch (e) {
     console.error("vopay-webhook", e);
     return jsonResponse({ error: e instanceof Error ? e.message : "Unknown" }, 500);

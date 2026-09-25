@@ -2,14 +2,13 @@ import { useMemo, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import CheckoutShell from "@/components/payments/CheckoutShell";
 import CheckoutMethodGrid, { type CheckoutMethod } from "@/components/payments/CheckoutMethodGrid";
-import InteracCheckout from "@/components/payments/InteracCheckout";
+import ZumInteracCheckout from "@/components/payments/ZumInteracCheckout";
 import PlaidInvoicePayIn from "@/components/payments/PlaidInvoicePayIn";
 import LoopBillingPayPanel from "@/components/payments/LoopBillingPayPanel";
 import type { InteracIntent } from "@/components/payments/InteracCheckout";
 import { type Lang } from "@/components/payments/checkoutStrings";
 import { loopBillingLinkConfigured } from "@/lib/loopCad";
 import { productFeatures } from "@/lib/productFeatures";
-import { FINCRA_CAD_INTERAC_ALIAS } from "@/lib/fincraCad";
 
 interface Props {
   walletId: string;
@@ -58,7 +57,7 @@ export default function WiseInteracInvoiceCheckout({
   onLangChange,
   onExit,
   onComplete,
-  onIntentCreated,
+  onIntentCreated: _onIntentCreated,
   className,
   preferredMethod,
 }: Props) {
@@ -77,11 +76,11 @@ export default function WiseInteracInvoiceCheckout({
     if (preferredMethod === null) return null;
     return fincraOn || !loopBillingLinkConfigured() ? "interac" : null;
   });
-  const interacTitle = fincraOn ? "Interac e-Transfer" : undefined;
+  const interacTitle = fincraOn ? "Interac" : undefined;
   const interacDescription = fincraOn
     ? lang === "fr"
-      ? `Virement Autodeposit vers ${FINCRA_CAD_INTERAC_ALIAS}`
-      : `Send Interac Autodeposit to ${FINCRA_CAD_INTERAC_ALIAS}`
+      ? "Approuvez le paiement dans votre banque"
+      : "Approve the payment in your bank"
     : undefined;
 
   const amountLabel = useMemo(() => {
@@ -177,15 +176,14 @@ export default function WiseInteracInvoiceCheckout({
           onComplete={onComplete}
         />
       ) : (
-        <InteracCheckout
+        <ZumInteracCheckout
           key={`${walletId}-${amount}-${transferId || "topup"}`}
           walletId={walletId}
           purpose={purpose}
           transferId={transferId}
-          fixedAmount={amount}
+          amount={amount}
           lang={lang}
           onComplete={onComplete}
-          onIntentCreated={onIntentCreated}
         />
       )}
     </CheckoutShell>

@@ -8,7 +8,7 @@ export const CHECKOUT_STRINGS = {
   en: {
     selectMethod: "Select a payment method",
     interac: "Interac",
-    interacDesc: `Send Interac Autodeposit to ${FINCRA_CAD_INTERAC_ALIAS}`,
+    interacDesc: "Use your bank account to approve an instant Interac payment",
     plaid: "Bank EFT",
     plaidDesc: "Pay by EFT from your linked Canadian bank to Loop Bank",
     loopBilling: "Loop payment link",
@@ -80,7 +80,7 @@ export const CHECKOUT_STRINGS = {
   fr: {
     selectMethod: "Choisissez un mode de paiement",
     interac: "Interac",
-    interacDesc: `Envoyez un Virement Autodeposit vers ${FINCRA_CAD_INTERAC_ALIAS}`,
+    interacDesc: "Approuvez un paiement Interac instantané dans votre banque",
     plaid: "TEF bancaire",
     plaidDesc: "Payez par TEF depuis votre banque canadienne liée vers Loop Bank",
     loopBilling: "Lien de paiement Loop",
