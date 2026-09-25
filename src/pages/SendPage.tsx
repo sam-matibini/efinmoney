@@ -2888,21 +2888,6 @@ const SendPage = () => {
                                           <Users className="w-3.5 h-3.5" /> All contacts
                                         </button>
                                       </div>
-                                      {pickedBeneficiaryId && (
-                                        <p className="inline-flex items-center gap-1.5 text-xs font-medium text-primary">
-                                          <CheckCircle className="w-3.5 h-3.5" /> Contact selected — {recipientName}
-                                          {prefillSummary && <span className="text-muted-foreground">· {prefillSummary}</span>}
-                                          <button
-                                            type="button"
-                                            onClick={clearSelectedContact}
-
-                                            aria-label="Clear selected contact"
-                                            className="opacity-70 hover:opacity-100"
-                                          >
-                                            <X className="w-3.5 h-3.5" />
-                                          </button>
-                                        </p>
-                                      )}
                                     </motion.div>
 
                                     <motion.div custom={1} variants={fieldVariants} initial="hidden" animate="show">

@@ -133,12 +133,6 @@ const ChargeSummary = ({
 
 function InteracAutodepositPanel({
   interacTitle,
-  interacDescription,
-  amount,
-  fee,
-  total,
-  currency,
-  symbol,
 }: {
   interacTitle?: string;
   interacDescription?: string;
@@ -148,23 +142,13 @@ function InteracAutodepositPanel({
   currency: string;
   symbol: string;
 }) {
-  const fincraOn = productFeatures.fincraInterac;
   const [bank, setBank] = useState(readRememberedBank);
   return (
     <div className="rounded-xl border-2 border-pay-bank/30 bg-pay-bank/5 p-4 space-y-3">
-      <div>
-        <div className="flex items-center gap-2">
-          <PayMethodMark kind="interac" className="h-8 w-8" />
-          <p className="text-sm font-semibold">{interacTitle || (fincraOn ? "Interac e-Transfer" : "Interac (CAD)")}</p>
-        </div>
-        <p className="mt-1 text-xs text-muted-foreground">
-          {interacDescription
-            || (fincraOn
-              ? `Confirm to open Interac checkout for ${symbol}${money(total)} ${currency}. Send CAD Auto-deposit with your payment code.`
-              : `Confirm to open checkout for ${symbol}${money(total)} ${currency}. Send Interac Auto-deposit — payout releases when the deposit matches.`)}
-        </p>
+      <div className="flex items-center gap-2">
+        <PayMethodMark kind="interac" className="h-8 w-8" />
+        <p className="text-sm font-semibold">{interacTitle || "Interac Autodeposit"}</p>
       </div>
-      <ChargeSummary amount={amount} fee={fee} total={total} currency={currency} symbol={symbol} debitLabel="Interac from your bank" />
       <div className="space-y-1.5">
         <Label>Select your bank</Label>
         <Select
@@ -184,7 +168,7 @@ function InteracAutodepositPanel({
           </SelectContent>
         </Select>
         <p className="text-[11px] leading-relaxed text-muted-foreground">
-          Choose the bank you will send from. You open it once, from the payment details.
+          Opened once, from the payment details.
         </p>
       </div>
     </div>
