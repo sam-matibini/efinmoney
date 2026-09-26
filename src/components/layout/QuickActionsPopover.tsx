@@ -1,11 +1,12 @@
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { LayoutGrid, Send, Download, RefreshCw, Smartphone, CreditCard, PiggyBank, MapPin, type LucideIcon } from "lucide-react";
+import { LayoutGrid, Send, Download, RefreshCw, Smartphone, CreditCard, PiggyBank, MapPin, HandCoins, type LucideIcon } from "lucide-react";
 import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
 import SendMoneyModal from "@/components/modals/SendMoneyModal";
 import ExchangeModal from "@/components/modals/ExchangeModal";
 import MobileMoneyModal from "@/components/modals/MobileMoneyModal";
 import SavingsModal from "@/components/modals/SavingsModal";
+import { productFeatures } from "@/lib/productFeatures";
 import {
   headerIconBase,
   headerIconBreathe,
@@ -21,6 +22,9 @@ type Item =
 const items: Item[] = [
   { kind: "modal", Modal: SendMoneyModal, icon: Send, label: "Send" },
   { kind: "link", to: "/wallet/topup", icon: Download, label: "Add Money" },
+  ...(productFeatures.requestMoney
+    ? [{ kind: "link" as const, to: "/request-money", icon: HandCoins, label: "Request money" }]
+    : []),
   { kind: "link", to: "/wallet/receive", icon: Smartphone, label: "Bank account" },
   { kind: "modal", Modal: ExchangeModal, icon: RefreshCw, label: "Exchange" },
 ];

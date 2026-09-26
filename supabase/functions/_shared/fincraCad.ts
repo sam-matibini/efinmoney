@@ -122,6 +122,8 @@ export function buildFincraInteracInstructions(
       ? `Your transfer is released once we match the deposit to this reference.`
       : purpose === "merchant_collection"
       ? `The payment is confirmed once we match the deposit to this reference.`
+      : purpose === "money_request"
+      ? `The recipient’s eFinMoney wallet credits once we match the deposit to this reference.`
       : `Your CAD wallet credits once we match the deposit to this reference.`,
   ];
 }
@@ -139,6 +141,7 @@ export type FincraCadIntentRow = {
   status: string;
   purpose: string;
   transfer_id: string | null;
+  money_request_id?: string | null;
   provider_reference?: string | null;
 };
 
@@ -208,7 +211,7 @@ export async function settleFincraCadInteracIntent(
     })
     .eq("id", intent.id)
     .in("status", FINCRA_INTERAC_OPEN_STATUSES)
-    .select("id, user_id, wallet_id, amount, reference, public_id, status, purpose, transfer_id, provider_reference")
+    .select("id, user_id, wallet_id, amount, reference, public_id, status, purpose, transfer_id, money_request_id, provider_reference")
     .maybeSingle();
 
   if (error) throw new Error(error.message);
@@ -224,6 +227,24 @@ export async function settleFincraCadInteracIntent(
       await releaseLinkedTransfer(intent.transfer_id);
     } catch (releaseErr) {
       console.warn("fincraCad: transfer release failed", releaseErr);
+    }
+  }
+
+  const moneyRequestId = intent.money_request_id || settled.money_request_id;
+  if ((intent.purpose === "money_request" || moneyRequestId) && moneyRequestId) {
+    try {
+      await admin
+        .from("money_requests")
+        .update({
+          status: "paid",
+          paid_at: nowIso,
+          fincra_intent_id: intent.id,
+          updated_at: nowIso,
+        })
+        .eq("id", moneyRequestId)
+        .in("status", ["pending", "awaiting_payment"]);
+    } catch (mrErr) {
+      console.warn("fincraCad: money_request mark paid failed", mrErr);
     }
   }
 

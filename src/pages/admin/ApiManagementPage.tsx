@@ -280,6 +280,10 @@ const EDGE_FUNCTIONS: Array<{ name: string; description: string; jwt: boolean; c
   { name: "initiate-cpn-payout",       description: "CPN card payout initiation",              jwt: true,  category: "Cards" },
   // Payment Links
   { name: "payment-link-create",       description: "Create shareable payment link",           jwt: false, category: "Payment Links" },
+  { name: "money-request-create",      description: "Create Request Money pay-in link",        jwt: false, category: "Request Money" },
+  { name: "money-request-resolve",     description: "Public lookup for /pay/:code",            jwt: false, category: "Request Money" },
+  { name: "money-request-start-pay",   description: "Start CAD Interac for a money request", jwt: false, category: "Request Money" },
+  { name: "money-request-cancel",      description: "Cancel an open money request",            jwt: false, category: "Request Money" },
   { name: "payment-link-resolve",      description: "Resolve payment link details",            jwt: false, category: "Payment Links" },
   { name: "payment-link-claim",        description: "Claim a payment link",                   jwt: false, category: "Payment Links" },
   { name: "payment-link-revoke",       description: "Revoke a payment link",                  jwt: false, category: "Payment Links" },

@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { creditWalletViaFincra, isFincraWalletTopUp } from "../_shared/fincra-credit.ts";
+import { markMoneyRequestPaid } from "../_shared/moneyRequestPaid.ts";
 import { getFincraConfig } from "../_shared/fincra.ts";
 import { settleFincraCadInteracIntent } from "../_shared/fincraCad.ts";
 import { settleFincraUsdBankIntent } from "../_shared/fincraUsd.ts";
@@ -132,6 +133,16 @@ Deno.serve(async (req) => {
             supabase, userId, currency, amount, idempotencyRef, walletId,
             `Wallet top-up (${merchantRef || idempotencyRef})`,
           );
+          const moneyRequestId = meta.money_request_id ? String(meta.money_request_id) : "";
+          if (moneyRequestId || (meta.purpose === "money_request" && walletId)) {
+            await markMoneyRequestPaid(supabase, {
+              moneyRequestId: moneyRequestId || null,
+              walletId: walletId || null,
+              amount,
+              currency,
+              matchOpenByWalletAmount: !moneyRequestId,
+            });
+          }
           const transferId = String(meta.transfer_id || "");
           const shouldPayout = Boolean(transferId) && (
             meta.type === "bank_send" || meta.purpose === "send" || meta.purpose === "bank_send"
@@ -218,7 +229,7 @@ Deno.serve(async (req) => {
         const openStatuses = ["pending", "awaiting_payment"];
         const { data: candidates } = await supabase
           .from("fincra_cad_interac_intents")
-          .select("id, user_id, wallet_id, amount, reference, public_id, status, purpose, transfer_id, provider_reference")
+          .select("id, user_id, wallet_id, amount, reference, public_id, status, purpose, transfer_id, money_request_id, provider_reference")
           .in("status", openStatuses)
           .eq("currency_code", "CAD")
           .gt("expires_at", nowIso)
@@ -254,6 +265,7 @@ Deno.serve(async (req) => {
                 status: String(match.status),
                 purpose: String(match.purpose),
                 transfer_id: (match.transfer_id as string | null) ?? null,
+                money_request_id: (match.money_request_id as string | null) ?? null,
                 provider_reference: (match.provider_reference as string | null) ?? null,
               },
               providerRef || null,

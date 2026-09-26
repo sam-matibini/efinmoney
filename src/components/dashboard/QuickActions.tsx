@@ -1,6 +1,6 @@
 import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
-import { Send, Download, RefreshCw, Smartphone, Building2 } from "lucide-react";
+import { HandCoins, Send, Download, RefreshCw, Smartphone, Building2 } from "lucide-react";
 import SendMoneyModal from "@/components/modals/SendMoneyModal";
 import ExchangeModal from "@/components/modals/ExchangeModal";
 import { productFeatures } from "@/lib/productFeatures";
@@ -13,6 +13,7 @@ type Item =
 const allItems: Item[] = [
   { kind: "modal", Modal: SendMoneyModal, icon: Send, label: "Send", color: "bg-primary/15 text-primary" },
   { kind: "link", to: "/wallet/topup", icon: Download, label: "Add Money", color: "bg-primary/10 text-primary" },
+  { kind: "link", to: "/request-money", icon: HandCoins, label: "Request", color: "bg-sky-500/15 text-sky-600 dark:text-sky-400" },
   { kind: "link", to: "/wallet/receive", icon: Smartphone, label: "Receive", color: "bg-indigo-500/15 text-indigo-600 dark:text-indigo-400" },
   { kind: "modal", Modal: ExchangeModal, icon: RefreshCw, label: "Exchange", color: "bg-violet-500/15 text-violet-600 dark:text-violet-400" },
 ];
@@ -70,7 +71,7 @@ const QuickActions = () => {
           : bizStepPath[business.current_step] ?? "/onboarding/business/details";
 
   const items: Item[] = [
-    ...allItems,
+    ...allItems.filter((item) => item.label !== "Request" || productFeatures.requestMoney),
     {
       kind: "link",
       to: businessTo,

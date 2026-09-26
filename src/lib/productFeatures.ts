@@ -22,6 +22,8 @@ export const productFeatures = {
   crypto: envFlag("VITE_FEATURE_CRYPTO", false),
   billPay: envFlag("VITE_FEATURE_BILL_PAY", true),
   paymentLinks: envFlag("VITE_FEATURE_PAYMENT_LINKS", false),
+  /** Request Money — shareable CAD Interac Autodeposit pay-in link (third party → your wallet). */
+  requestMoney: envFlag("VITE_FEATURE_REQUEST_MONEY", true),
   otherAfricanCorridors: envFlag("VITE_FEATURE_OTHER_AFRICA", false),
   cards: envFlag("VITE_FEATURE_CARDS", true),
   swychr: envFlag("VITE_FEATURE_SWYCHR", true),

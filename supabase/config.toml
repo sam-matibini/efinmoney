@@ -476,6 +476,19 @@ verify_jwt = false
 [functions.payment-link-revoke]
 verify_jwt = false
 
+# Request Money: resolve + start-pay are public (payer need not be logged in).
+[functions.money-request-create]
+verify_jwt = false
+
+[functions.money-request-resolve]
+verify_jwt = false
+
+[functions.money-request-start-pay]
+verify_jwt = false
+
+[functions.money-request-cancel]
+verify_jwt = false
+
 # Lenhub Flutter wrapper (/app/flutter/*)
 [functions.lenhub-flutter]
 verify_jwt = true

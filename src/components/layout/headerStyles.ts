@@ -34,6 +34,7 @@ export const navIconTints: Record<string, string> = {
   Dashboard: "text-primary",
   Send: "text-sky-600 dark:text-sky-400",
   "Payment Links": "text-violet-600 dark:text-violet-400",
+  "Request money": "text-sky-600 dark:text-sky-400",
   "Top up": "text-emerald-600 dark:text-emerald-400",
   Receive: "text-cyan-600 dark:text-cyan-400",
   "Bank account": "text-cyan-600 dark:text-cyan-400",
@@ -82,6 +83,12 @@ export const navCellTones: Record<string, NavCellTone> = {
     hover: "group-hover/nav:bg-emerald-500/22",
     active: "bg-emerald-500/22 ring-1 ring-emerald-500/45 shadow-[0_4px_14px_-6px_rgb(16_185_129/0.6)]",
     label: "text-emerald-700 dark:text-emerald-300",
+  },
+  "Request money": {
+    idle: "bg-sky-500/20",
+    hover: "group-hover/nav:bg-sky-500/22",
+    active: "bg-sky-500/22 ring-1 ring-sky-500/45 shadow-[0_4px_14px_-6px_rgb(14_165_233/0.6)]",
+    label: "text-sky-700 dark:text-sky-300",
   },
   Receive: {
     idle: "bg-cyan-500/20",
@@ -169,6 +176,7 @@ export const navShortLabels: Record<string, string> = {
   Send: "Send",
   "Payment Links": "Payments",
   "Top up": "Top up",
+  "Request money": "Request",
   Receive: "Receive",
   "Bank account": "Bank",
   Contacts: "Contacts",

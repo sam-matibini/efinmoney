@@ -1,6 +1,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { sendTopupEmail } from "../_shared/topup-email.ts";
 import { recordObservedPartnerCost } from "../_shared/observedPartnerCost.ts";
+import { markMoneyRequestPaid } from "../_shared/moneyRequestPaid.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -184,6 +185,16 @@ Deno.serve(async (req) => {
               );
               if (credited) {
                 sendTopupEmail(supabase, userIdMeta, currency, amount, idempotencyRef).catch(() => {});
+                const moneyRequestId = meta?.money_request_id ? String(meta.money_request_id) : "";
+                if (moneyRequestId || String(meta?.purpose || "") === "money_request") {
+                  await markMoneyRequestPaid(supabase, {
+                    moneyRequestId: moneyRequestId || null,
+                    walletId: walletId || null,
+                    amount,
+                    currency,
+                    matchOpenByWalletAmount: !moneyRequestId,
+                  });
+                }
               }
             }
           }
@@ -195,6 +206,12 @@ Deno.serve(async (req) => {
             const { data: va } = await supabase.from("virtual_accounts").select("user_id, wallet_id, currency_code").eq("account_number", acctNum).maybeSingle();
             if (va?.user_id && va?.wallet_id) {
               await creditWallet(supabase, va.user_id, va.wallet_id, va.currency_code || currency, amount, String(reference || flwId), `Virtual account deposit ${flwId}`);
+              await markMoneyRequestPaid(supabase, {
+                walletId: va.wallet_id,
+                amount,
+                currency: va.currency_code || currency,
+                matchOpenByWalletAmount: true,
+              });
             }
           }
         }

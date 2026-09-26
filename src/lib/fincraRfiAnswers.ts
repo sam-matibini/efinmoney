@@ -36,6 +36,9 @@ function purposeLine(ctx: FincraRfiContext): string {
   if (p === "merchant_collection") {
     return "to pay an eFinMoney merchant collection on the customer’s account";
   }
+  if (p === "money_request") {
+    return "to fund an eFinMoney wallet top-up requested by the account holder (family or friend pay-in with a unique payment code)";
+  }
   return "to credit the customer’s own eFinMoney CAD wallet (wallet top-up)";
 }
 

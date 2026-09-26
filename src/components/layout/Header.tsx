@@ -92,6 +92,7 @@ const Header = () => {
     buildNavItem("Send", "/send"),
     ...(productFeatures.paymentLinks ? [buildNavItem("Payment Links", "/payment-links")] : []),
     buildNavItem("Top up", "/wallet/topup"),
+    ...(productFeatures.requestMoney ? [buildNavItem("Request money", "/request-money")] : []),
     buildNavItem("Bank account", "/wallet/receive"),
     buildNavItem("Contacts", "/contacts"),
     buildNavItem("Foreign Currency Exchange", "/exchange"),

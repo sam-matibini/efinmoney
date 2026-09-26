@@ -88,6 +88,8 @@ const KybRejected = lazyImport(() => import("./pages/onboarding/business/Rejecte
 const BusinessOverview = lazyImport(() => import("./pages/business/BusinessOverview"));
 const ShortLinkResolver = lazyImport(() => import("./pages/ShortLinkResolver"));
 const ClaimPaymentLinkPage = lazyImport(() => import("./pages/ClaimPaymentLinkPage"));
+const RequestMoneyPage = lazyImport(() => import("./pages/RequestMoneyPage"));
+const PayMoneyRequestPage = lazyImport(() => import("./pages/PayMoneyRequestPage"));
 const AdminDashboardPage = lazyImport(() => import("./pages/admin/AdminDashboardPage"));
 const KycQueuePage = lazyImport(() => import("./pages/admin/KycQueuePage"));
 const KycReviewPage = lazyImport(() => import("./pages/admin/KycReviewPage"));
@@ -300,6 +302,7 @@ const AppRoutes = () => {
         <Route path="/" element={<RootRoute />} />
         <Route path="/s/:code" element={<ShortLinkResolver />} />
         <Route path="/claim/:code" element={<GatedPage feature="paymentLinks"><ClaimPaymentLinkPage /></GatedPage>} />
+        <Route path="/pay/:code" element={<GatedPage feature="requestMoney"><PayMoneyRequestPage /></GatedPage>} />
         <Route path="/privacy" element={<PrivacyPolicyPage />} />
         <Route path="/terms" element={<TermsPage />} />
         <Route path="/refund" element={<RefundPolicyPage />} />
@@ -330,6 +333,7 @@ const AppRoutes = () => {
           <Route path="/contacts" element={<ContactsPage />} />
           <Route path="/payees" element={<ContactsPage />} />
           <Route path="/payment-links" element={<GatedPage feature="paymentLinks"><PaymentLinksPage /></GatedPage>} />
+          <Route path="/request-money" element={<GatedPage feature="requestMoney"><RequestMoneyPage /></GatedPage>} />
           <Route path="/transfers/canada" element={<GatedPage feature="canadaDomestic"><CanadaTransferPage /></GatedPage>} />
           <Route path="/wallet/receive" element={<ReceivePage />} />
           <Route path="/wallet/topup" element={<TopUpPage />} />

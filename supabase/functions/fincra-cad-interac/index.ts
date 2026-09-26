@@ -335,8 +335,8 @@ Deno.serve(async (req) => {
     const senderBank = String(body.sender_bank || "").trim();
     const purpose = String(body.purpose || "topup").toLowerCase();
     const transferId = String(body.transfer_id || "").trim();
-    if (!["topup", "transfer", "merchant_collection"].includes(purpose)) {
-      return fail("purpose", "purpose must be topup, transfer or merchant_collection", 400, { purpose });
+    if (!["topup", "transfer", "merchant_collection", "money_request"].includes(purpose)) {
+      return fail("purpose", "purpose must be topup, transfer, merchant_collection or money_request", 400, { purpose });
     }
     if (purpose === "transfer" && !/^[0-9a-f-]{36}$/i.test(transferId)) {
       return fail("transfer_id", "transfer_id required for transfer funding", 400, { transferId });
