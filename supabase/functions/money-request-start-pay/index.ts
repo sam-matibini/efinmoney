@@ -1,5 +1,5 @@
 // Public: start pay-in for a money request (payer need not be logged in).
-// Methods: interac (CAD) | bank_va (NGN/GHS) | checkout (Fincra hosted — USD/KES/ZMW/NGN/GHS).
+// Methods: interac (CAD Fincra) | nomba (CAD card/EFT) | bank_va (NGN/GHS) | checkout (Fincra hosted).
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { corsHeaders } from "../_shared/cors.ts";
 import {
@@ -8,6 +8,20 @@ import {
   FINCRA_INTERAC_OPEN_STATUSES,
 } from "../_shared/fincraCad.ts";
 import { fincraFetch, getFincraConfig, normalizeFincraRedirectUrl } from "../_shared/fincra.ts";
+import {
+  createNombaCheckoutOrder,
+  nombaApiConfigured,
+} from "../_shared/nomba-api.ts";
+import {
+  nombaCheckoutAllowedPaymentMethods,
+  parseNombaCollectRails,
+} from "../_shared/nomba-checkout-methods.ts";
+import {
+  quoteCadWalletViaNombaUsd,
+  resolveFxRate,
+  type FxRateRow,
+} from "../_shared/nomba-topup-quote.ts";
+import { resolveNombaCustomerEmail } from "../_shared/nomba-customer-email.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -84,7 +98,7 @@ Deno.serve(async (req) => {
   // Infer method if omitted
   let payMethod = method;
   if (!payMethod) {
-    if (currency === "CAD") payMethod = "interac";
+    if (currency === "CAD") payMethod = "nomba";
     else if (currency === "NGN" || currency === "GHS") payMethod = "bank_va";
     else payMethod = "checkout";
   }
@@ -347,6 +361,162 @@ Deno.serve(async (req) => {
       instructions: [
         `You'll pay ${currency} ${amount.toFixed(2)} on a secure checkout page.`,
         `After payment succeeds, ${profile?.full_name || "their"} eFinMoney wallet is credited automatically.`,
+      ],
+    });
+  }
+
+  // ── CAD Nomba card / bank (EFT) checkout ─────────────────────────────────
+  if (payMethod === "nomba" || payMethod === "nomba_checkout") {
+    if (currency !== "CAD") {
+      return json({ error: "Nomba checkout on Request Money is currently for CAD only" }, 400);
+    }
+    if (!nombaApiConfigured()) {
+      return json({ error: "Card / bank checkout is not configured yet" }, 503);
+    }
+    if (!redirectUrl) {
+      return json({ error: "redirect_url required for Nomba checkout" }, 400);
+    }
+
+    const { data: rates } = await admin
+      .from("fx_rates")
+      .select("from_currency, to_currency, effective_rate")
+      .or(`valid_until.is.null,valid_until.gt.${new Date().toISOString()}`)
+      .order("valid_from", { ascending: false })
+      .limit(500);
+    const cadToUsd = resolveFxRate("CAD", "USD", (rates ?? []) as FxRateRow[]);
+    if (!cadToUsd || cadToUsd <= 0) {
+      return json({ error: "CAD/USD exchange rate unavailable. Try Interac Autodeposit, or try again shortly." }, 503);
+    }
+
+    const quote = quoteCadWalletViaNombaUsd(amount, cadToUsd);
+    const checkoutAmount = Math.round(quote.checkoutAmount * 100) / 100;
+    if (checkoutAmount < 1) {
+      return json({ error: "Amount is too small for card checkout after FX. Try Interac Autodeposit." }, 400);
+    }
+
+    const collectRails = parseNombaCollectRails(["card", "eft"]);
+    const customerEmail = resolveNombaCustomerEmail(
+      payerEmail,
+      reqRow.requester_id,
+    ).email;
+    const appReturn = normalizeFincraRedirectUrl(redirectUrl);
+    const internalRef = `efin-nomba-mreq-${reqRow.id.replace(/-/g, "").slice(0, 10)}-${Date.now()}`;
+    const supabaseUrl = (Deno.env.get("SUPABASE_URL") || "").replace(/\/+$/, "");
+    const callbackUrl = `${supabaseUrl}/functions/v1/nomba-payment-callback`;
+
+    const { data: txn, error: insErr } = await admin
+      .from("nomba_pay_transactions")
+      .insert({
+        user_id: reqRow.requester_id,
+        corridor: "international",
+        reference: internalRef,
+        amount: checkoutAmount,
+        currency: quote.checkoutCurrency,
+        credit_amount: quote.creditAmount,
+        credit_currency: quote.creditCurrency,
+        checkout_amount: checkoutAmount,
+        checkout_currency: quote.checkoutCurrency,
+        platform_fee: quote.feeAmount,
+        fx_rate: quote.fxRateCadToUsd,
+        email: customerEmail,
+        target_wallet_id: reqRow.requester_wallet_id,
+        status: "pending",
+        raw_request: {
+          corridor: "international",
+          rail: "nomba_api",
+          purpose: "money_request",
+          money_request_id: reqRow.id,
+          credit_amount: quote.creditAmount,
+          credit_currency: quote.creditCurrency,
+          checkout_amount: checkoutAmount,
+          checkout_currency: quote.checkoutCurrency,
+          platform_fee: quote.feeAmount,
+          fx_rate: quote.fxRateCadToUsd,
+          email: customerEmail,
+          return_url: appReturn,
+          payment_methods: collectRails,
+        },
+      })
+      .select("id")
+      .single();
+
+    if (insErr || !txn) {
+      return json({ error: insErr?.message || "Could not start Nomba checkout" }, 500);
+    }
+
+    const created = await createNombaCheckoutOrder({
+      amount: checkoutAmount,
+      currency: quote.checkoutCurrency,
+      callbackUrl,
+      customerEmail,
+      userId: reqRow.requester_id,
+      orderReference: internalRef.slice(0, 50),
+      allowedPaymentMethods: nombaCheckoutAllowedPaymentMethods({
+        checkoutCurrency: quote.checkoutCurrency,
+        creditCurrency: quote.creditCurrency,
+        rails: collectRails,
+      }),
+      meta: {
+        efin_txn_id: String(txn.id),
+        wallet_id: String(reqRow.requester_wallet_id),
+        user_id: String(reqRow.requester_id),
+        purpose: "money_request",
+        money_request_id: String(reqRow.id),
+        collect_rails: collectRails.join(","),
+        app_return: appReturn,
+      },
+    });
+
+    if (!created.ok) {
+      await admin.from("nomba_pay_transactions").update({
+        status: "failed",
+        failure_reason: created.error,
+        raw_response: { error: created.error, rail: "nomba_api" },
+      }).eq("id", txn.id);
+      return json({
+        error: created.error || "Nomba checkout failed",
+        fallback_method: "interac",
+      }, 502);
+    }
+
+    await admin.from("nomba_pay_transactions").update({
+      status: "processing",
+      order_id: created.orderReference,
+      checkout_url: created.checkoutLink,
+      provider_reference: created.orderReference,
+      raw_response: { rail: "nomba_api", ...created },
+    }).eq("id", txn.id);
+
+    await admin
+      .from("money_requests")
+      .update({
+        status: "awaiting_payment",
+        payer_name: payerName,
+        payer_email: payerEmail,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", reqRow.id)
+      .in("status", ["pending", "awaiting_payment"]);
+
+    return json({
+      ok: true,
+      method: "nomba",
+      amount: quote.creditAmount,
+      currency: "CAD",
+      payment_link: created.checkoutLink,
+      reference: created.orderReference,
+      quote: {
+        credit_amount: quote.creditAmount,
+        credit_currency: "CAD",
+        checkout_amount: checkoutAmount,
+        checkout_currency: "USD",
+        platform_fee: quote.feeAmount,
+        fx_rate: quote.fxRateCadToUsd,
+      },
+      instructions: [
+        `You'll pay about $${checkoutAmount.toFixed(2)} USD on Nomba checkout (card or bank).`,
+        `Their CAD wallet is credited C$${quote.creditAmount.toFixed(2)} when payment succeeds.`,
+        `A small processing fee is included in the USD charge.`,
       ],
     });
   }

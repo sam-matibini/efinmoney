@@ -54,7 +54,7 @@ function minAmount(currency: string): number {
 
 function payRailBlurb(currency: string): string {
   const c = currency.toUpperCase();
-  if (c === "CAD") return "Interac Autodeposit";
+  if (c === "CAD") return "Interac Autodeposit or card / bank (Nomba)";
   if (c === "NGN" || c === "GHS") return "bank transfer or card / mobile money";
   if (c === "KES" || c === "ZMW") return "mobile money or card";
   if (c === "USD") return "card";

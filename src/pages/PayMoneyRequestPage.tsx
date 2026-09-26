@@ -79,6 +79,7 @@ async function api<T>(path: string, init?: RequestInit): Promise<T> {
 
 const METHOD_LABEL: Record<string, string> = {
   interac: "Interac Autodeposit",
+  nomba: "Card / bank (Nomba)",
   bank_va: "Bank transfer",
   checkout: "Card / mobile money",
 };
@@ -150,7 +151,7 @@ const PayMoneyRequestPage = () => {
       });
       setPay(data);
       await refresh();
-      if (data.method === "checkout" && data.payment_link) {
+      if ((data.method === "checkout" || data.method === "nomba") && data.payment_link) {
         toast.success("Opening secure checkout…");
         window.location.href = data.payment_link;
         return;
@@ -182,8 +183,8 @@ const PayMoneyRequestPage = () => {
   };
 
   const currency = link?.currency || "CAD";
-  const needsEmail = method === "checkout";
-  const needsName = method === "interac" || method === "checkout" || method === "bank_va";
+  const needsEmail = method === "checkout" || method === "nomba";
+  const needsName = method === "interac" || method === "checkout" || method === "nomba" || method === "bank_va";
   const canContinue =
     !!method
     && (!needsName || !!payerName.trim())
@@ -328,7 +329,7 @@ const PayMoneyRequestPage = () => {
                       <span className="inline-flex items-center gap-2">
                         <Loader2 className="h-4 w-4 animate-spin" /> Preparing…
                       </span>
-                    ) : method === "checkout" ? (
+                    ) : method === "checkout" || method === "nomba" ? (
                       "Continue to checkout"
                     ) : method === "bank_va" ? (
                       "Show bank details"
@@ -431,7 +432,7 @@ const PayMoneyRequestPage = () => {
                     This page updates automatically when the deposit credits their wallet.
                   </p>
                 </div>
-              ) : pay.method === "checkout" ? (
+              ) : pay.method === "checkout" || pay.method === "nomba" ? (
                 <div className="rounded-2xl border border-border bg-card p-8 text-center space-y-3">
                   <Loader2 className="mx-auto h-8 w-8 animate-spin text-muted-foreground" />
                   <p className="text-sm text-muted-foreground">Redirecting to secure checkout…</p>

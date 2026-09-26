@@ -1,6 +1,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { getNombaPayConfig } from "../_shared/nomba-pay.ts";
 import { sendTopupEmail } from "../_shared/topup-email.ts";
+import { markMoneyRequestPaid } from "../_shared/moneyRequestPaid.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -168,6 +169,19 @@ async function completeNombaCollection(
     .limit(1);
   if (existing?.length) {
     await supabase.from("nomba_pay_transactions").update({ status: "completed" }).eq("id", txn.id);
+    const rawDup = (txn.raw_request && typeof txn.raw_request === "object")
+      ? txn.raw_request as Record<string, unknown>
+      : {};
+    const mrId = rawDup.money_request_id ? String(rawDup.money_request_id) : "";
+    if (mrId || String(rawDup.purpose || "") === "money_request") {
+      await markMoneyRequestPaid(supabase, {
+        moneyRequestId: mrId || null,
+        walletId: txn.target_wallet_id ? String(txn.target_wallet_id) : null,
+        amount: creditAmount,
+        currency: creditCurrency,
+        matchOpenByWalletAmount: !mrId,
+      });
+    }
     return { ok: true, duplicate: true };
   }
   // Legacy: prior credits may have keyed on orderId instead of merchant reference
@@ -250,6 +264,20 @@ async function completeNombaCollection(
   }).then(() => null, () => null);
 
   sendTopupEmail(supabase, txn.user_id, creditCurrency, creditAmount, idempotencyRef).catch(() => {});
+
+  const raw = (txn.raw_request && typeof txn.raw_request === "object")
+    ? txn.raw_request as Record<string, unknown>
+    : {};
+  const moneyRequestId = raw.money_request_id ? String(raw.money_request_id) : "";
+  if (moneyRequestId || String(raw.purpose || "") === "money_request") {
+    await markMoneyRequestPaid(supabase, {
+      moneyRequestId: moneyRequestId || null,
+      walletId: txn.target_wallet_id ? String(txn.target_wallet_id) : null,
+      amount: creditAmount,
+      currency: creditCurrency,
+      matchOpenByWalletAmount: !moneyRequestId,
+    });
+  }
 
   return { ok: true };
 }

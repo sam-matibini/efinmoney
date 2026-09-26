@@ -71,7 +71,8 @@ export function isLiveRequestMoneyCurrency(code: string): boolean {
 
 export function payMethodsForCurrency(currency: string): string[] {
   const c = String(currency || "").toUpperCase();
-  if (c === "CAD") return ["interac"];
+  // Nomba card/EFT first (same ranking as wallet top-up), then Fincra Interac Autodeposit.
+  if (c === "CAD") return ["nomba", "interac"];
   if (c === "NGN" || c === "GHS") return ["bank_va", "checkout"];
   if (c === "USD" || c === "KES" || c === "ZMW") return ["checkout"];
   return [];
