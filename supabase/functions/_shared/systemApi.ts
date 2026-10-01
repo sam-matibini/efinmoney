@@ -25,6 +25,25 @@ function adminClient() {
   );
 }
 
+async function loadIntegrationApi(
+  admin: ReturnType<typeof createClient>,
+  provider: string,
+): Promise<Loaded | null> {
+  const { data, error } = await admin
+    .from("integration_settings")
+    .select("is_enabled, config")
+    .eq("key", `system_api:${provider}`)
+    .maybeSingle();
+  if (error || !data) return null;
+  const config = data.config && typeof data.config === "object" ? data.config as Record<string, unknown> : {};
+  return {
+    enabled: data.is_enabled !== false,
+    secrets: asRecord(config.secrets),
+    publicConfig: asRecord(config.public_config),
+    at: Date.now(),
+  };
+}
+
 function asRecord(value: unknown): Record<string, string> {
   if (!value || typeof value !== "object" || Array.isArray(value)) return {};
   const out: Record<string, string> = {};
@@ -45,12 +64,14 @@ export async function loadSystemApi(provider: string): Promise<Loaded | null> {
       .select("is_enabled, public_config, updated_at")
       .eq("provider", provider)
       .maybeSingle();
-    if (error) {
-      console.warn("system api provider lookup", provider, error.message);
-      return null;
-    }
-    if (!row) {
-      cache.set(provider, { at: Date.now(), row: null });
+    if (error || !row) {
+      if (error) console.warn("system api provider lookup", provider, error.message);
+      const saved = await loadIntegrationApi(admin, provider);
+      if (saved) {
+        cache.set(provider, { at: Date.now(), row: saved });
+        return saved;
+      }
+      if (!error) cache.set(provider, { at: Date.now(), row: null });
       return null;
     }
     const { data: secretRow, error: secretErr } = await admin

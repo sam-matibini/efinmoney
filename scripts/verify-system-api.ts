@@ -8,6 +8,7 @@ import {
   systemApiDef,
 } from "../supabase/functions/_shared/systemApiLogic.ts";
 import { FALLBACK_SYSTEM_APIS } from "../src/lib/systemApiCatalog.ts";
+import { assertProviderId, mergeSystemApiRows, secretHint as clientHint } from "../src/lib/systemApiRecords.ts";
 
 assert.equal(secretHint(""), null);
 assert.equal(secretHint("abcd"), "••••");
@@ -88,6 +89,26 @@ assert.equal(stripe.secrets[0].key, "api_key");
 assert.equal(stripe.secrets[1].key, "api_key_2");
 assert.equal(stripe.publicFields[0].key, "setting");
 assert.throws(() => parseCustomDefinition({ provider: "gemini", label: "Gemini" }));
+assert.equal(parseCustomDefinition({ provider: "909681129488", label: "Google Gemini" }).provider, "909681129488");
+assert.equal(assertProviderId("909681129488"), "909681129488");
+
+const mergedRows = mergeSystemApiRows(FALLBACK_SYSTEM_APIS, [{
+  key: "system_api:909681129488",
+  is_enabled: true,
+  updated_at: null,
+  config: {
+    label: "Google Gemini",
+    description: "Alice",
+    secrets: { api_key: "AIza-live-key-9488" },
+    fields: { secrets: [{ key: "api_key", label: "API key" }] },
+  },
+}]);
+const added = mergedRows.find((item) => item.provider === "909681129488");
+assert.ok(added);
+assert.equal(added?.custom, true);
+assert.equal(added?.fields[0].hint, clientHint("AIza-live-key-9488"));
+assert.equal(JSON.stringify(added).includes("AIza-live-key-9488"), false);
+assert.equal(mergedRows.filter((item) => item.provider === "gemini").length, 1);
 
 for (const def of [systemApiDef("gemini")!, systemApiDef("plaid")!, systemApiDef("resend")!]) {
   const view = buildProviderView(def, null, {}, () => false);

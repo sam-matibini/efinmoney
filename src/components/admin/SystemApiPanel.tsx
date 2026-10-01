@@ -10,6 +10,8 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { FALLBACK_SYSTEM_APIS, TESTABLE_SYSTEM_APIS } from "@/lib/systemApiCatalog";
+import { normalizeProviderId } from "@/lib/systemApiRecords";
+import { loadSystemApiProviders, removeSystemApi, saveSystemApi } from "@/lib/systemApiStore";
 import { Eye, EyeOff, KeyRound, Loader2, Plus, Save, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -61,45 +63,9 @@ function sourceLabel(field: SystemApiField): string {
   return "Default";
 }
 
-async function readInvokeError(error: unknown): Promise<string> {
-  const fallback = error instanceof Error ? error.message : "Could not reach System API";
-  const context = (error as { context?: { json?: () => Promise<unknown> } })?.context;
-  if (!context?.json) {
-    if (/abort|timed out|timeout/i.test(fallback)) return "System API did not respond. The cards below can still be edited.";
-    return fallback;
-  }
-  try {
-    const body = await context.json();
-    if (body && typeof body === "object") {
-      const record = body as Record<string, unknown>;
-      if (typeof record.error === "string" && record.error) return record.error;
-      if (typeof record.message === "string" && record.message) return record.message;
-    }
-  } catch {
-    /* The error body was already read. */
-  }
-  return fallback;
-}
-
-async function invokeSystemApi(body: Record<string, unknown>) {
-  const { data, error } = await supabase.functions.invoke("system-api", {
-    body,
-    timeout: 15000,
-  });
-  if (error) throw new Error(await readInvokeError(error));
-  if (data?.error) throw new Error(String(data.error));
-  return data as { providers?: SystemApiProvider[]; warning?: string | null };
-}
-
 async function loadProviders(): Promise<SystemApiList> {
-  const data = await invokeSystemApi({ action: "list" });
-  const providers = (data?.providers || []) as SystemApiProvider[];
-  if (!providers.length) throw new Error(data?.warning || "System API returned no cards");
-  return { providers, warning: data?.warning || null };
-}
-
-function slugify(value: string): string {
-  return value.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 40);
+  const providers = await loadSystemApiProviders();
+  return { providers, warning: null };
 }
 
 export function SystemApiPanel({ preview }: { preview?: SystemApiProvider[] }) {
@@ -140,21 +106,17 @@ export function SystemApiPanel({ preview }: { preview?: SystemApiProvider[] }) {
         const value = (draft.secrets[field.key] || "").trim();
         if (value) secrets[field.key] = value;
       }
-      const data = await invokeSystemApi({
-        action: "save",
-        provider: provider.provider,
-        is_enabled: draft.enabled,
+      const providers = await saveSystemApi({
+        provider,
+        enabled: draft.enabled,
         secrets,
-        clear_secrets: clearSecrets,
-        public_config: draft.publicConfig,
+        clearSecrets,
+        publicConfig: draft.publicConfig,
       });
-      return data;
+      return providers;
     },
-    onSuccess: (data, provider) => {
-      const list = (data?.providers || []) as SystemApiProvider[];
-      if (list.length) {
-        queryClient.setQueryData(["system-api"], { providers: list, warning: data?.warning || null });
-      }
+    onSuccess: (list, provider) => {
+      if (list.length) queryClient.setQueryData(["system-api"], { providers: list, warning: null });
       const fresh = list.find((item) => item.provider === provider.provider);
       if (fresh) {
         setDrafts((current) => ({ ...current, [provider.provider]: emptyDraft(fresh) }));
@@ -180,10 +142,9 @@ export function SystemApiPanel({ preview }: { preview?: SystemApiProvider[] }) {
   });
 
   const removeApi = useMutation({
-    mutationFn: async (provider: SystemApiProvider) => invokeSystemApi({ action: "remove", provider: provider.provider }),
-    onSuccess: (data) => {
-      const list = (data?.providers || []) as SystemApiProvider[];
-      if (list.length) queryClient.setQueryData(["system-api"], { providers: list, warning: data?.warning || null });
+    mutationFn: async (provider: SystemApiProvider) => removeSystemApi(provider.provider),
+    onSuccess: (list) => {
+      if (list.length) queryClient.setQueryData(["system-api"], { providers: list, warning: null });
       toast.success("API removed");
     },
     onError: (err: Error) => toast.error(err.message),
@@ -442,7 +403,7 @@ function AddSystemApiDialog({
       if (!label.trim()) throw new Error("Enter a name for the API");
       if (!secretFields.length) throw new Error("Add at least one key");
       const keyFor = (name: string, fallback: string) => {
-        let key = slugify(name) || fallback;
+        let key = normalizeProviderId(name) || fallback;
         const base = key;
         let n = 2;
         while (used.has(key)) key = `${base}_${n++}`.slice(0, 40);
@@ -469,20 +430,48 @@ function AddSystemApiDialog({
         const value = publicFields[index]?.value || "";
         if (value) publicConfig[field.key] = value;
       });
-      return invokeSystemApi({
-        action: "create",
-        provider: providerId || slugify(label),
+      const id = providerId || normalizeProviderId(label);
+      const provider: SystemApiProvider = {
+        provider: id,
         label: label.trim(),
         description: description.trim(),
-        definition,
-        secrets: secretValues,
-        public_config: publicConfig,
         is_enabled: true,
+        updated_at: null,
+        custom: !["gemini", "plaid", "resend"].includes(id),
+        fields: [
+          ...definition.secrets.map((field) => ({
+            key: field.key,
+            label: field.label,
+            kind: "secret" as const,
+            env: null,
+            configured: false,
+            source: "missing" as const,
+            hint: null,
+            value: null,
+          })),
+          ...definition.publicFields.map((field) => ({
+            key: field.key,
+            label: field.label,
+            kind: "public" as const,
+            env: null,
+            configured: Boolean(publicConfig[field.key]),
+            source: "saved" as const,
+            hint: null,
+            value: publicConfig[field.key] || "",
+          })),
+        ],
+      };
+      return saveSystemApi({
+        provider,
+        enabled: true,
+        secrets: secretValues,
+        clearSecrets: [],
+        publicConfig,
       });
     },
-    onSuccess: (data) => {
+    onSuccess: (providers) => {
       toast.success(`${label.trim() || "API"} added`);
-      onCreated((data?.providers || []) as SystemApiProvider[], data?.warning || null);
+      onCreated(providers, null);
       reset();
     },
     onError: (err: Error) => toast.error(err.message),
@@ -507,7 +496,7 @@ function AddSystemApiDialog({
               onChange={(e) => {
                 const next = e.target.value;
                 setLabel(next);
-                if (!idEdited) setProviderId(slugify(next));
+                if (!idEdited) setProviderId(normalizeProviderId(next));
               }}
             />
           </div>
@@ -520,7 +509,7 @@ function AddSystemApiDialog({
               placeholder="stripe"
               onChange={(e) => {
                 setIdEdited(true);
-                setProviderId(slugify(e.target.value));
+                setProviderId(normalizeProviderId(e.target.value));
               }}
             />
           </div>

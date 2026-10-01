@@ -80,7 +80,7 @@ export const SYSTEM_API_CATALOG: SystemApiDef[] = [
 
 const PROVIDERS = new Set(SYSTEM_API_CATALOG.map((d) => d.provider));
 const FIELD_KEY = /^[a-z][a-z0-9_]{0,40}$/;
-const PROVIDER_ID = /^[a-z][a-z0-9_]{1,40}$/;
+const PROVIDER_ID = /^[a-z0-9][a-z0-9_]{0,39}$/;
 
 export function systemApiDef(provider: string): SystemApiDef | null {
   return SYSTEM_API_CATALOG.find((d) => d.provider === provider) ?? null;
@@ -120,7 +120,7 @@ export function parseCustomDefinition(input: {
   definition?: unknown;
 }): SystemApiDef {
   const provider = typeof input.provider === "string" ? input.provider.trim().toLowerCase() : "";
-  if (!PROVIDER_ID.test(provider)) throw new Error("Use a short name like stripe or twilio");
+  if (!PROVIDER_ID.test(provider)) throw new Error("Use a short id, such as gemini or a project number");
   if (isBuiltinSystemApi(provider)) throw new Error("That API is already on this page");
   const label = cleanLabel(input.label, "");
   if (!label) throw new Error("Enter a name for the API");
