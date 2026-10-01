@@ -61,8 +61,8 @@ export function ApproveVerificationDialog({
           <Button variant="outline" type="button" onClick={() => onOpenChange(false)} disabled={loading}>
             Cancel
           </Button>
-          <Button type="button" onClick={onConfirm} disabled={loading}>
-            {loading ? "Sending email…" : "Approve & Send Notification Email"}
+          <Button type="button" className="min-w-64" onClick={onConfirm} disabled={loading}>
+            {loading ? "Sending…" : "Approve & Send Notification Email"}
           </Button>
         </DialogFooter>
       </DialogContent>
