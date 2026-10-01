@@ -26,7 +26,7 @@ export default function AppPage({
   innerClassName,
 }: AppPageProps) {
   return (
-    <main
+    <div
       className={cn(
         "container mx-auto px-4 py-6 pb-24 md:pb-6",
         className,
@@ -35,6 +35,6 @@ export default function AppPage({
       <div className={cn(innerWidthClass[width], innerClassName)}>
         {children}
       </div>
-    </main>
+    </div>
   );
 }

@@ -1,28 +1,34 @@
 import { Outlet } from "react-router-dom";
 import { Suspense } from "react";
-import Header from "@/components/layout/Header";
+import AppSidebar from "@/components/layout/AppSidebar";
 import MobileNav from "@/components/layout/MobileNav";
 import PageTransition from "@/components/ui/PageTransition";
 import PageSkeleton from "@/components/ui/PageSkeleton";
 import EfinTagGuard from "@/components/auth/EfinTagGuard";
 import { DeferredAliceWidget, ShellAdyenHandler } from "@/components/layout/DeferredShellWidgets";
 import { LivePricingHydrator } from "@/hooks/useLivePricingWorkbook";
+import { EfmToastProvider } from "@/components/dashboard/redesign/ToastProvider";
 
-/** Persistent shell — Header stays mounted while only page content swaps. */
+/** Persistent shell — sidebar stays mounted while only page content swaps. */
 const ClientShell = () => (
   <EfinTagGuard>
-    <div className="min-h-screen bg-background overflow-x-hidden pb-[calc(5.5rem+env(safe-area-inset-bottom))] lg:pb-8">
-      <ShellAdyenHandler />
-      <LivePricingHydrator />
-      <Header />
-      <PageTransition>
-        <Suspense fallback={<PageSkeleton />}>
-          <Outlet />
-        </Suspense>
-      </PageTransition>
-      <MobileNav />
-      <DeferredAliceWidget context="user" />
-    </div>
+    <EfmToastProvider>
+      <div className="app-shell">
+        <a className="skip-link" href="#main-content">Skip to content</a>
+        <ShellAdyenHandler />
+        <LivePricingHydrator />
+        <AppSidebar />
+        <main id="main-content" className="main-content" tabIndex={-1}>
+          <PageTransition>
+            <Suspense fallback={<PageSkeleton />}>
+              <Outlet />
+            </Suspense>
+          </PageTransition>
+        </main>
+        <MobileNav />
+        <DeferredAliceWidget context="user" />
+      </div>
+    </EfmToastProvider>
   </EfinTagGuard>
 );
 

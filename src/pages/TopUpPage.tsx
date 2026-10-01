@@ -258,7 +258,7 @@ const TopUpPage = () => {
   );
 
   const [selectedWalletId, setSelectedWalletId] = useState<string>("");
-  const [amount, setAmount] = useState("");
+  const [amount, setAmount] = useState(() => params.get("amount") || "");
   const [method, setMethod] = useState<FlwMethod>("card");
   const [network, setNetwork] = useState<string>("");
   const [phone, setPhone] = useState<string>("");

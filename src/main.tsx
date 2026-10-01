@@ -2,7 +2,11 @@ import React from "react";
 import { createRoot } from "react-dom/client";
 import * as Sentry from "@sentry/react";
 import App from "./App.tsx";
+import "../styles/tokens.css";
 import "./index.css";
+import "../styles/sidebar.css";
+import "../styles/dashboard.css";
+import "../styles/components.css";
 import { initAnalytics } from "./lib/analytics";
 
 initAnalytics();
