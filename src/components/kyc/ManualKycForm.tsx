@@ -141,7 +141,7 @@ const ManualKycForm = ({ onBack, onSubmitted }: Props) => {
           label="Photo of ID"
           uploadedPath={idUrl}
           onUpload={async (file) => {
-            const path = await uploadToKyc("id", file);
+            const path = await uploadToKyc("identity", file);
             setIdUrl(path);
           }}
           onRemove={() => setIdUrl(null)}
@@ -211,7 +211,7 @@ const ManualKycForm = ({ onBack, onSubmitted }: Props) => {
         onOpenChange={setSelfieOpen}
         onCapture={async (blob) => {
           const file = new File([blob], "selfie.jpg", { type: blob.type || "image/jpeg" });
-          const path = await uploadToKyc("selfie", file);
+          const path = await uploadToKyc("identity", file);
           setSelfieUrl(path);
         }}
       />

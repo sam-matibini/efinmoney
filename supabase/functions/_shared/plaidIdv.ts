@@ -80,10 +80,15 @@ export async function applyPlaidIdvToKyc(
     verification_status = "rejected";
     update.verification_status = "rejected";
     update.id_verification_status = "rejected";
-    update.id_rejection_reason = `Plaid IDV ${status}`;
+    const steps = (opts.payload?.steps ?? {}) as Record<string, unknown>;
+    const failedSteps = Object.entries(steps)
+      .filter(([, s]) => s === "failed")
+      .map(([name]) => name);
+    const stepNote = failedSteps.length ? ` (failed: ${failedSteps.join(", ")})` : "";
+    update.id_rejection_reason = `Plaid IDV ${status}${stepNote}`;
     update.reviewed_at = now;
     auditAction = "plaid_idv_rejected";
-    notes = `Plaid Identity Verification ended with status=${status}.`;
+    notes = `Plaid Identity Verification ended with status=${status}${stepNote}.`;
   } else {
     // active / other
     if (kyc.verification_status === "not_started") {

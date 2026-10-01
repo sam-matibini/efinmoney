@@ -1,7 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { corsPreflightResponse, jsonResponse } from "../_shared/cors.ts";
 import { plaidConfigured, plaidErrorMessage, plaidFetch, plaidEnv } from "../_shared/plaid.ts";
-
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return corsPreflightResponse();
   if (req.method !== "POST") return jsonResponse({ error: "Method not allowed" }, 405);
@@ -42,7 +41,6 @@ Deno.serve(async (req) => {
       client_user_id: user.id,
     };
     if (user.email) userBody.email_address = user.email;
-    if (profile?.phone_number) userBody.phone_number = profile.phone_number;
     if (profile?.date_of_birth) userBody.date_of_birth = profile.date_of_birth;
     if (givenName || familyName) {
       userBody.name = {
@@ -51,13 +49,20 @@ Deno.serve(async (req) => {
       };
     }
 
-    const createRes = await plaidFetch("/identity_verification/create", {
+    const createBody = {
       template_id: templateId,
       is_shareable: false,
       is_idempotent: true,
       gave_consent: true,
       user: userBody,
-    });
+    };
+    let createRes = await plaidFetch("/identity_verification/create", createBody);
+    // Idempotent create hands back the user's previous session as-is, so a single failed
+    // attempt would otherwise lock them out; is_idempotent=false resets it for a fresh try.
+    const priorStatus = String(createRes.json?.status || "").toLowerCase();
+    if (createRes.ok && ["failed", "expired", "canceled"].includes(priorStatus)) {
+      createRes = await plaidFetch("/identity_verification/create", { ...createBody, is_idempotent: false });
+    }
     if (!createRes.ok) {
       return jsonResponse({ error: plaidErrorMessage(createRes.json) }, 400);
     }
