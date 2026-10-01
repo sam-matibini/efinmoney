@@ -61,10 +61,30 @@ Deno.serve(async (req) => {
     // attempt would otherwise lock them out; is_idempotent=false resets it for a fresh try.
     const priorStatus = String(createRes.json?.status || "").toLowerCase();
     if (createRes.ok && ["failed", "expired", "canceled"].includes(priorStatus)) {
-      createRes = await plaidFetch("/identity_verification/create", { ...createBody, is_idempotent: false });
+      const retryRes = await plaidFetch("/identity_verification/retry", {
+        client_user_id: user.id,
+        template_id: templateId,
+        strategy: "reset",
+      });
+      if (retryRes.ok) {
+        createRes = retryRes;
+      } else {
+        console.warn("plaid-idv-create: retry failed", retryRes.json);
+        const resetRes = await plaidFetch("/identity_verification/create", { ...createBody, is_idempotent: false });
+        if (!resetRes.ok) {
+          console.error("plaid-idv-create: reset failed", resetRes.json);
+          return jsonResponse({
+            error: `Could not restart verification: ${plaidErrorMessage(retryRes.json)} / ${plaidErrorMessage(resetRes.json)}`,
+            plaid_retry_error: retryRes.json,
+            plaid_reset_error: resetRes.json,
+          }, 400);
+        }
+        createRes = resetRes;
+      }
     }
     if (!createRes.ok) {
-      return jsonResponse({ error: plaidErrorMessage(createRes.json) }, 400);
+      console.error("plaid-idv-create: create failed", createRes.json);
+      return jsonResponse({ error: plaidErrorMessage(createRes.json), plaid_error: createRes.json }, 400);
     }
 
     const idvId = String(createRes.json.id || "");
@@ -101,7 +121,11 @@ Deno.serve(async (req) => {
 
     const linkRes = await plaidFetch("/link/token/create", linkBody);
     if (!linkRes.ok) {
-      return jsonResponse({ error: plaidErrorMessage(linkRes.json, "Failed to create IDV link token") }, 400);
+      console.error("plaid-idv-create: link token failed", linkRes.json);
+      return jsonResponse({
+        error: plaidErrorMessage(linkRes.json, "Failed to create IDV link token"),
+        plaid_error: linkRes.json,
+      }, 400);
     }
 
     return jsonResponse({

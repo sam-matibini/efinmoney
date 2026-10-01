@@ -46,7 +46,11 @@ export const PlaidIdvVerification = ({
         body: { user_id: userId },
       });
       if (data?.error) throw new Error(String(data.error));
-      if (error) throw error;
+      if (error) {
+        const body = await (error as { context?: Response }).context?.json?.().catch(() => null);
+        if (body) console.error("plaid-idv-create response", body);
+        throw new Error(body?.error ? String(body.error) : error.message);
+      }
       const token = String(data?.link_token || "");
       const verificationId = String(data?.identity_verification_id || "");
       if (!token) throw new Error("Plaid IDV did not return a link token");
