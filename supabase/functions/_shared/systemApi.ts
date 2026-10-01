@@ -124,7 +124,41 @@ export async function geminiCredentials(): Promise<{ apiKey: string; model: stri
     resolveSystemSecret("gemini", "api_key", "GEMINI_API_KEY"),
     resolveSystemPublic("gemini", "model", modelDefault),
   ]);
-  return { apiKey, model };
+  if (apiKey) return { apiKey, model: model || "gemini-2.5-flash" };
+  const saved = await findLabeledGeminiKey();
+  if (saved) return saved;
+  return { apiKey: "", model: model || "gemini-2.5-flash" };
+}
+
+async function findLabeledGeminiKey(): Promise<{ apiKey: string; model: string } | null> {
+  const admin = adminClient();
+  const { data, error } = await admin
+    .from("integration_settings")
+    .select("key, is_enabled, config")
+    .like("key", "system_api:%");
+  if (error || !data) return null;
+  const ranked = data
+    .map((row) => {
+      const id = String(row.key || "").replace(/^system_api:/, "");
+      const config = row.config && typeof row.config === "object" ? row.config as Record<string, unknown> : {};
+      const label = `${id} ${typeof config.label === "string" ? config.label : ""}`.toLowerCase();
+      const rank = id === "gemini" ? 2 : label.includes("gemini") ? 1 : 0;
+      const secrets = config.secrets && typeof config.secrets === "object" ? config.secrets as Record<string, unknown> : {};
+      const preferred = [secrets.api_key, secrets.apiKey, secrets.key].find((value) => typeof value === "string" && value.trim());
+      const fallback = Object.values(secrets).find((value) => typeof value === "string" && value.trim());
+      const apiKey = preferred || fallback;
+      const publicConfig = config.public_config && typeof config.public_config === "object"
+        ? config.public_config as Record<string, unknown>
+        : {};
+      const model = typeof publicConfig.model === "string" && publicConfig.model.trim()
+        ? publicConfig.model.trim()
+        : "gemini-2.5-flash";
+      return { enabled: row.is_enabled !== false, rank, apiKey: typeof apiKey === "string" ? apiKey.trim() : "", model };
+    })
+    .filter((row) => row.enabled && row.rank > 0 && row.apiKey)
+    .sort((a, b) => b.rank - a.rank);
+  const match = ranked[0];
+  return match ? { apiKey: match.apiKey, model: match.model } : null;
 }
 
 export async function resendCredentials(): Promise<{ apiKey: string; from: string | null }> {

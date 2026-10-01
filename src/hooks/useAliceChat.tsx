@@ -1,6 +1,8 @@
 import { useCallback, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { askAliceWithSavedGemini } from "@/lib/aliceGemini";
+import { shouldUseSavedGemini } from "@/lib/aliceGeminiKey";
 import { syncAliceTurnToSupport } from "@/lib/syncAliceToSupport";
 
 export type AliceRole = "user" | "assistant";
@@ -17,10 +19,25 @@ export interface AliceConversationSummary {
 
 type Context = "user" | "admin";
 
+async function functionErrorMessage(error: unknown): Promise<string> {
+  let msg = error instanceof Error ? error.message : "Something went wrong.";
+  const ctx = (error as { context?: { json?: () => Promise<{ error?: string }> } })?.context;
+  if (ctx && typeof ctx.json === "function") {
+    try {
+      const body = await ctx.json();
+      if (body?.error) msg = body.error;
+    } catch {
+      /* body already read */
+    }
+  }
+  return msg;
+}
+
 /**
  * Alice chat state for one widget instance. Sends the running thread to the
- * `alice-chat` edge function (which enforces role + RLS server-side) and
- * persists messages to the RLS-scoped alice_* tables so history can be revisited.
+ * `alice-chat` edge function and, when that function still only knows the
+ * server env secret, answers with the Gemini key saved in System API.
+ * Messages persist to the RLS-scoped alice_* tables so history can be revisited.
  */
 export const useAliceChat = (context: Context) => {
   const qc = useQueryClient();
@@ -94,8 +111,26 @@ export const useAliceChat = (context: Context) => {
       const { data, error } = await supabase.functions.invoke("alice-chat", {
         body: { messages: thread.map((m) => ({ role: m.role, content: m.content })), context },
       });
-      if (error) throw error;
-      const reply: string = data?.reply || data?.error || "Sorry, I couldn't answer that. Please try again.";
+      const fromData = typeof data?.error === "string" ? data.error : "";
+      const fromError = error ? await functionErrorMessage(error) : "";
+      const serverMessage = fromData || fromError;
+      const serverReply = typeof data?.reply === "string" ? data.reply : "";
+      let reply = "";
+      if (shouldUseSavedGemini(serverReply, serverMessage)) {
+        try {
+          reply = await askAliceWithSavedGemini(thread.map((m) => ({ role: m.role, content: m.content })));
+        } catch (fallbackError) {
+          const fallbackMessage = fallbackError instanceof Error ? fallbackError.message : "";
+          if (serverMessage && /cannot read the saved Gemini key/i.test(fallbackMessage)) {
+            throw new Error(serverMessage);
+          }
+          throw fallbackError;
+        }
+      } else if (serverReply) {
+        reply = serverReply;
+      } else {
+        throw new Error(serverMessage);
+      }
 
       await db.from("alice_messages").insert({ conversation_id: convId, role: "assistant", content: reply });
       await db.from("alice_conversations").update({ updated_at: new Date().toISOString() }).eq("id", convId);
