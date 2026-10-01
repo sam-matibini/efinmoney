@@ -16,6 +16,21 @@ interface Props {
   className?: string;
 }
 
+const ACCEPT_GROUPS: { label: string; exts: string[] }[] = [
+  { label: "Photo", exts: ["jpg", "jpeg", "png", "heic", "heif", "webp", "tif", "tiff"] },
+  { label: "PDF", exts: ["pdf"] },
+  { label: "Word", exts: ["doc", "docx"] },
+  { label: "Excel", exts: ["xls", "xlsx"] },
+];
+
+function describeAccept(accept: string): string {
+  const exts = accept.split(",").map((t) => t.trim().replace(/^\./, "").toLowerCase());
+  const labels = ACCEPT_GROUPS.filter((g) => g.exts.some((e) => exts.includes(e))).map((g) => g.label);
+  if (labels.length === 0) return exts.map((e) => e.toUpperCase()).join(", ");
+  if (labels.length === 1) return labels[0];
+  return `${labels.slice(0, -1).join(", ")} or ${labels[labels.length - 1]}`;
+}
+
 const DocumentUploader = ({
   label,
   accept = ".jpg,.jpeg,.png,.pdf,.tif,.tiff,.heic,.heif,.webp,.doc,.docx,.xls,.xlsx",
@@ -68,6 +83,7 @@ const DocumentUploader = ({
           }
         }
       } catch (e) {
+        console.error("DocumentUploader upload failed", e);
         toast.error("Hmm, something went wrong. Please try again.");
         setLocalPreview(null);
         setFileName(null);
@@ -169,8 +185,8 @@ const DocumentUploader = ({
             <p className="text-sm font-medium text-foreground">
               Drop your file here or click to browse
             </p>
-            <p className="text-xs text-muted-foreground">
-              {accept.toUpperCase().replace(/\./g, "")} · up to {maxSizeMb}MB
+            <p className="text-xs text-muted-foreground text-center break-words px-2">
+              {describeAccept(accept)} · Max {maxSizeMb}MB
             </p>
           </div>
         )}
