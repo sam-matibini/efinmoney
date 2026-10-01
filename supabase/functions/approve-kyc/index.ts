@@ -87,6 +87,33 @@ Deno.serve(async (req) => {
       }
     }
 
+    let emailSent = false;
+    let email: string | null = null;
+    let emailError: string | null = null;
+    try {
+      const notifyRes = await fetch(`${SUPABASE_URL}/functions/v1/notify-user`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${SERVICE_KEY}`,
+          apikey: SERVICE_KEY,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ user_id: kyc.user_id, type: "kyc_approved", scope }),
+      });
+      const notifyBody = await notifyRes.json().catch(() => ({}));
+      if (!notifyRes.ok) {
+        emailError = typeof notifyBody?.error === "string" ? notifyBody.error : "Could not notify the user";
+      } else if (notifyBody?.email_sent === false) {
+        email = typeof notifyBody?.email === "string" ? notifyBody.email : null;
+        emailError = typeof notifyBody?.email_error === "string" ? notifyBody.email_error : "Notification email was not sent";
+      } else {
+        emailSent = true;
+        email = typeof notifyBody?.email === "string" ? notifyBody.email : null;
+      }
+    } catch (err) {
+      emailError = err instanceof Error ? err.message : "Could not notify the user";
+    }
+
     const noteParts: string[] = [
       scope === "id_and_address" ? "Approved ID + address (Tier 3)" : "Approved ID only (Tier 2)",
     ];
@@ -94,6 +121,8 @@ Deno.serve(async (req) => {
       noteParts.push(`OVERRIDE — previous: ${previous}`);
       if (kyc.persona_decision) noteParts.push(`Persona: ${kyc.persona_decision}`);
     }
+    if (emailSent) noteParts.push(email ? `Notification email sent to ${email}` : "Notification email sent");
+    else noteParts.push(`Notification email not sent${emailError ? `: ${emailError.slice(0, 180)}` : ""}`);
 
     await admin.from("kyc_audit_log").insert({
       kyc_verification_id: verification_id,
@@ -104,14 +133,7 @@ Deno.serve(async (req) => {
       notes: noteParts.join(" • "),
     });
 
-    // Best-effort user notification (non-blocking)
-    try {
-      await admin.functions.invoke("notify-user", {
-        body: { user_id: kyc.user_id, type: "kyc_approved", scope },
-      });
-    } catch { /* ignore */ }
-
-    return json(200, { ok: true });
+    return json(200, { ok: true, email_sent: emailSent, email, email_error: emailError });
   } catch (e) {
     return json(500, { error: (e as Error).message });
   }

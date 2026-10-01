@@ -6,8 +6,9 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
+import { ApproveVerificationDialog } from "@/components/admin/ApproveVerificationDialog";
+import { kycApprovalToast } from "@/lib/kycApprovalNotice";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { KycStatusBadge, TierBadge } from "@/components/admin-portal/Badges";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -33,7 +34,12 @@ const REJECTION_REASONS = [
 ];
 
 const KycActionResponseSchema = z.union([
-  z.object({ ok: z.literal(true) }).passthrough(),
+  z.object({
+    ok: z.literal(true),
+    email_sent: z.boolean().optional(),
+    email: z.string().nullable().optional(),
+    email_error: z.string().nullable().optional(),
+  }).passthrough(),
   z.object({ error: z.string() }),
 ]);
 
@@ -165,17 +171,25 @@ const KycReviewPage = () => {
     if (error) throw new Error(error.message || "Action failed");
     const parsed = KycActionResponseSchema.safeParse(result);
     if (!parsed.success) throw new Error(`Unexpected response from ${fn}`);
-    const data = parsed.data as { error?: string };
-    if (data.error) throw new Error(data.error);
-    return parsed.data;
+    if ("error" in parsed.data && typeof parsed.data.error === "string" && parsed.data.error) {
+      throw new Error(parsed.data.error);
+    }
+    return parsed.data as {
+      ok: true;
+      email_sent?: boolean;
+      email?: string | null;
+      email_error?: string | null;
+    };
   };
 
   const handleApprove = async () => {
     if (!requirePermission("approve_kyc") || !id) return;
     setActionLoading(true);
     try {
-      await callEdge("approve-kyc", { verification_id: id, scope: approveScope, override: isFinal });
-      toast.success(isFinal ? "Decision overridden — approved" : "Verification approved");
+      const result = await callEdge("approve-kyc", { verification_id: id, scope: approveScope, override: isFinal });
+      const notice = kycApprovalToast(result, { overridden: isFinal, fallbackEmail: data?.profile?.email });
+      if (notice.level === "success") toast.success(notice.message);
+      else toast.error(notice.message);
       setApproveOpen(false);
       queryClient.invalidateQueries({ queryKey: ["admin-kyc-detail", id] });
       queryClient.invalidateQueries({ queryKey: ["admin-kyc-queue"] });
@@ -619,35 +633,15 @@ const KycReviewPage = () => {
 
       </div>
 
-      {/* Approve dialog */}
-      <Dialog open={approveOpen} onOpenChange={setApproveOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Approve verification</DialogTitle>
-            <DialogDescription>Choose the tier this approval grants.</DialogDescription>
-          </DialogHeader>
-          <RadioGroup value={approveScope} onValueChange={(v) => setApproveScope(v as "id_only" | "id_and_address")} className="space-y-2">
-            <div className="flex items-start gap-3 p-3 border rounded-lg">
-              <RadioGroupItem value="id_only" id="id_only" className="mt-1" />
-              <Label htmlFor="id_only" className="flex-1 cursor-pointer">
-                <div className="font-medium">Approve ID only — Tier 2</div>
-                <div className="text-xs text-muted-foreground">Up to $5,000/day, $50,000/month</div>
-              </Label>
-            </div>
-            <div className="flex items-start gap-3 p-3 border rounded-lg">
-              <RadioGroupItem value="id_and_address" id="id_and_address" className="mt-1" />
-              <Label htmlFor="id_and_address" className="flex-1 cursor-pointer">
-                <div className="font-medium">Approve ID + Address — Tier 3</div>
-                <div className="text-xs text-muted-foreground">Up to $50,000/day, $500,000/month, international + virtual cards</div>
-              </Label>
-            </div>
-          </RadioGroup>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setApproveOpen(false)}>Cancel</Button>
-            <Button onClick={handleApprove} disabled={actionLoading}>Confirm approval</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <ApproveVerificationDialog
+        open={approveOpen}
+        onOpenChange={setApproveOpen}
+        scope={approveScope}
+        onScopeChange={setApproveScope}
+        recipientEmail={profile?.email}
+        loading={actionLoading}
+        onConfirm={handleApprove}
+      />
 
       {/* Reject dialog */}
       <Dialog open={rejectOpen} onOpenChange={setRejectOpen}>

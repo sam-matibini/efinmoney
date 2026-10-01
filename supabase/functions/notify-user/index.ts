@@ -43,7 +43,12 @@ Deno.serve(async (req) => {
       is_read: false,
     });
 
-    // Send confirmation email for KYC approval
+    let emailSent = false;
+    let email: string | null = null;
+    let emailError: string | null = null;
+
+    // Approval emails the account holder. Profile email is the login address;
+    // fall back to the auth user when that column is empty.
     if (type === "kyc_approved") {
       try {
         const { data: profile } = await admin
@@ -51,22 +56,54 @@ Deno.serve(async (req) => {
           .select("email, full_name")
           .eq("user_id", user_id)
           .maybeSingle();
-        if (profile?.email) {
-          await admin.functions.invoke("send-email", {
-            body: {
-              type: "kyc_update",
-              to: profile.email,
-              data: { status: "approved", scope, name: profile.full_name },
+        let name = (profile?.full_name || body?.name || "").trim();
+        email = (profile?.email || "").trim() || null;
+        if (!email) {
+          const { data: authUser, error: authErr } = await admin.auth.admin.getUserById(user_id);
+          if (authErr) console.warn("[notify-user] auth email lookup failed:", authErr.message);
+          email = (authUser?.user?.email || "").trim() || null;
+          if (!name) name = String(authUser?.user?.user_metadata?.full_name || "").trim();
+        }
+        if (!email) {
+          emailError = "No email address on the user account";
+        } else {
+          const sendRes = await fetch(`${SUPABASE_URL}/functions/v1/send-email`, {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${SERVICE_KEY}`,
+              apikey: SERVICE_KEY,
+              "Content-Type": "application/json",
             },
+            body: JSON.stringify({
+              type: "kyc_update",
+              to: email,
+              data: { status: "approved", scope, name },
+            }),
           });
+          const sendBody = await sendRes.json().catch(() => ({}));
+          if (!sendRes.ok || sendBody?.error) {
+            const providerError = sendBody?.error;
+            emailError = typeof providerError === "string"
+              ? providerError
+              : typeof providerError?.message === "string"
+              ? providerError.message
+              : "The email provider rejected the notification";
+            console.warn("[notify-user] email send failed:", sendRes.status, sendBody);
+          } else {
+            emailSent = true;
+          }
         }
       } catch (emailErr) {
+        emailError = emailErr instanceof Error ? emailErr.message : "Email send failed";
         console.warn("[notify-user] email send failed:", emailErr);
       }
     }
 
-    console.log(`[notify-user] queued ${type} for user ${user_id}`);
-    return json(200, { ok: true });
+    console.log(`[notify-user] queued ${type} for user ${user_id} email_sent=${emailSent}`);
+    return json(200, {
+      ok: true,
+      ...(type === "kyc_approved" ? { email_sent: emailSent, email, email_error: emailError } : {}),
+    });
   } catch (e) {
     return json(500, { error: (e as Error).message });
   }
