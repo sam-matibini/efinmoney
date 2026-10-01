@@ -27,7 +27,6 @@ const DashboardHome = () => {
     "there";
   const firstName = displayName.split(" ")[0];
   const greeting = getGreeting(profile?.address_country || profile?.country_code).text;
-  const currency = (profile?.default_currency || "CAD").toUpperCase();
   const today = new Intl.DateTimeFormat("en-CA", {
     weekday: "long",
     month: "long",
@@ -53,7 +52,7 @@ const DashboardHome = () => {
       <KycTierCard />
 
       <div className="motion-row">
-        <QuickActionsGrid currency={currency} />
+        <QuickActionsGrid />
         <MoneyInMotion />
         <RecentActivity />
       </div>

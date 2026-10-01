@@ -5,6 +5,7 @@ import {
   ArrowDownLeft,
   ArrowUpRight,
   Briefcase,
+  Building2,
   FileText,
   Home,
   Landmark,
@@ -36,7 +37,8 @@ import { useKyb } from "@/hooks/useKyb";
 import { useProfile } from "@/hooks/useProfile";
 import { useUserRoles } from "@/hooks/useUserRoles";
 import { prefetchRoute } from "@/lib/prefetchRoute";
-import { kybResumePath } from "@/lib/kybOnboarding";
+import { businessAccountLabel, isBusinessPrimaryAccount, kybResumePath } from "@/lib/kybOnboarding";
+import { Logo } from "@/components/Logo";
 import { resolveAvatarUrl } from "@/lib/avatar";
 
 type NavItem = {
@@ -177,7 +179,7 @@ const AppSidebar = () => {
     <TooltipProvider delayDuration={200}>
       <aside className="sidebar" aria-label="Primary">
         <Link to="/dashboard" className="brand">
-          <span className="brand-mark" aria-hidden>eF</span>
+          <Logo static className="brand-logo" />
           <span className="brand-copy">
             <span className="brand-name">eFinMoney</span>
             <span className="brand-sub">Business Platform</span>
@@ -202,7 +204,7 @@ const AppSidebar = () => {
             <button type="button" className="sidebar-tool" aria-label="Search" onClick={() => setSearchOpen(true)}>
               <Search size={20} />
             </button>
-            <NotificationsPanel />
+            <NotificationsPanel variant="dialog" />
             <PendingTransfersButton />
             <SupportLink />
             <ThemeToggle />
@@ -222,14 +224,24 @@ const AppSidebar = () => {
                 </span>
               </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent side="top" align="start" className="w-56">
+            <DropdownMenuContent side="right" align="end" sideOffset={8} className="w-64">
               <div className="px-3 py-2">
-                <p className="text-sm font-medium">{firstName}</p>
+                <p className="text-sm font-medium">Account</p>
+                <p className="text-xs text-muted-foreground truncate">{firstName}</p>
                 <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
               </div>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => navigate("/profile")}>Profile</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => navigate("/dashboard")}>Home</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => navigate("/profile")}>Profile settings</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => navigate("/kyc")}>
+                {isBusinessPrimaryAccount(user, business) ? "Business verification" : "KYC verification"}
+              </DropdownMenuItem>
               <DropdownMenuItem onClick={() => navigate("/security")}>Security</DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => navigate(kybResumePath(business))}>
+                <Building2 className="w-4 h-4 mr-2" />
+                {businessAccountLabel(business)}
+              </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => signOut()}>
                 <LogOut className="w-4 h-4 mr-2" />

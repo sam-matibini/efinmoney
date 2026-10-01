@@ -1,54 +1,65 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { ArrowDownLeft, ArrowUpRight, Landmark, PlusCircle, RefreshCw, Wallet } from "lucide-react";
-import QuickActionDrawer, { type QuickActionType } from "@/components/dashboard/redesign/QuickActionDrawer";
+import { Link } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
+import { ArrowDownLeft, ArrowUpRight, Briefcase, Landmark, PlusCircle, RefreshCw, Wallet } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
+import { useKyb } from "@/hooks/useKyb";
+import { prefetchRoute } from "@/lib/prefetchRoute";
+import { businessAccountLabel, kybResumePath } from "@/lib/kybOnboarding";
 
 const ACTIONS: Array<{
   label: string;
-  icon: typeof ArrowUpRight;
+  href: string;
+  icon: LucideIcon;
   color: string;
-  action?: QuickActionType;
-  href?: string;
 }> = [
-  { label: "Send Money", icon: ArrowUpRight, color: "var(--color-accent-blue)", action: "send" },
-  { label: "Top Up", icon: PlusCircle, color: "var(--color-accent-emerald)", action: "topup" },
-  { label: "Request", icon: ArrowDownLeft, color: "var(--color-accent-purple)", action: "request" },
-  { label: "Exchange", icon: RefreshCw, color: "var(--color-accent-orange)", action: "exchange" },
-  { label: "Wallets", icon: Wallet, color: "var(--color-accent-green)", href: "/wallets" },
-  { label: "Bank", icon: Landmark, color: "var(--color-accent-pink)", href: "/wallet/receive" },
+  { label: "Send Money", href: "/send", icon: ArrowUpRight, color: "var(--color-accent-blue)" },
+  { label: "Top Up", href: "/wallet/topup", icon: PlusCircle, color: "var(--color-accent-emerald)" },
+  { label: "Request", href: "/request-money", icon: ArrowDownLeft, color: "var(--color-accent-purple)" },
+  { label: "Exchange", href: "/exchange", icon: RefreshCw, color: "var(--color-accent-orange)" },
+  { label: "Wallets", href: "/wallets", icon: Wallet, color: "var(--color-accent-green)" },
+  { label: "Bank", href: "/wallet/receive", icon: Landmark, color: "var(--color-accent-pink)" },
 ];
 
-type QuickActionsGridProps = {
-  currency: string;
-};
+const QuickActionsGrid = () => {
+  const { user } = useAuth();
+  const { business } = useKyb();
+  const queryClient = useQueryClient();
+  const businessHref = kybResumePath(business);
+  const shortcuts = [
+    ...ACTIONS,
+    {
+      label: businessAccountLabel(business),
+      href: businessHref,
+      icon: Briefcase,
+      color: "var(--color-accent-violet)",
+    },
+  ];
 
-const QuickActionsGrid = ({ currency }: QuickActionsGridProps) => {
-  const navigate = useNavigate();
-  const [action, setAction] = useState<QuickActionType | null>(null);
+  const warm = (href: string) => {
+    if (user?.id) prefetchRoute(queryClient, href, user.id);
+  };
 
   return (
     <section className="dash-panel" aria-label="Quick actions">
       <h2 className="panel-title">Quick Actions</h2>
       <div className="qa-grid">
-        {ACTIONS.map((item) => {
+        {shortcuts.map((item) => {
           const Icon = item.icon;
           return (
-            <button
-              key={item.label}
-              type="button"
+            <Link
+              key={item.href + item.label}
+              to={item.href}
               className="qa-btn"
-              onClick={() => {
-                if (item.action) setAction(item.action);
-                else if (item.href) navigate(item.href);
-              }}
+              onMouseEnter={() => warm(item.href)}
+              onFocus={() => warm(item.href)}
             >
               <Icon size={24} color={item.color} aria-hidden />
               <span>{item.label}</span>
-            </button>
+            </Link>
           );
         })}
       </div>
-      <QuickActionDrawer action={action} currency={currency} onClose={() => setAction(null)} />
     </section>
   );
 };

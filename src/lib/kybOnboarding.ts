@@ -18,6 +18,23 @@ const STEP_PATH: Record<KybStep, string> = {
   completed: "/onboarding/business/details",
 };
 
+/** Label for the account button. Approved companies keep the existing-account action. */
+export function businessAccountLabel(
+  business: Pick<BusinessProfile, "kyb_status"> | null | undefined,
+): string {
+  if (!business) return "Open a business account";
+  switch (business.kyb_status) {
+    case "approved":
+      return "Business account";
+    case "pending_review":
+    case "rejected":
+    case "suspended":
+      return "Business application";
+    default:
+      return "Continue business application";
+  }
+}
+
 export function kybResumePath(
   business: Pick<BusinessProfile, "kyb_status" | "current_step"> | null | undefined,
 ): string {
