@@ -3,9 +3,11 @@ import {
   buildProviderView,
   mergeSecrets,
   normalizePublicConfig,
+  parseCustomDefinition,
   secretHint,
   systemApiDef,
 } from "../supabase/functions/_shared/systemApiLogic.ts";
+import { FALLBACK_SYSTEM_APIS } from "../src/lib/systemApiCatalog.ts";
 
 assert.equal(secretHint(""), null);
 assert.equal(secretHint("abcd"), "••••");
@@ -70,5 +72,29 @@ const disabled = buildProviderView(
 );
 assert.equal(disabled.is_enabled, false);
 assert.equal(disabled.fields.find((f) => f.key === "api_key")?.configured, false);
+assert.equal(disabled.custom, false);
+
+const stripe = parseCustomDefinition({
+  provider: "Stripe",
+  label: "Stripe",
+  description: "Card payments",
+  definition: {
+    secrets: [{ label: "Secret key" }, { label: "Webhook secret" }],
+    publicFields: [{ label: "Account" }],
+  },
+});
+assert.equal(stripe.provider, "stripe");
+assert.equal(stripe.secrets[0].key, "api_key");
+assert.equal(stripe.secrets[1].key, "api_key_2");
+assert.equal(stripe.publicFields[0].key, "setting");
+assert.throws(() => parseCustomDefinition({ provider: "gemini", label: "Gemini" }));
+
+for (const def of [systemApiDef("gemini")!, systemApiDef("plaid")!, systemApiDef("resend")!]) {
+  const view = buildProviderView(def, null, {}, () => false);
+  const fallback = FALLBACK_SYSTEM_APIS.find((item) => item.provider === def.provider);
+  assert.ok(fallback, def.provider);
+  assert.deepEqual(fallback.fields.map((field) => field.key), view.fields.map((field) => field.key));
+  assert.equal(fallback.custom, false);
+}
 
 console.log("system api checks passed");

@@ -8,7 +8,9 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Eye, EyeOff, KeyRound, Loader2, Save } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { FALLBACK_SYSTEM_APIS, TESTABLE_SYSTEM_APIS } from "@/lib/systemApiCatalog";
+import { Eye, EyeOff, KeyRound, Loader2, Plus, Save, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 export type SystemApiField = {
@@ -29,8 +31,11 @@ export type SystemApiProvider = {
   description: string;
   is_enabled: boolean;
   updated_at: string | null;
+  custom?: boolean;
   fields: SystemApiField[];
 };
+
+type SystemApiList = { providers: SystemApiProvider[]; warning: string | null };
 
 type Draft = {
   enabled: boolean;
@@ -56,11 +61,45 @@ function sourceLabel(field: SystemApiField): string {
   return "Default";
 }
 
-async function loadProviders(): Promise<SystemApiProvider[]> {
-  const { data, error } = await supabase.functions.invoke("system-api", { body: { action: "list" } });
-  if (error) throw new Error(error.message || "Could not load system APIs");
+async function readInvokeError(error: unknown): Promise<string> {
+  const fallback = error instanceof Error ? error.message : "Could not reach System API";
+  const context = (error as { context?: { json?: () => Promise<unknown> } })?.context;
+  if (!context?.json) {
+    if (/abort|timed out|timeout/i.test(fallback)) return "System API did not respond. The cards below can still be edited.";
+    return fallback;
+  }
+  try {
+    const body = await context.json();
+    if (body && typeof body === "object") {
+      const record = body as Record<string, unknown>;
+      if (typeof record.error === "string" && record.error) return record.error;
+      if (typeof record.message === "string" && record.message) return record.message;
+    }
+  } catch {
+    /* The error body was already read. */
+  }
+  return fallback;
+}
+
+async function invokeSystemApi(body: Record<string, unknown>) {
+  const { data, error } = await supabase.functions.invoke("system-api", {
+    body,
+    timeout: 15000,
+  });
+  if (error) throw new Error(await readInvokeError(error));
   if (data?.error) throw new Error(String(data.error));
-  return (data?.providers || []) as SystemApiProvider[];
+  return data as { providers?: SystemApiProvider[]; warning?: string | null };
+}
+
+async function loadProviders(): Promise<SystemApiList> {
+  const data = await invokeSystemApi({ action: "list" });
+  const providers = (data?.providers || []) as SystemApiProvider[];
+  if (!providers.length) throw new Error(data?.warning || "System API returned no cards");
+  return { providers, warning: data?.warning || null };
+}
+
+function slugify(value: string): string {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 40);
 }
 
 export function SystemApiPanel({ preview }: { preview?: SystemApiProvider[] }) {
@@ -69,9 +108,11 @@ export function SystemApiPanel({ preview }: { preview?: SystemApiProvider[] }) {
     queryKey: ["system-api"],
     queryFn: loadProviders,
     enabled: !preview,
+    retry: false,
   });
-  const providers = preview ?? query.data;
+  const providers = preview ?? (query.data?.providers?.length ? query.data.providers : FALLBACK_SYSTEM_APIS);
   const [drafts, setDrafts] = useState<Record<string, Draft>>({});
+  const [addOpen, setAddOpen] = useState(false);
 
   useEffect(() => {
     if (!providers?.length) return;
@@ -99,23 +140,21 @@ export function SystemApiPanel({ preview }: { preview?: SystemApiProvider[] }) {
         const value = (draft.secrets[field.key] || "").trim();
         if (value) secrets[field.key] = value;
       }
-      const { data, error } = await supabase.functions.invoke("system-api", {
-        body: {
-          action: "save",
-          provider: provider.provider,
-          is_enabled: draft.enabled,
-          secrets,
-          clear_secrets: clearSecrets,
-          public_config: draft.publicConfig,
-        },
+      const data = await invokeSystemApi({
+        action: "save",
+        provider: provider.provider,
+        is_enabled: draft.enabled,
+        secrets,
+        clear_secrets: clearSecrets,
+        public_config: draft.publicConfig,
       });
-      if (error) throw new Error(error.message || "Could not save");
-      if (data?.error) throw new Error(String(data.error));
       return data;
     },
     onSuccess: (data, provider) => {
       const list = (data?.providers || []) as SystemApiProvider[];
-      if (list.length) queryClient.setQueryData(["system-api"], list);
+      if (list.length) {
+        queryClient.setQueryData(["system-api"], { providers: list, warning: data?.warning || null });
+      }
       const fresh = list.find((item) => item.provider === provider.provider);
       if (fresh) {
         setDrafts((current) => ({ ...current, [provider.provider]: emptyDraft(fresh) }));
@@ -140,6 +179,16 @@ export function SystemApiPanel({ preview }: { preview?: SystemApiProvider[] }) {
     onError: (err: Error) => toast.error(err.message),
   });
 
+  const removeApi = useMutation({
+    mutationFn: async (provider: SystemApiProvider) => invokeSystemApi({ action: "remove", provider: provider.provider }),
+    onSuccess: (data) => {
+      const list = (data?.providers || []) as SystemApiProvider[];
+      if (list.length) queryClient.setQueryData(["system-api"], { providers: list, warning: data?.warning || null });
+      toast.success("API removed");
+    },
+    onError: (err: Error) => toast.error(err.message),
+  });
+
   const patch = (provider: string, update: (draft: Draft) => Draft) => {
     setDrafts((current) => {
       const base = current[provider];
@@ -149,42 +198,43 @@ export function SystemApiPanel({ preview }: { preview?: SystemApiProvider[] }) {
   };
 
   const providerList = providers ?? [];
-
-  if (!preview && query.isLoading) {
-    return (
-      <Card>
-        <CardContent className="py-10 text-sm text-muted-foreground">Loading system APIs…</CardContent>
-      </Card>
-    );
-  }
-
-  if (!preview && query.isError) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle>System API</CardTitle>
-          <CardDescription>Could not load API settings.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Button variant="outline" onClick={() => query.refetch()}>Try again</Button>
-        </CardContent>
-      </Card>
-    );
-  }
+  const loadError = !preview && query.isError ? (query.error instanceof Error ? query.error.message : "Could not load saved API settings") : "";
+  const warning = !preview && !loadError ? query.data?.warning || "" : "";
 
   return (
     <div className="space-y-4">
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <KeyRound className="h-5 w-5 text-primary" />
-            System API
-          </CardTitle>
+          <div className="flex items-start justify-between gap-3">
+            <CardTitle className="flex items-center gap-2">
+              <KeyRound className="h-5 w-5 text-primary" />
+              System API
+            </CardTitle>
+            <Button type="button" size="sm" onClick={() => setAddOpen(true)} disabled={Boolean(preview)}>
+              <Plus className="mr-2 h-4 w-4" />
+              Add API
+            </Button>
+          </div>
           <CardDescription>
-            Update the keys Alice, Plaid, and Resend use. A saved key replaces the server secret.
-            Leave a secret blank to keep the current one. Turning a system off stops it, even when a server secret is still present.
+            Update the keys Alice, Plaid, and Resend use, or add another API.
+            A saved key replaces the server secret. Leave a secret blank to keep the current one.
+            Turning a system off stops it, even when a server secret is still present.
           </CardDescription>
         </CardHeader>
+        {(loadError || warning || (!preview && query.isFetching && !query.data)) && (
+          <CardContent className="space-y-3 pt-0">
+            {!preview && query.isFetching && !query.data && (
+              <p className="text-sm text-muted-foreground">Checking saved keys…</p>
+            )}
+            {loadError && (
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm">
+                <span>{loadError}</span>
+                <Button type="button" variant="outline" size="sm" onClick={() => query.refetch()}>Try again</Button>
+              </div>
+            )}
+            {warning && <p className="text-sm text-muted-foreground">{warning}</p>}
+          </CardContent>
+        )}
       </Card>
 
       {providerList.map((provider) => {
@@ -312,20 +362,239 @@ export function SystemApiPanel({ preview }: { preview?: SystemApiProvider[] }) {
                   {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
                   Save {provider.label}
                 </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  disabled={testing || Boolean(preview)}
-                  onClick={() => testConnection.mutate(provider)}
-                >
-                  {testing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                  Test connection
-                </Button>
+                {TESTABLE_SYSTEM_APIS.has(provider.provider) && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={testing || Boolean(preview)}
+                    onClick={() => testConnection.mutate(provider)}
+                  >
+                    {testing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                    Test connection
+                  </Button>
+                )}
+                {provider.custom && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    disabled={removeApi.isPending || Boolean(preview)}
+                    onClick={() => {
+                      if (window.confirm(`Remove ${provider.label}? Saved keys for this API will be deleted.`)) {
+                        removeApi.mutate(provider);
+                      }
+                    }}
+                  >
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Remove
+                  </Button>
+                )}
               </div>
             </CardContent>
           </Card>
         );
       })}
+      <AddSystemApiDialog
+        open={addOpen}
+        onOpenChange={setAddOpen}
+        onCreated={(list, warningText) => {
+          if (list.length) queryClient.setQueryData(["system-api"], { providers: list, warning: warningText });
+          setAddOpen(false);
+        }}
+      />
     </div>
+  );
+}
+
+function AddSystemApiDialog({
+  open,
+  onOpenChange,
+  onCreated,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onCreated: (providers: SystemApiProvider[], warning: string | null) => void;
+}) {
+  const [label, setLabel] = useState("");
+  const [providerId, setProviderId] = useState("");
+  const [idEdited, setIdEdited] = useState(false);
+  const [description, setDescription] = useState("");
+  const [secrets, setSecrets] = useState([{ label: "API key", value: "" }]);
+  const [settings, setSettings] = useState<{ label: string; value: string }[]>([]);
+
+  const reset = () => {
+    setLabel("");
+    setProviderId("");
+    setIdEdited(false);
+    setDescription("");
+    setSecrets([{ label: "API key", value: "" }]);
+    setSettings([]);
+  };
+
+  const create = useMutation({
+    mutationFn: async () => {
+      const used = new Set<string>();
+      const secretFields = secrets
+        .map((field) => ({ label: field.label.trim(), value: field.value }))
+        .filter((field) => field.label);
+      const publicFields = settings
+        .map((field) => ({ label: field.label.trim(), value: field.value.trim() }))
+        .filter((field) => field.label);
+      if (!label.trim()) throw new Error("Enter a name for the API");
+      if (!secretFields.length) throw new Error("Add at least one key");
+      const keyFor = (name: string, fallback: string) => {
+        let key = slugify(name) || fallback;
+        const base = key;
+        let n = 2;
+        while (used.has(key)) key = `${base}_${n++}`.slice(0, 40);
+        used.add(key);
+        return key;
+      };
+      const definition = {
+        secrets: secretFields.map((field, index) => ({
+          key: keyFor(field.label, index === 0 ? "api_key" : "secret"),
+          label: field.label,
+        })),
+        publicFields: publicFields.map((field) => ({
+          key: keyFor(field.label, "setting"),
+          label: field.label,
+        })),
+      };
+      const secretValues: Record<string, string> = {};
+      definition.secrets.forEach((field, index) => {
+        const value = secretFields[index]?.value.trim();
+        if (value) secretValues[field.key] = value;
+      });
+      const publicConfig: Record<string, string> = {};
+      definition.publicFields.forEach((field, index) => {
+        const value = publicFields[index]?.value || "";
+        if (value) publicConfig[field.key] = value;
+      });
+      return invokeSystemApi({
+        action: "create",
+        provider: providerId || slugify(label),
+        label: label.trim(),
+        description: description.trim(),
+        definition,
+        secrets: secretValues,
+        public_config: publicConfig,
+        is_enabled: true,
+      });
+    },
+    onSuccess: (data) => {
+      toast.success(`${label.trim() || "API"} added`);
+      onCreated((data?.providers || []) as SystemApiProvider[], data?.warning || null);
+      reset();
+    },
+    onError: (err: Error) => toast.error(err.message),
+  });
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Add API</DialogTitle>
+          <DialogDescription>
+            Store the keys for another system. Saved keys stay on the server and are not shown again.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-3">
+          <div className="space-y-2">
+            <Label htmlFor="new-api-name">Name</Label>
+            <Input
+              id="new-api-name"
+              value={label}
+              placeholder="Stripe"
+              onChange={(e) => {
+                const next = e.target.value;
+                setLabel(next);
+                if (!idEdited) setProviderId(slugify(next));
+              }}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="new-api-id">ID</Label>
+            <Input
+              id="new-api-id"
+              value={providerId}
+              className="font-mono"
+              placeholder="stripe"
+              onChange={(e) => {
+                setIdEdited(true);
+                setProviderId(slugify(e.target.value));
+              }}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="new-api-description">Description</Label>
+            <Input
+              id="new-api-description"
+              value={description}
+              placeholder="What this API is used for"
+              onChange={(e) => setDescription(e.target.value)}
+            />
+          </div>
+          {secrets.map((field, index) => (
+            <div key={`secret-${index}`} className="grid gap-2 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor={`new-secret-label-${index}`}>Key name</Label>
+                <Input
+                  id={`new-secret-label-${index}`}
+                  value={field.label}
+                  onChange={(e) => setSecrets((current) => current.map((item, i) => i === index ? { ...item, label: e.target.value } : item))}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor={`new-secret-value-${index}`}>Key</Label>
+                <Input
+                  id={`new-secret-value-${index}`}
+                  type="password"
+                  autoComplete="off"
+                  className="font-mono"
+                  placeholder="Paste a key"
+                  value={field.value}
+                  onChange={(e) => setSecrets((current) => current.map((item, i) => i === index ? { ...item, value: e.target.value } : item))}
+                />
+              </div>
+            </div>
+          ))}
+          <Button type="button" variant="outline" size="sm" onClick={() => setSecrets((current) => [...current, { label: "", value: "" }])}>
+            <Plus className="mr-2 h-4 w-4" />
+            Add another key
+          </Button>
+          {settings.map((field, index) => (
+            <div key={`setting-${index}`} className="grid gap-2 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor={`new-setting-label-${index}`}>Setting</Label>
+                <Input
+                  id={`new-setting-label-${index}`}
+                  value={field.label}
+                  placeholder="Base URL"
+                  onChange={(e) => setSettings((current) => current.map((item, i) => i === index ? { ...item, label: e.target.value } : item))}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor={`new-setting-value-${index}`}>Value</Label>
+                <Input
+                  id={`new-setting-value-${index}`}
+                  value={field.value}
+                  onChange={(e) => setSettings((current) => current.map((item, i) => i === index ? { ...item, value: e.target.value } : item))}
+                />
+              </div>
+            </div>
+          ))}
+          <Button type="button" variant="outline" size="sm" onClick={() => setSettings((current) => [...current, { label: "", value: "" }])}>
+            <Plus className="mr-2 h-4 w-4" />
+            Add a setting
+          </Button>
+        </div>
+        <DialogFooter>
+          <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={create.isPending}>Cancel</Button>
+          <Button type="button" onClick={() => create.mutate()} disabled={create.isPending}>
+            {create.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Plus className="mr-2 h-4 w-4" />}
+            Add API
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

@@ -34,8 +34,11 @@ export type ProviderView = {
   description: string;
   is_enabled: boolean;
   updated_at: string | null;
+  custom: boolean;
   fields: FieldView[];
 };
+
+export type CustomFieldInput = { key?: unknown; label?: unknown; env?: unknown; defaultValue?: unknown; options?: unknown };
 
 export const SYSTEM_API_CATALOG: SystemApiDef[] = [
   {
@@ -76,13 +79,102 @@ export const SYSTEM_API_CATALOG: SystemApiDef[] = [
 ];
 
 const PROVIDERS = new Set(SYSTEM_API_CATALOG.map((d) => d.provider));
+const FIELD_KEY = /^[a-z][a-z0-9_]{0,40}$/;
+const PROVIDER_ID = /^[a-z][a-z0-9_]{1,40}$/;
 
 export function systemApiDef(provider: string): SystemApiDef | null {
   return SYSTEM_API_CATALOG.find((d) => d.provider === provider) ?? null;
 }
 
+export function isBuiltinSystemApi(provider: string): boolean {
+  return PROVIDERS.has(provider);
+}
+
 export function isSystemApiProvider(provider: string): boolean {
   return PROVIDERS.has(provider);
+}
+
+function cleanLabel(value: unknown, fallback: string): string {
+  const label = typeof value === "string" ? value.trim() : "";
+  if (!label) return fallback;
+  if (label.length > 80) throw new Error("Field name is too long");
+  return label;
+}
+
+function cleanKey(value: unknown, fallback: string, used: Set<string>): string {
+  const raw = typeof value === "string" ? value.trim().toLowerCase() : "";
+  let key = FIELD_KEY.test(raw) ? raw : fallback;
+  if (!FIELD_KEY.test(key)) throw new Error("Field key is not valid");
+  let unique = key;
+  let n = 2;
+  while (used.has(unique)) unique = `${key}_${n++}`.slice(0, 41);
+  if (!FIELD_KEY.test(unique)) throw new Error("Field key is not valid");
+  used.add(unique);
+  return unique;
+}
+
+export function parseCustomDefinition(input: {
+  provider?: unknown;
+  label?: unknown;
+  description?: unknown;
+  definition?: unknown;
+}): SystemApiDef {
+  const provider = typeof input.provider === "string" ? input.provider.trim().toLowerCase() : "";
+  if (!PROVIDER_ID.test(provider)) throw new Error("Use a short name like stripe or twilio");
+  if (isBuiltinSystemApi(provider)) throw new Error("That API is already on this page");
+  const label = cleanLabel(input.label, "");
+  if (!label) throw new Error("Enter a name for the API");
+  const description = typeof input.description === "string" ? input.description.trim().slice(0, 240) : "";
+  const definition = input.definition && typeof input.definition === "object"
+    ? input.definition as { secrets?: unknown; publicFields?: unknown }
+    : {};
+  const secretInput = Array.isArray(definition.secrets) ? definition.secrets : [{ label: "API key" }];
+  const publicInput = Array.isArray(definition.publicFields) ? definition.publicFields : [];
+  if (secretInput.length > 8 || publicInput.length > 6) throw new Error("Too many fields");
+  const used = new Set<string>();
+  const secrets: SecretField[] = secretInput.map((item, index) => {
+    const field = (item || {}) as CustomFieldInput;
+    const fieldLabel = cleanLabel(field.label, index === 0 ? "API key" : "");
+    if (!fieldLabel) throw new Error("Each key needs a name");
+    const env = typeof field.env === "string" ? field.env.trim().toUpperCase() : "";
+    if (env && !/^[A-Z][A-Z0-9_]{0,60}$/.test(env)) throw new Error("Server secret name is not valid");
+    return { key: cleanKey(field.key, "api_key", used), label: fieldLabel, env };
+  });
+  if (!secrets.length) throw new Error("Add at least one key");
+  const publicFields: PublicField[] = publicInput.map((item) => {
+    const field = (item || {}) as CustomFieldInput;
+    const fieldLabel = cleanLabel(field.label, "");
+    if (!fieldLabel) throw new Error("Each setting needs a name");
+    const options = Array.isArray(field.options)
+      ? field.options.map((option) => String(option).trim()).filter(Boolean).slice(0, 8)
+      : undefined;
+    return {
+      key: cleanKey(field.key, "setting", used),
+      label: fieldLabel,
+      defaultValue: typeof field.defaultValue === "string" ? field.defaultValue.trim().slice(0, 200) : "",
+      options: options?.length ? options : undefined,
+    };
+  });
+  return { provider, label, description, secrets, publicFields };
+}
+
+export function defFromStoredSchema(
+  provider: string,
+  label: string,
+  description: string,
+  schema: unknown,
+): SystemApiDef | null {
+  if (!schema || typeof schema !== "object" || Array.isArray(schema)) return null;
+  try {
+    return parseCustomDefinition({
+      provider,
+      label,
+      description,
+      definition: schema,
+    });
+  } catch {
+    return null;
+  }
 }
 
 export function secretHint(value: string | null | undefined): string | null {
@@ -135,10 +227,10 @@ export function normalizePublicConfig(
     if (field.options && !field.options.includes(value)) {
       throw new Error(`${field.label} must be ${field.options.join(", ")}`);
     }
-    if (field.key === "model" && !/^[a-zA-Z0-9._-]{1,80}$/.test(value)) {
+    if (def.provider === "gemini" && field.key === "model" && !/^[a-zA-Z0-9._-]{1,80}$/.test(value)) {
       throw new Error("Model name is not valid");
     }
-    if (field.key === "from" && !value.includes("@")) {
+    if (def.provider === "resend" && field.key === "from" && !value.includes("@")) {
       throw new Error("From address must include an email");
     }
     next[field.key] = value;
@@ -164,7 +256,7 @@ export function buildProviderView(
       key: field.key,
       label: field.label,
       kind: "secret",
-      env: field.env,
+      env: field.env || null,
       configured: enabled && (Boolean(saved) || onServer),
       source,
       hint: saved ? secretHint(saved) : null,
@@ -194,6 +286,7 @@ export function buildProviderView(
     description: def.description,
     is_enabled: enabled,
     updated_at: row?.updated_at ?? null,
+    custom: !isBuiltinSystemApi(def.provider),
     fields,
   };
 }
