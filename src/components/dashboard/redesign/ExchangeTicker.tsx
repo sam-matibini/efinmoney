@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import { ArrowDown, ArrowUp } from "lucide-react";
 import { useFxRates } from "@/hooks/useFxRates";
 
@@ -33,30 +33,14 @@ const ExchangeTicker = () => {
   }, [rates]);
 
   const usingSample = !isLoading && live.length === 0;
-  const [ticks, setTicks] = useState<Tick[]>(SAMPLE);
-
-  useEffect(() => {
-    setTicks(live.length ? live : SAMPLE);
-  }, [live]);
-
-  useEffect(() => {
-    const timer = window.setInterval(() => {
-      setTicks((current) =>
-        current.map((rate) => {
-          const next = rate.base + (Math.random() - 0.5) * 0.0004;
-          const direction = next > rate.value ? "up" : next < rate.value ? "down" : "flat";
-          return { ...rate, value: next, direction };
-        }),
-      );
-    }, 3000);
-    return () => window.clearInterval(timer);
-  }, []);
+  const ticks = live.length ? live : isLoading ? [] : SAMPLE;
 
   return (
     <section className="dash-panel" aria-label="Live exchange rates">
       <div className="panel-head">
         <h2 className="panel-title">Live Exchange Rates</h2>
       </div>
+      <p className="panel-empty">Mid-market reference. Send Money uses this rate for the currency you pick, then applies the corridor exchange spread and transfer fee.</p>
       {usingSample && <p className="panel-empty">Sample quotes — live desk rates are unavailable.</p>}
       <div className="rate-list">
         {(isLoading ? [] : ticks).map((rate) => (

@@ -53,6 +53,8 @@ export type LiveFxCalculatorProps = {
   feeLabel?: string;
   /** Overrides the small fee line under the send input. */
   feeNote?: string;
+  /** Explains how this quote relates to the mid-market board. */
+  rateNote?: string;
   walletBalance?: number | null;
   walletSymbol?: string;
   showComparison?: boolean;
@@ -67,6 +69,10 @@ export type LiveFxCalculatorProps = {
   /** Sendwave-style single row: You send | They receive + currency, rate/fee caption below. */
   pairLayout?: boolean;
 };
+
+function fmtRate(value: number) {
+  return Math.abs(value) < 20 ? value.toFixed(6) : value.toFixed(4);
+}
 
 const Flag = ({ code, size = 20 }: { code: string; size?: number }) => (
   <CurrencyFlag code={code} size={size <= 16 ? "sm" : "md"} />
@@ -94,6 +100,7 @@ const LiveFxCalculator = ({
   displayRate,
   feeLabel,
   feeNote,
+  rateNote,
   walletBalance,
   walletSymbol,
   showComparison = true,
@@ -149,6 +156,10 @@ const LiveFxCalculator = ({
     const id = setInterval(() => setTick((t) => t + 1), 1000);
     return () => clearInterval(id);
   }, []);
+
+  useEffect(() => {
+    setLastEdited("send");
+  }, [from, to]);
 
   const { data: nombaQuote } = useQuery({
     queryKey: ["nomba-fx-calc", from, to],
@@ -404,8 +415,9 @@ const LiveFxCalculator = ({
           {rateUnavailable ? (
             <p>Rate unavailable for {from} → {to}</p>
           ) : (
-            <p>Exchange Rate: 1 {from} = {efinDisplayRate ? fmt(efinDisplayRate) : "—"} {to}</p>
+            <p>Exchange Rate: 1 {from} = {efinDisplayRate ? fmtRate(efinDisplayRate) : "—"} {to}</p>
           )}
+          {rateNote && <p>{rateNote}</p>}
           <p>{feeNote ?? `Transfer fees: ${resolvedFeeLabel}`}</p>
           {walletBalance != null && (
             <p className={walletBalance <= 0 ? "text-destructive" : undefined}>
@@ -508,7 +520,7 @@ const LiveFxCalculator = ({
                 <div className="space-y-1.5 text-[11px]">
                   <Row
                     label="eFinMoney"
-                    rate={efinDisplayRate ? `1 ${from} = ${fmt(efinDisplayRate)} ${to}` : "—"}
+                    rate={efinDisplayRate ? `1 ${from} = ${fmtRate(efinDisplayRate)} ${to}` : "—"}
                     fee={resolvedFeeLabel}
                     good
                     compact={embedded || isApp}

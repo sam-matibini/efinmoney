@@ -42,7 +42,8 @@ export function useCorridorFxBenchmark(opts: {
       }
     },
     enabled,
-    staleTime: 60_000,
+    staleTime: 15_000,
+    refetchInterval: 20_000,
     retry: 1,
   });
 

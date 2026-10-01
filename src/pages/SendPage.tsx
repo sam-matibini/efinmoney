@@ -46,6 +46,7 @@ import {
 import { resolveMidMarketRate } from "@/lib/fx";
 import { freezeFxSnapshot } from "@/lib/efrr/freezeSnapshot";
 import { useCorridorFxBenchmark } from "@/hooks/useCorridorFxBenchmark";
+import { formatFxRate, quoteSendLookup } from "@/lib/sendFxQuote";
 import type { CorridorProviderQuote } from "@/lib/fxCorridorBenchmark";
 import { currencySymbol, countryToCurrency } from "@/lib/currency";
 import { useProfile } from "@/hooks/useProfile";
@@ -572,7 +573,8 @@ const SendPage = () => {
     queryKey: ["corridor-fx", sourceCurrency, targetCountry.code],
     queryFn: () => getFlovideOrNombaRate(sourceCurrency, targetCountry.code),
     enabled: !isSameCurrency && isNgnPair(sourceCurrency, targetCountry.code),
-    staleTime: 60_000,
+    staleTime: 15_000,
+    refetchInterval: 20_000,
   });
   const nombaRate = nombaFxQuote?.effective_rate && nombaFxQuote.effective_rate > 0
     ? nombaFxQuote.effective_rate
@@ -597,9 +599,6 @@ const SendPage = () => {
   });
 
   const cardFundingLeg = priceQuote?.legs?.find((l) => l.label === 'card_funding');
-  const baseFee = priceQuote && !priceQuote.pricing_missing
-    ? Number(priceQuote.fee)
-    : (pricing?.transfer_base_fee ?? 0);
   const cardFee = fundingSource === 'card'
     ? (cardFundingLeg && !cardFundingLeg.pricingMissing
       ? Number(cardFundingLeg.fee)
@@ -638,40 +637,47 @@ const SendPage = () => {
     liveQuotes: liveProviderQuotes,
     enabled: !isSameCurrency,
   });
-  // Provider FX + internal margin. Never fx_rates.effective_rate, never Nomba treasury fallback.
-  const rawRate = isSameCurrency ? 1 : fxBenchmark.rate || Number(treasuryMid) || 0;
+  // Live mid for this pair, unless a fresh partner quote is within 3% of it.
+  // A round placeholder such as 1,000 NGN must not freeze the send form.
+  const sendLookup = useMemo(() => {
+    const livePartner = fxBenchmark.source === "live_api" || fxBenchmark.source === "composed";
+    return quoteSendLookup({
+      sourceCurrency,
+      destinationCurrency: targetCountry.code,
+      payoutMethod: destPayoutMethod,
+      amount: parsedAmount,
+      liveMid: isSameCurrency ? 1 : treasuryMid,
+      partnerRate: !isSameCurrency && livePartner ? fxBenchmark.rate : null,
+      partnerSource: livePartner ? fxBenchmark.source : "treasury_mid",
+      cardFee,
+    });
+  }, [
+    sourceCurrency,
+    targetCountry.code,
+    destPayoutMethod,
+    parsedAmount,
+    isSameCurrency,
+    treasuryMid,
+    fxBenchmark.source,
+    fxBenchmark.rate,
+    cardFee,
+  ]);
   const engineQuote = useMemo(
     () =>
       quoteTransfer({
         sourceCurrency,
         destinationCurrency: targetCountry.code,
-        amount: parsedAmount,
+        amount: parsedAmount > 0 ? parsedAmount : 1,
         channel: "external",
         payoutMethod: destPayoutMethod,
-        midMarketRate: rawRate > 0 ? rawRate : null,
+        midMarketRate: sendLookup.benchmark > 0 ? sendLookup.benchmark : null,
       }),
-    [sourceCurrency, targetCountry.code, parsedAmount, destPayoutMethod, rawRate],
+    [sourceCurrency, targetCountry.code, parsedAmount, destPayoutMethod, sendLookup.benchmark],
   );
-  const engineReady = !engineQuote.pricingMissing && parsedAmount > 0 && rawRate > 0;
-  const fxMarginBps = engineReady
-    ? engineQuote.fxSpread * 10_000
-    : Number(priceQuote?.fx_margin_bps ?? 0);
-  const effectiveRate = engineReady && engineQuote.customerRate
-    ? engineQuote.customerRate
-    : rawRate > 0 && fxMarginBps > 0
-      ? rawRate * (1 - fxMarginBps / 10_000)
-      : rawRate;
+  const effectiveRate = isSameCurrency ? 1 : sendLookup.customerRate;
   const rateAvailable = isSameCurrency || effectiveRate > 0;
-  const fee = parsedAmount > 0
-    ? (engineReady
-      ? engineQuote.transferFee + cardFee
-      : (priceQuote && !priceQuote.pricing_missing && Number.isFinite(Number(priceQuote.total_fee))
-        ? Number(priceQuote.total_fee)
-        : baseFee + cardFee))
-    : 0;
-  const receivedAmount = parsedAmount > 0 && rateAvailable
-    ? (engineReady ? (engineQuote.youReceive ?? 0) : Math.max(0, parsedAmount * effectiveRate))
-    : 0;
+  const fee = sendLookup.fee;
+  const receivedAmount = parsedAmount > 0 && rateAvailable ? sendLookup.youReceive : 0;
   const payoutMinError = receivedAmount > 0
     ? validatePayoutMin(targetCountry.code, receivedAmount)
     : null;
@@ -813,13 +819,18 @@ const SendPage = () => {
     if (c) setTargetCountryId(c.id);
   }, []);
 
-  const feeDisplayLabel =
-    fee > 0
-      ? `+${sourceSymbol}${fee.toFixed(2)} fee`
-      : `${sourceSymbol}0.00 fee`;
+  const feeShown = parsedAmount > 0 ? fee : sendLookup.scheduledFee;
+  const feeDisplayLabel = feeShown > 0
+    ? `${parsedAmount > 0 ? "+" : ""}${sourceSymbol}${feeShown.toFixed(2)} fee`
+    : `${sourceSymbol}0.00 fee`;
 
   const feeNote = parsedAmount > 0 && fee > 0
     ? `+${sourceSymbol}${fee.toFixed(2)} ${sourceCurrency} fee added · total ${sourceSymbol}${totalCharge.toFixed(2)} ${sourceCurrency}`
+    : undefined;
+  const rateNote = !isSameCurrency && sendLookup.liveMid && effectiveRate > 0
+    ? sendLookup.basis === "live_partner"
+      ? `Live partner rate for ${targetCountry.country}. Mid-market reference is 1 ${sourceCurrency} = ${formatFxRate(sendLookup.liveMid)} ${targetCountry.code}.`
+      : `Live mid-market 1 ${sourceCurrency} = ${formatFxRate(sendLookup.liveMid)} ${targetCountry.code}. Your rate includes a ${(sendLookup.spread * 100).toFixed(2)}% exchange spread.`
     : undefined;
 
   /**
@@ -949,10 +960,7 @@ const SendPage = () => {
       toCurrency: destCurrency,
       customerRate: Number(overrides?.exchange_rate ?? effectiveRate),
       efinSpread: engineQuote.fxSpread,
-      providerExecutionRate:
-        fxBenchmark.source === "treasury_mid" || fxBenchmark.source === "unavailable"
-          ? null
-          : fxBenchmark.rate,
+      providerExecutionRate: sendLookup.basis === "live_partner" ? sendLookup.benchmark : null,
       partner: fxBenchmark.partnerCode,
       sourceAmount: overrides?.source_amount ?? parsedAmount,
       customerAmount: overrides?.target_amount ?? receivedAmount,
@@ -3189,6 +3197,7 @@ const SendPage = () => {
                                         displayRate={rateAvailable ? effectiveRate : null}
                                         feeLabel={feeDisplayLabel}
                                         feeNote={feeNote}
+                                        rateNote={rateNote}
                                         walletBalance={
                                           fundingSource === "wallet" && selectedWallet
                                             ? Number(selectedWallet.balance)
