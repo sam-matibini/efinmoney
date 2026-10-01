@@ -2,6 +2,7 @@
 // Body: { type: 'welcome' | 'transfer_completed' | 'transfer_apology_completed' | 'kyc_update' | 'kyb_update' | 'topup_completed' | 'payment_link' | 'password_reset' | 'signup_confirmation' | 'email_change', to: string, data?: Record<string, any> }
 
 import { brandAuthActionLink, getPublicAppOrigin } from "../_shared/authConfirmLink.ts";
+import { kycApprovedInnerHtml, limitsFromEmailData } from "../_shared/kycLimitCopy.ts";
 import { resendCredentials } from "../_shared/systemApi.ts";
 
 const corsHeaders = {
@@ -274,24 +275,12 @@ function paymentLinkBody(d: Record<string, any>, appUrl: string) {
 function kycBody(status: string, d: Record<string, any> = {}) {
   const name = d.name ? `, ${d.name}` : "";
   if (status === "approved") {
-    const isTier3 = d.scope === "id_and_address";
-    const tier = isTier3 ? "Tier 3" : "Tier 2";
-    const limits = isTier3
-      ? "up to $50,000/day and $500,000/month, including international transfers and virtual cards"
-      : "up to $5,000/day and $50,000/month";
-    return `
-      <div style="text-align:center;margin:0 0 18px">
-        <div style="display:inline-block;width:64px;height:64px;line-height:64px;border-radius:50%;background:linear-gradient(135deg,#10b981 0%,#059669 100%);color:#ffffff;font-size:32px;box-shadow:0 8px 20px -6px rgba(16,185,129,0.5)">✓</div>
-      </div>
-      <h1 style="margin:0 0 8px;font-family:'Space Grotesk','Inter',sans-serif;font-size:26px;font-weight:700;color:#0f172a;text-align:center;letter-spacing:-0.02em">Identity verified</h1>
-      <p style="margin:0 0 22px;line-height:1.6;color:#334155;text-align:center">Great news${name}! Your identity verification has been approved.</p>
-      <div style="margin:0 0 20px;padding:22px;border:1px solid #bbf7d0;border-radius:12px;background:linear-gradient(135deg,#f0fdf4 0%,#ecfdf5 100%);text-align:center">
-        <p style="margin:0 0 4px;color:#065f46;font-size:11px;text-transform:uppercase;letter-spacing:0.08em;font-weight:600">Account level</p>
-        <p style="margin:0;font-family:'Space Grotesk','Inter',sans-serif;font-size:22px;font-weight:700;color:#065f46;letter-spacing:-0.01em">${tier} — Verified</p>
-        <p style="margin:10px 0 0;color:#047857;font-size:13px;line-height:1.5">You can now send ${limits}.</p>
-      </div>
-      <p style="margin:0;line-height:1.6;color:#334155;text-align:center">Sign in to your dashboard to start sending money.</p>
-    `;
+    const tier = d.scope === "id_and_address" ? "tier_3" : "tier_2";
+    return kycApprovedInnerHtml({
+      name: typeof d.name === "string" ? d.name : "",
+      tierLabel: tier === "tier_3" ? "Tier 3" : "Tier 2",
+      limits: limitsFromEmailData(d, tier),
+    });
   }
   const pretty = status.charAt(0).toUpperCase() + status.slice(1);
   const tone = status === "rejected" ? "danger" : "neutral";

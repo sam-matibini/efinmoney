@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { kycSendLimitPhrase, limitsFromTierRow, type KycTierKey } from "../_shared/kycLimitCopy.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -26,10 +27,31 @@ Deno.serve(async (req) => {
       kyc_info_requested: "More information needed",
       support_reply: "Support replied to your ticket",
     };
+    const tier: KycTierKey = scope === "id_and_address" ? "tier_3" : "tier_2";
+    let approvalLimits = limitsFromTierRow(null, tier);
+    if (type === "kyc_approved") {
+      try {
+        const [{ data: applied }, { data: schedule }] = await Promise.all([
+          admin.from("user_risk_tiers")
+            .select("current_tier, daily_transaction_limit, monthly_transaction_limit, single_transaction_limit, features_enabled")
+            .eq("user_id", user_id)
+            .maybeSingle(),
+          admin.from("tier_limits")
+            .select("daily_limit, monthly_limit, single_limit, features_enabled")
+            .eq("tier", tier)
+            .maybeSingle(),
+        ]);
+        const source = applied?.current_tier === tier ? applied : schedule;
+        approvalLimits = limitsFromTierRow(source, tier);
+      } catch (limitErr) {
+        console.warn("[notify-user] tier limit lookup failed:", limitErr instanceof Error ? limitErr.message : limitErr);
+      }
+    }
+    const limitPhrase = kycSendLimitPhrase(approvalLimits);
     const messages: Record<string, string> = {
       kyc_approved: scope === "id_and_address"
-        ? "Your identity and address have been verified. You now have full access (Tier 3)."
-        : "Your identity has been verified. You can now use the platform (Tier 2).",
+        ? `Your identity and address have been verified. You can now send ${limitPhrase}.`
+        : `Your identity has been verified. You can now send ${limitPhrase}.`,
       kyc_rejected: `Your verification was rejected: ${reason || "Please review your submission."}`,
       kyc_info_requested: message || "An administrator has requested more information for your verification.",
       support_reply: message || "Our support team replied to your conversation. Open Support in the app to read it.",
@@ -77,7 +99,16 @@ Deno.serve(async (req) => {
             body: JSON.stringify({
               type: "kyc_update",
               to: email,
-              data: { status: "approved", scope, name },
+              data: {
+                status: "approved",
+                scope,
+                name,
+                daily_limit: approvalLimits.daily,
+                monthly_limit: approvalLimits.monthly,
+                single_limit: approvalLimits.single,
+                international: approvalLimits.international === true,
+                virtual_card: approvalLimits.virtualCard === true,
+              },
             }),
           });
           const sendBody = await sendRes.json().catch(() => ({}));
