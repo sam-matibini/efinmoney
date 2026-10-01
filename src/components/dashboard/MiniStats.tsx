@@ -2,9 +2,11 @@ import { motion, useMotionValue, useSpring, useTransform, useMotionTemplate, use
 import { useMemo, useState } from "react";
 import { Globe, PiggyBank, ShieldCheck } from "lucide-react";
 import { useDashboardStats } from "@/hooks/useDashboardStats";
+import { useKyc } from "@/hooks/useKyc";
 import { useProfile } from "@/hooks/useProfile";
 import { useSavingsGoals } from "@/hooks/useSavingsGoals";
-import { Link } from "react-router-dom";
+import KycStatusDialog from "@/components/kyc/KycStatusDialog";
+import { kycTierNumber } from "@/lib/kycStages";
 
 const cardClass =
   "group relative overflow-hidden rounded-2xl bg-card border border-border p-4 transition-[transform,box-shadow] duration-200 ease-out hover:-translate-y-1 hover:shadow-lg";
@@ -18,7 +20,9 @@ const cardBg: Record<string, string> = {
 const MiniStats = () => {
   const { corridorCodes } = useDashboardStats();
   const { data: profile } = useProfile();
+  const { tier } = useKyc();
   const { data: goals } = useSavingsGoals();
+  const [kycOpen, setKycOpen] = useState(false);
 
   const corridors = corridorCodes;
 
@@ -45,8 +49,7 @@ const MiniStats = () => {
     return { pct, label: g.name || "Savings" };
   }, [goals]);
 
-  const tier = profile?.kyc_tier?.replace(/[^0-9]/g, "") || "0";
-  const tierNum = Number(tier);
+  const tierNum = kycTierNumber(tier?.current_tier || profile?.kyc_tier);
 
   const stats = [
     {
@@ -106,16 +109,9 @@ const MiniStats = () => {
               />
             ))}
           </div>
-          {tierNum < 3 ? (
-            <Link
-              to="/kyc"
-              className="mt-3 inline-flex items-center justify-center w-full px-2 py-1.5 rounded-lg bg-primary text-primary-foreground text-[11px] font-semibold animate-glow-pulse hover:bg-primary/90 transition-colors"
-            >
-              Upgrade to Tier {tierNum + 1} →
-            </Link>
-          ) : (
-            <p className="text-xs text-muted-foreground mt-2">Max tier reached</p>
-          )}
+          <span className="mt-3 inline-flex items-center justify-center w-full px-2 py-1.5 rounded-lg bg-primary text-primary-foreground text-[11px] font-semibold">
+            {tierNum < 3 ? `Upgrade to Tier ${tierNum + 1} →` : "View KYC status"}
+          </span>
         </>
       ),
       icon: ShieldCheck,
@@ -126,7 +122,13 @@ const MiniStats = () => {
   return (
     <section className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 mb-8">
       {stats.map((s, i) => (
-        <StatCard key={s.key} index={i} className={`${cardClass} ${cardBg[s.key] || ""}`}>
+        <StatCard
+          key={s.key}
+          index={i}
+          className={`${cardClass} ${cardBg[s.key] || ""} ${s.key === "kyc" ? "cursor-pointer" : ""}`}
+          onActivate={s.key === "kyc" ? () => setKycOpen(true) : undefined}
+          activateLabel={s.key === "kyc" ? "Open KYC status" : undefined}
+        >
           <div className="flex items-start justify-between mb-3">
             <p className="text-xs font-medium text-muted-foreground">{s.label}</p>
             <div
@@ -138,11 +140,24 @@ const MiniStats = () => {
           {s.content}
         </StatCard>
       ))}
+      <KycStatusDialog open={kycOpen} onOpenChange={setKycOpen} />
     </section>
   );
 };
 
-const StatCard = ({ index, className, children }: { index: number; className: string; children: React.ReactNode }) => {
+const StatCard = ({
+  index,
+  className,
+  children,
+  onActivate,
+  activateLabel,
+}: {
+  index: number;
+  className: string;
+  children: React.ReactNode;
+  onActivate?: () => void;
+  activateLabel?: string;
+}) => {
   const reduceMotion = useReducedMotion();
   const px = useMotionValue(0);
   const py = useMotionValue(0);
@@ -165,6 +180,20 @@ const StatCard = ({ index, className, children }: { index: number; className: st
       initial={reduceMotion ? false : { opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: reduceMotion ? 0 : index * 0.06, duration: 0.35, ease: [0.23, 1, 0.32, 1] }}
+      role={onActivate ? "button" : undefined}
+      tabIndex={onActivate ? 0 : undefined}
+      aria-label={activateLabel}
+      onClick={onActivate}
+      onKeyDown={
+        onActivate
+          ? (event) => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                onActivate();
+              }
+            }
+          : undefined
+      }
       onMouseMove={reduceMotion ? undefined : onMove}
       onMouseEnter={() => setHovering(true)}
       onMouseLeave={onLeave}

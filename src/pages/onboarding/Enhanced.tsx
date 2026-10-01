@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import OnboardingShell from "@/components/kyc/OnboardingShell";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -36,6 +36,17 @@ const Enhanced = () => {
   const [sourceUrl, setSourceUrl] = useState<string | null>(null);
   const [sourceType, setSourceType] = useState<string>("employment");
   const [submitting, setSubmitting] = useState(false);
+  const [searchParams] = useSearchParams();
+
+  const requestedStage = searchParams.get("stage");
+
+  useEffect(() => {
+    if (requestedStage !== "address" && requestedStage !== "source") return;
+    const frame = requestAnimationFrame(() => {
+      document.getElementById(`kyc-stage-${requestedStage}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [requestedStage]);
 
   // Hydrate state from existing kyc record so returning users see their uploads
   useEffect(() => {
@@ -144,7 +155,7 @@ const Enhanced = () => {
         </Card>
       )}
 
-      <Card className="p-5 space-y-4">
+      <Card id="kyc-stage-address" className={`p-5 space-y-4 ${requestedStage === "address" ? "ring-2 ring-primary" : ""}`}>
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <FileText className="w-4 h-4 text-primary" />
@@ -171,7 +182,7 @@ const Enhanced = () => {
         />
       </Card>
 
-      <Card className="p-5 space-y-4">
+      <Card id="kyc-stage-source" className={`p-5 space-y-4 ${requestedStage === "source" ? "ring-2 ring-primary" : ""}`}>
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <Briefcase className="w-4 h-4 text-primary" />

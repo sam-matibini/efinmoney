@@ -4,6 +4,7 @@ import BusinessPromptCard from "@/components/kyb/BusinessPromptCard";
 import { SectionBoundary } from "@/components/common/SectionBoundary";
 import BudgetModal from "@/components/dashboard/redesign/BudgetModal";
 import DashboardStats from "@/components/dashboard/redesign/DashboardStats";
+import KycTierCard from "@/components/dashboard/redesign/KycTierCard";
 import ExchangeTicker from "@/components/dashboard/redesign/ExchangeTicker";
 import MoneyInMotion from "@/components/dashboard/redesign/MoneyInMotion";
 import QuickActionsGrid from "@/components/dashboard/redesign/QuickActionsGrid";
@@ -49,6 +50,7 @@ const DashboardHome = () => {
       </header>
 
       <DashboardStats budget={budget} onSetBudget={() => setBudgetOpen(true)} />
+      <KycTierCard />
 
       <div className="motion-row">
         <QuickActionsGrid currency={currency} />

@@ -14,6 +14,8 @@ import PageHeroBanner from "@/components/common/PageHeroBanner";
 import AppPage from "@/components/layout/AppPage";
 import { useBusinessAccount } from "@/hooks/useBusinessAccount";
 import { kybResumePath } from "@/lib/kybOnboarding";
+import { KycStageRows } from "@/components/kyc/KycStatusDialog";
+import { buildKycStages, kycTierNumber, remainingKycStages, type KycStage } from "@/lib/kycStages";
 
 type TierKey = "tier_1" | "tier_2" | "tier_3";
 const VISIBLE_TIERS: TierKey[] = ["tier_1", "tier_2", "tier_3"];
@@ -60,43 +62,12 @@ const KYCPage = () => {
   const cfg = statusConfig[status as keyof typeof statusConfig] || statusConfig.pending;
   const Icon = cfg.icon;
 
-  if (isBusiness) {
-    const kybStatus = business?.kyb_status || "not_started";
-    const kybLabel =
-      kybStatus === "approved"
-        ? "Approved"
-        : kybStatus === "pending_review"
-          ? "Waiting for compliance review"
-          : kybStatus === "rejected" || kybStatus === "suspended"
-            ? "Action needed"
-            : "KYB in progress";
-    const KybIcon = isApproved ? CheckCircle2 : isRejected ? AlertTriangle : Clock;
-    return (
-      <AppPage width="default" className="py-8" innerClassName="space-y-6">
-        <h1 className="text-2xl font-bold text-foreground">Business verification (KYB)</h1>
-        <PageHeroBanner
-          icon={Shield}
-          label="Company verification"
-          value={kybLabel}
-          meta={[
-            { icon: KybIcon, text: business?.legal_name || "Company account" },
-            { icon: Lock, text: isApproved ? "Business payments unlocked" : "Staff document review — not Persona" },
-          ]}
-          variant="cta"
-        />
-        <Card className="p-6 space-y-3">
-          <p className="text-sm text-muted-foreground">
-            Business accounts are verified through a manual KYB review: company details, ownership, and documents.
-            Personal KYC (Persona) is not used for company onboarding.
-          </p>
-          <Button onClick={() => navigate(kybResumePath(business))} className="gap-1.5">
-            {isApproved ? "Open business account" : isPendingReview ? "View status" : "Continue KYB"}
-            <ArrowRight className="h-4 w-4" />
-          </Button>
-        </Card>
-      </AppPage>
-    );
-  }
+  const tierNumber = kycTierNumber(userTier?.current_tier || profile?.kyc_tier);
+  const stages = buildKycStages(tierNumber, kyc as Parameters<typeof buildKycStages>[1]);
+  const remaining = remainingKycStages(stages);
+  const openStage = (stage: KycStage) => {
+    if (stage.href) navigate(stage.href);
+  };
 
   return (
     <AppPage width="default" className="py-8" innerClassName="space-y-6">
@@ -112,6 +83,18 @@ const KYCPage = () => {
           ]}
           variant="cta"
         />
+
+        {isBusiness && (
+          <Card className="p-4 flex flex-wrap items-center justify-between gap-3">
+            <p className="text-sm text-muted-foreground">
+              {business?.legal_name || "Your company"} is verified separately. Personal KYC tiers are below.
+            </p>
+            <Button variant="outline" onClick={() => navigate(kybResumePath(business))} className="gap-1.5">
+              {isApproved ? "Open business account" : "Continue KYB"}
+              <ArrowRight className="h-4 w-4" />
+            </Button>
+          </Card>
+        )}
 
         <KycPromptBanner />
         {isLoading ? (
@@ -185,6 +168,16 @@ const KYCPage = () => {
             </Card>
 
             <div>
+              <h3 className="font-semibold text-foreground mb-1">Remaining stages</h3>
+              <p className="text-sm text-muted-foreground mb-4">
+                {remaining.length === 0
+                  ? "Every verification stage for your tier is complete."
+                  : "Open a stage to finish the next tier."}
+              </p>
+              <KycStageRows stages={remaining.length === 0 ? stages : remaining} onOpen={openStage} />
+            </div>
+
+            <div>
               <h3 className="font-semibold text-foreground mb-1">Tier Limits & Features</h3>
               <p className="text-sm text-muted-foreground mb-4">
                 Your current tier is highlighted. Unlock higher tiers by completing the matching verification step.
@@ -198,9 +191,9 @@ const KYCPage = () => {
                   const isLocked = !isUnlocked;
                   const upgradePath =
                     tKey === "tier_2"
-                      ? "/onboarding/identity"
+                      ? "/onboarding/identity?upgrade=1&stage=identity"
                       : tKey === "tier_3"
-                      ? "/onboarding/enhanced"
+                      ? "/onboarding/enhanced?upgrade=1&stage=address"
                       : null;
                   const canUpgrade =
                     upgradePath && TIER_ORDER[tKey] === TIER_ORDER[currentTier] + 1;

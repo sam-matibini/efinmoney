@@ -124,6 +124,52 @@
   color: var(--color-bg-primary);
 }
 
+.kyc-tier-card {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--spacing-md);
+  width: 100%;
+  text-align: left;
+  background: var(--color-bg-card);
+  border: 0;
+  border-top: 3px solid var(--color-accent-gold);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
+  color: var(--color-text-primary);
+  cursor: pointer;
+  transition: transform 0.2s ease;
+}
+
+.kyc-tier-card:hover {
+  transform: scale(1.01);
+}
+
+.kyc-tier-copy {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.kyc-tier-track {
+  display: flex;
+  gap: 6px;
+  width: 180px;
+}
+
+.kyc-tier-track span {
+  height: 6px;
+  flex: 1;
+  border-radius: var(--radius-full);
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.kyc-tier-track span.is-on {
+  background: var(--color-accent-gold);
+}
+
 .motion-row {
   display: grid;
   grid-template-columns: minmax(0, 40fr) minmax(0, 35fr) minmax(0, 25fr);

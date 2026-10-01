@@ -20,9 +20,9 @@ const NEXT_TIER: Record<Tier, Tier | null> = {
 };
 
 const UPGRADE_ROUTE: Record<Tier, string> = {
-  tier_1: "/onboarding/identity",
-  tier_2: "/onboarding/enhanced",
-  tier_3: "/onboarding/enhanced",
+  tier_1: "/onboarding/identity?upgrade=1&stage=identity",
+  tier_2: "/onboarding/enhanced?upgrade=1&stage=address",
+  tier_3: "/onboarding/enhanced?upgrade=1&stage=address",
 };
 
 export const tierLabel = (t: Tier) =>

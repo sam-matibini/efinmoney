@@ -14,6 +14,7 @@ import { toast } from "sonner";
 import { Logo, Wordmark } from "@/components/Logo";
 import { useBusinessAccount } from "@/hooks/useBusinessAccount";
 import LoadingSpinner from "@/components/LoadingSpinner";
+import { skipBusinessKycRedirect } from "@/lib/kycStages";
 
 const Identity = () => {
   const navigate = useNavigate();
@@ -25,7 +26,9 @@ const Identity = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const autoStartPlaid =
     searchParams.get("autostart") === "plaid" || searchParams.get("autostart") === "persona";
+  const allowPersonalUpgrade = skipBusinessKycRedirect(searchParams.get("upgrade"));
   const [manualOpen, setManualOpen] = useState(searchParams.get("method") === "manual");
+  const requestedStage = searchParams.get("stage");
 
   const awaitingReview = kyc?.verification_status === "pending_review";
   const wasRejected = kyc?.verification_status === "rejected";
@@ -35,7 +38,7 @@ const Identity = () => {
 
   useEffect(() => {
     if (!user) return;
-    if (isBusiness) return;
+    if (isBusiness && !allowPersonalUpgrade) return;
     if (isVerified || hasPassedCoreChecks) return;
     if (kyc?.verification_status && kyc.verification_status !== "not_started") return;
 
@@ -46,20 +49,30 @@ const Identity = () => {
         { onConflict: "user_id" },
       )
       .then(() => refetch());
-  }, [user, kyc?.verification_status, isVerified, hasPassedCoreChecks, refetch, isBusiness]);
+  }, [user, kyc?.verification_status, isVerified, hasPassedCoreChecks, refetch, isBusiness, allowPersonalUpgrade]);
 
   useEffect(() => {
+    if (allowPersonalUpgrade) return;
     if (isBusiness) return;
     if (isVerified || hasPassedCoreChecks) {
       navigate("/dashboard", { replace: true });
     }
-  }, [isVerified, hasPassedCoreChecks, navigate, isBusiness]);
+  }, [isVerified, hasPassedCoreChecks, navigate, isBusiness, allowPersonalUpgrade]);
 
   useEffect(() => {
+    if (allowPersonalUpgrade) return;
     if (!businessLoading && isBusiness) {
       navigate(resumePath, { replace: true });
     }
-  }, [businessLoading, isBusiness, resumePath, navigate]);
+  }, [businessLoading, isBusiness, resumePath, navigate, allowPersonalUpgrade]);
+
+  useEffect(() => {
+    if (requestedStage !== "identity" && requestedStage !== "selfie") return;
+    const frame = requestAnimationFrame(() => {
+      document.getElementById(`kyc-stage-${requestedStage}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [requestedStage, manualOpen]);
 
   const openManual = () => {
     setManualOpen(true);
@@ -104,7 +117,7 @@ const Identity = () => {
     }
   };
 
-  if (businessLoading || isBusiness) {
+  if ((businessLoading || isBusiness) && !allowPersonalUpgrade) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <LoadingSpinner size={80} />
@@ -120,13 +133,17 @@ const Identity = () => {
             variant="ghost"
             size="sm"
             onClick={async () => {
+              if (allowPersonalUpgrade) {
+                navigate("/dashboard");
+                return;
+              }
               await signOut();
               navigate("/auth");
             }}
             className="text-muted-foreground hover:text-foreground -ml-2"
           >
             <ArrowLeft className="w-4 h-4 mr-1" />
-            Back to sign in
+            {allowPersonalUpgrade ? "Back to dashboard" : "Back to sign in"}
           </Button>
           <div className="flex items-center gap-2">
             <Logo className="w-7 h-7" />
@@ -173,7 +190,10 @@ const Identity = () => {
           <ManualKycForm onBack={closeManual} onSubmitted={() => refetch()} />
         ) : (
           <>
-            <Card className="p-5 space-y-3">
+            <Card
+              id="kyc-stage-identity"
+              className={`p-5 space-y-3 ${requestedStage === "identity" ? "ring-2 ring-primary" : ""}`}
+            >
               <div className="flex items-start gap-3">
                 <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
                   <ShieldCheck className="w-5 h-5 text-primary" />
@@ -197,7 +217,10 @@ const Identity = () => {
               )}
             </Card>
 
-            <Card className="p-5 space-y-3">
+            <Card
+              id="kyc-stage-selfie"
+              className={`p-5 space-y-3 ${requestedStage === "selfie" ? "ring-2 ring-primary" : ""}`}
+            >
               <div className="flex items-start gap-3">
                 <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
                   <Upload className="w-5 h-5 text-primary" />
