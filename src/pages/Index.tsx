@@ -8,6 +8,7 @@ import RecentTransactions from "@/components/dashboard/RecentTransactions";
 import ExchangeRates from "@/components/dashboard/ExchangeRates";
 import MiniStats from "@/components/dashboard/MiniStats";
 import TierProgressCard from "@/components/dashboard/TierProgressCard";
+import KycStatusCard from "@/components/dashboard/KycStatusCard";
 import AppPage from "@/components/layout/AppPage";
 import { SectionBoundary } from "@/components/common/SectionBoundary";
 
@@ -15,12 +16,13 @@ const Index = () => {
   return (
     <AppPage width="wide" className="py-4 sm:py-6">
 
+      <SectionBoundary name="KycStatusCard"><KycStatusCard /></SectionBoundary>
       <SectionBoundary name="KycPromptBanner"><KycPromptBanner /></SectionBoundary>
-      <SectionBoundary name="BusinessPromptCard"><BusinessPromptCard /></SectionBoundary>
       <SectionBoundary name="WealthPulseBanner"><WealthPulseBanner /></SectionBoundary>
       <SectionBoundary name="HeroBalance"><HeroBalance /></SectionBoundary>
       <SectionBoundary name="WalletCarousel"><WalletCarousel /></SectionBoundary>
       <SectionBoundary name="QuickActions"><QuickActions /></SectionBoundary>
+      <SectionBoundary name="BusinessPromptCard"><div className="mt-6"><BusinessPromptCard /></div></SectionBoundary>
       <SectionBoundary name="MiniStats"><MiniStats /></SectionBoundary>
       <SectionBoundary name="TierProgressCard"><TierProgressCard /></SectionBoundary>
       <SectionBoundary name="RecentTransactions"><RecentTransactions /></SectionBoundary>

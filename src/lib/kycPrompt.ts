@@ -42,7 +42,7 @@ export function getKycPromptConfig(
   const perks =
     current === "tier_1"
       ? ["Higher send limits", "Top up wallets", "Bill payments"]
-      : ["Virtual cards", "International transfers", "Business features"];
+      : ["Virtual cards", "International transfers", "Highest limits"];
 
   if (kyc?.verification_status === "pending_review") {
     return {

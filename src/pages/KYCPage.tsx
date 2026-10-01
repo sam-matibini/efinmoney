@@ -18,7 +18,7 @@ import { kybResumePath } from "@/lib/kybOnboarding";
 type TierKey = "tier_1" | "tier_2" | "tier_3";
 const VISIBLE_TIERS: TierKey[] = ["tier_1", "tier_2", "tier_3"];
 const TIER_ORDER: Record<TierKey, number> = { tier_1: 1, tier_2: 2, tier_3: 3 };
-const FEATURE_KEYS = ["receive", "send", "topup", "bills", "international", "virtual_card", "business"] as const;
+const FEATURE_KEYS = ["receive", "send", "topup", "bills", "international", "virtual_card"] as const;
 
 const KYCPage = () => {
   const { data: profile, isLoading } = useProfile();
@@ -344,6 +344,22 @@ const KYCPage = () => {
               </div>
             </div>
 
+            <Card className="flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h3 className="font-semibold text-foreground">Business verification (KYB)</h3>
+                <p className="text-sm text-muted-foreground">
+                  Separate from your personal KYC levels above. Only needed if you want a business account for a company.
+                </p>
+              </div>
+              <Button
+                variant="outline"
+                className="shrink-0 gap-1.5"
+                onClick={() => navigate(business ? kybResumePath(business) : "/onboarding/business/details")}
+              >
+                {business ? (isApproved ? "Open business account" : "View business application") : "Register a business"}
+                <ArrowRight className="h-4 w-4" />
+              </Button>
+            </Card>
           </div>
         )}
     </AppPage>

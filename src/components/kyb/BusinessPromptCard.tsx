@@ -82,14 +82,14 @@ const BusinessPromptCard = () => {
   if (isLoading) return null;
 
   let variant: keyof typeof variants = "register";
-  let eyebrow = "Business account";
-  let title = "Onboard your business";
+  let eyebrow = "Business account (KYB)";
+  let title = "Have a company? Open a business account";
   let message =
-    "Open a business account for your company. Verification takes 1–2 business days.";
+    "Separate from your personal KYC. Register your company for business payouts — review takes 1–2 business days.";
   let cta = "Register a business";
   let href = "/onboarding/business/details";
   let dismissible = !businessPrimary;
-  let perks = ["Higher limits", "Business payouts", "Multi-currency"];
+  let perks = ["Company payouts", "Multi-currency", "Team-ready"];
 
   if (businessPrimary && !business) {
     title = "Verify your business";
@@ -135,7 +135,7 @@ const BusinessPromptCard = () => {
       message = "Your application is saved. Pick up where you left off.";
       cta = "Continue application";
       href = stepPath[business.current_step] ?? "/onboarding/business/details";
-      perks = ["Higher limits", "Business payouts"];
+      perks = ["Company payouts"];
     }
   }
 

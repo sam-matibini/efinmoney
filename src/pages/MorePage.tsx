@@ -235,7 +235,7 @@ const MorePage = () => {
               { icon: UserIcon, label: "Your Profile", onClick: () => navigate("/profile") },
               {
                 icon: ShieldCheck,
-                label: businessPrimary ? "Business verification (KYB)" : "Account Verification",
+                label: businessPrimary ? "Business verification (KYB)" : "Personal KYC verification",
                 onClick: () => navigate(businessPrimary ? kybResumePath(business) : "/kyc"),
                 right: !verificationPending ? (
                   <Badge className="bg-primary/15 text-primary border-primary/30 hover:bg-primary/15">Verified</Badge>

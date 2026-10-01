@@ -329,7 +329,7 @@ const Header = () => {
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={() => navigate("/profile")}>Profile Settings</DropdownMenuItem>
                 <DropdownMenuItem onClick={() => navigate("/kyc")}>
-                  {businessPrimary ? "Business verification" : "KYC Verification"}
+                  {businessPrimary ? "Business verification (KYB)" : "Personal KYC verification"}
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => navigate("/security")}>Security</DropdownMenuItem>
                 <DropdownMenuSeparator />

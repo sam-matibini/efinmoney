@@ -112,7 +112,7 @@ const KycPromptBanner = () => {
 
         <div className="min-w-0 flex-1">
           <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            Account verification
+            Personal KYC
           </p>
           <h2 className="mt-0.5 font-display text-lg font-bold tracking-tight text-foreground sm:text-xl">
             {config.title}
