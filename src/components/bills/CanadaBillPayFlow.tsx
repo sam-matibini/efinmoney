@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
+import { useQuery } from "@tanstack/react-query";
 import {
-  AlertCircle, ArrowLeft, ArrowRight, Building2, CheckCircle2, Info, Loader2,
+  AlertCircle, ArrowLeft, ArrowRight, Building2, CheckCircle2, History, Info, Loader2, Mail,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -14,15 +15,43 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useWallets } from "@/hooks/useWallets";
 import { usePinGate } from "@/components/send/usePinGate";
 import { invokeEdgeFunction, stringifyErrorValue } from "@/lib/invokeEdgeFunction";
+import { supabase } from "@/integrations/supabase/client";
 import {
   CA_BILL_CATEGORIES,
   CA_BILL_CATEGORY_LABEL,
   CA_BILL_PAYEE_HINTS,
+  buildRecentPayees,
+  caInstitutionName,
   type CaBillCategoryId,
+  type CaBillPayMethod,
+  type CaRecentPayee,
 } from "@/lib/canadaBillPay";
 import { toast } from "sonner";
 
-const STEPS = ["Bill details", "Bank & amount", "Confirm"] as const;
+const STEPS = ["Bill details", "Payment & amount", "Confirm"] as const;
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+function useRecentCaPayees() {
+  return useQuery({
+    queryKey: ["ca-bill-recent-payees"],
+    queryFn: async (): Promise<CaRecentPayee[]> => {
+      const { data: bills } = await supabase
+        .from("bill_payments")
+        .select("biller_name, category, customer_identifier, flw_reference")
+        .in("biller_code", ["ca_eft", "ca_interac"])
+        .order("created_at", { ascending: false })
+        .limit(30);
+      const ids = (bills || []).map((b) => b.flw_reference).filter((v): v is string => !!v);
+      if (!ids.length) return [];
+      const { data: transfers } = await supabase
+        .from("transfers")
+        .select("id, recipient_account, payout_method")
+        .in("id", ids);
+      return buildRecentPayees(bills || [], transfers || []);
+    },
+    staleTime: 60_000,
+  });
+}
 
 const CanadaBillPayFlow = () => {
   const { data: wallets } = useWallets();
@@ -37,11 +66,27 @@ const CanadaBillPayFlow = () => {
   const [accountReference, setAccountReference] = useState("");
   const [memo, setMemo] = useState("");
 
+  const [method, setMethod] = useState<CaBillPayMethod>("eft");
   const [institution, setInstitution] = useState("");
   const [transit, setTransit] = useState("");
   const [accountNumber, setAccountNumber] = useState("");
+  const [payeeEmail, setPayeeEmail] = useState("");
   const [amount, setAmount] = useState("");
   const [walletId, setWalletId] = useState("");
+  const { data: recentPayees = [] } = useRecentCaPayees();
+
+  const applyPayee = (p: CaRecentPayee) => {
+    setCategory(p.category);
+    setPayeeName(p.payeeName);
+    setAccountReference(p.accountReference);
+    setMethod(p.method);
+    setInstitution(p.institution ?? "");
+    setTransit(p.transit ?? "");
+    setAccountNumber(p.accountNumber ?? "");
+    setPayeeEmail(p.email ?? "");
+    setStep(1);
+  };
+  const bankName = caInstitutionName(institution);
 
   const cadWallets = useMemo(
     () => (wallets || []).filter((w) => w.currency_code === "CAD"),
@@ -59,12 +104,18 @@ const CanadaBillPayFlow = () => {
   const categoryMeta = CA_BILL_CATEGORIES.find((c) => c.id === category)!;
 
   const step1Valid = payeeName.trim().length >= 2 && accountReference.trim().length >= 3;
+  const maxAmount = method === "interac" ? 10000 : 25000;
+  const destinationValid = method === "interac"
+    ? EMAIL_RE.test(payeeEmail.trim())
+    : /^\d{3}$/.test(institution)
+      && /^\d{5}$/.test(transit)
+      && accountNumber.length >= 5
+      && accountNumber.length <= 12;
   const step2Valid =
-    /^\d{3}$/.test(institution)
-    && /^\d{5}$/.test(transit)
-    && accountNumber.replace(/\D/g, "").length >= 5
+    destinationValid
     && Number.isFinite(parsedAmount)
     && parsedAmount >= 1
+    && parsedAmount <= maxAmount
     && !!selectedWallet
     && Number(selectedWallet.balance) >= parsedAmount;
 
@@ -78,15 +129,16 @@ const CanadaBillPayFlow = () => {
         transfer_id?: string;
         error?: string;
       }>("ca-bill-payment", {
+        method,
         wallet_id: selectedWallet.wallet_id,
         amount: parsedAmount,
         payee_name: payeeName.trim(),
         category,
         account_reference: accountReference.trim(),
         memo: memo.trim() || undefined,
-        institution,
-        transit,
-        account_number: accountNumber.replace(/\D/g, ""),
+        ...(method === "interac"
+          ? { payee_email: payeeEmail.trim() }
+          : { institution, transit, account_number: accountNumber }),
       });
       if (!res.reference || !res.transfer_id) throw new Error("Payment could not be completed");
       setSuccess({ reference: res.reference, transferId: res.transfer_id });
@@ -110,7 +162,10 @@ const CanadaBillPayFlow = () => {
         </div>
         <h2 className="text-2xl font-display font-bold">Bill payment submitted</h2>
         <p className="text-sm text-muted-foreground">
-          C${parsedAmount.toFixed(2)} to {payeeName} via EFT. Processing usually takes 1–3 business days.
+          C${parsedAmount.toFixed(2)} to {payeeName}{" "}
+          {method === "interac"
+            ? "via Interac e-Transfer. It usually arrives within minutes."
+            : "via EFT. Processing usually takes 1–3 business days."}
         </p>
         <p className="text-xs font-mono text-muted-foreground">Ref {success.reference}</p>
         <div className="flex flex-col sm:flex-row gap-2 justify-center pt-2">
@@ -131,9 +186,9 @@ const CanadaBillPayFlow = () => {
         <Alert className="border-primary/30 bg-primary/5">
           <Info className="h-4 w-4" />
           <AlertDescription className="text-sm">
-            Pay Canadian bills by sending an <strong>EFT</strong> to the biller&apos;s bank account.
-            Enter the payee name, your account/reference number, and the biller&apos;s institution, transit, and account numbers
-            (from your bill or online banking payee setup).
+            Pay any Canadian biller that accepts <strong>EFT</strong> (direct deposit) or <strong>Interac e-Transfer</strong>.
+            You&apos;ll find the biller&apos;s banking details or e-Transfer email under &ldquo;How to pay&rdquo; on your bill or invoice.
+            Your account number is sent with the payment so the biller can credit you.
           </AlertDescription>
         </Alert>
 
@@ -163,6 +218,29 @@ const CanadaBillPayFlow = () => {
                   <CardTitle>Who are you paying?</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
+                  {recentPayees.length > 0 && (
+                    <div>
+                      <Label className="flex items-center gap-1.5">
+                        <History className="w-3.5 h-3.5" /> Pay again
+                      </Label>
+                      <div className="flex flex-wrap gap-2 mt-2">
+                        {recentPayees.map((p) => (
+                          <button
+                            key={p.key}
+                            type="button"
+                            onClick={() => applyPayee(p)}
+                            className="px-3 py-2 rounded-xl border border-border hover:bg-muted/50 text-left transition"
+                          >
+                            <span className="text-xs font-medium block">{p.payeeName}</span>
+                            <span className="text-[11px] text-muted-foreground font-mono">
+                              {p.method === "interac" ? "Interac" : "EFT"} · {p.accountReference}
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
                   <div>
                     <Label>Bill category</Label>
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-2">
@@ -238,14 +316,51 @@ const CanadaBillPayFlow = () => {
             <motion.div key="s2" initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -12 }}>
               <Card>
                 <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Building2 className="w-5 h-5" />
-                    Biller bank details (EFT)
-                  </CardTitle>
+                  <CardTitle>How does {payeeName.trim() || "the biller"} accept payment?</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
+                  <div className="grid grid-cols-2 gap-2">
+                    {([
+                      { id: "eft", label: "Bank deposit (EFT)", hint: "Institution, transit, account", icon: Building2 },
+                      { id: "interac", label: "Interac e-Transfer", hint: "Biller's payment email", icon: Mail },
+                    ] as const).map((m) => {
+                      const Icon = m.icon;
+                      const active = method === m.id;
+                      return (
+                        <button
+                          key={m.id}
+                          type="button"
+                          onClick={() => setMethod(m.id)}
+                          className={`p-3 rounded-xl border text-left transition ${
+                            active ? "border-primary bg-primary/10" : "border-border hover:bg-muted/50"
+                          }`}
+                        >
+                          <Icon className="w-4 h-4 mb-1" />
+                          <span className="text-sm font-medium block">{m.label}</span>
+                          <span className="text-xs text-muted-foreground">{m.hint}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {method === "interac" ? (
+                    <div>
+                      <Label htmlFor="payee-email">Biller&apos;s Interac e-Transfer email</Label>
+                      <Input
+                        id="payee-email"
+                        type="email"
+                        value={payeeEmail}
+                        onChange={(e) => setPayeeEmail(e.target.value)}
+                        placeholder="payments@biller.ca"
+                      />
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Best with billers that have Autodeposit on, so the money lands without a security question.
+                      </p>
+                    </div>
+                  ) : (
+                  <>
                   <p className="text-sm text-muted-foreground">
-                    Find these on your bill or in your online banking when you add this payee as a bill payment recipient.
+                    Look for &ldquo;Pay by EFT / direct deposit&rdquo; on your bill or invoice.
                   </p>
 
                   <div className="grid grid-cols-3 gap-3">
@@ -273,12 +388,20 @@ const CanadaBillPayFlow = () => {
                       <Label>Account #</Label>
                       <Input
                         inputMode="numeric"
+                        maxLength={12}
                         value={accountNumber}
-                        onChange={(e) => setAccountNumber(e.target.value.replace(/\D/g, ""))}
+                        onChange={(e) => setAccountNumber(e.target.value.replace(/\D/g, "").slice(0, 12))}
                         placeholder="Account number"
                       />
                     </div>
                   </div>
+                  {institution.length === 3 && (
+                    <p className={`text-xs -mt-2 ${bankName ? "text-muted-foreground" : "text-amber-600"}`}>
+                      {bankName ?? "Institution number not recognised. Double-check it on your bill."}
+                    </p>
+                  )}
+                  </>
+                  )}
 
                   <div>
                     <Label>Amount (CAD)</Label>
@@ -286,13 +409,15 @@ const CanadaBillPayFlow = () => {
                       type="number"
                       inputMode="decimal"
                       min={1}
-                      max={25000}
+                      max={maxAmount}
                       step="0.01"
                       value={amount}
                       onChange={(e) => setAmount(e.target.value)}
                       placeholder="0.00"
                     />
-                    <p className="text-xs text-muted-foreground mt-1">Min C$1 · Max C$25,000 per payment</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Min C$1 · Max C${maxAmount.toLocaleString()} per payment
+                    </p>
                   </div>
 
                   <div>
@@ -357,9 +482,11 @@ const CanadaBillPayFlow = () => {
                       <dd className="font-medium text-right font-mono text-xs">{accountReference}</dd>
                     </div>
                     <div className="flex justify-between gap-4">
-                      <dt className="text-muted-foreground">Bank (EFT)</dt>
+                      <dt className="text-muted-foreground">{method === "interac" ? "Interac e-Transfer" : "Bank (EFT)"}</dt>
                       <dd className="font-medium text-right font-mono text-xs">
-                        {institution}-{transit} ····{accountNumber.slice(-4)}
+                        {method === "interac"
+                          ? payeeEmail.trim()
+                          : `${bankName ? `${bankName} · ` : ""}${institution}-${transit} ····${accountNumber.slice(-4)}`}
                       </dd>
                     </div>
                     <div className="flex justify-between gap-4 border-t pt-3">
@@ -374,7 +501,10 @@ const CanadaBillPayFlow = () => {
 
                   <Alert className="bg-muted/40">
                     <AlertDescription className="text-xs">
-                      Funds leave your eFinMoney CAD wallet immediately. EFT delivery to the biller typically takes 1–3 business days.
+                      Funds leave your eFinMoney CAD wallet immediately.{" "}
+                      {method === "interac"
+                        ? "Interac e-Transfers usually arrive within minutes."
+                        : "EFT delivery to the biller typically takes 1–3 business days."}
                       {CA_BILL_CATEGORY_LABEL[category] ? ` Category: ${CA_BILL_CATEGORY_LABEL[category]}.` : ""}
                     </AlertDescription>
                   </Alert>

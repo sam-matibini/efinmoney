@@ -21,6 +21,10 @@ export const productFeatures = {
   flutterwave: envFlag("VITE_FEATURE_FLUTTERWAVE", true),
   crypto: envFlag("VITE_FEATURE_CRYPTO", false),
   billPay: envFlag("VITE_FEATURE_BILL_PAY", true),
+  /** Canada bill pay — hidden until a biller-network partner (e.g. PaySimply) is live; EFT/Interac-to-invoice flow stays built. */
+  caBillPay: envFlag("VITE_FEATURE_CA_BILL_PAY", false),
+  /** CRA tax payments (ops remits via corporate bill pay). On in dev; set VITE_FEATURE_CRA_PAY=true to launch. */
+  craPay: envFlag("VITE_FEATURE_CRA_PAY", import.meta.env.DEV),
   paymentLinks: envFlag("VITE_FEATURE_PAYMENT_LINKS", false),
   /** Request Money — shareable CAD Interac Autodeposit pay-in link (third party → your wallet). */
   requestMoney: envFlag("VITE_FEATURE_REQUEST_MONEY", true),

@@ -31,6 +31,7 @@ import {
   CalendarClock,
   Download,
   HandCoins,
+  Landmark,
 } from "lucide-react";
 import { productFeatures } from "@/lib/productFeatures";
 import PageHeroBanner from "@/components/common/PageHeroBanner";
@@ -259,6 +260,7 @@ const MorePage = () => {
                 : []),
               ...(productFeatures.cards ? [{ icon: CreditCard, label: "Cards", onClick: () => navigate("/cards") }] : []),
               ...(productFeatures.billPay ? [{ icon: Receipt, label: "Pay Bills & Airtime", onClick: () => navigate("/pay-bills") }] : []),
+              ...(productFeatures.craPay ? [{ icon: Landmark, label: "Pay CRA taxes", onClick: () => navigate("/pay-cra") }] : []),
               { icon: ArrowLeftRight, label: "Exchange Currency", onClick: () => navigate("/exchange") },
               { icon: PieChart, label: "Transaction Limits", onClick: () => navigate("/kyc") },
             ]}

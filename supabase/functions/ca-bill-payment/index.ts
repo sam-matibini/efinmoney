@@ -1,7 +1,11 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { corsPreflightResponse, jsonResponse } from "../_shared/cors.ts";
+import { caInstitutionName } from "../_shared/caInstitutions.ts";
+import { parseInteracEmail } from "../_shared/cadInteracPayout.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+
+type PayMethod = "eft" | "interac";
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return corsPreflightResponse();
@@ -21,17 +25,19 @@ Deno.serve(async (req) => {
     if (!user) return jsonResponse({ error: "Unauthorized" }, 401);
 
     const body = await req.json().catch(() => ({}));
+    const method: PayMethod = String(body.method || "eft").toLowerCase() === "interac" ? "interac" : "eft";
     const walletId = String(body.wallet_id || "");
-    const amount = Number(body.amount);
-    const payeeName = String(body.payee_name || "").trim();
-    const category = String(body.category || "other").trim().toLowerCase();
-    const accountReference = String(body.account_reference || "").trim();
-    const memo = body.memo ? String(body.memo).trim() : null;
+    const amount = Math.round(Number(body.amount) * 100) / 100;
+    const payeeName = String(body.payee_name || "").trim().slice(0, 120);
+    const category = String(body.category || "other").trim().toLowerCase().replace(/[^a-z_]/g, "").slice(0, 30) || "other";
+    const accountReference = String(body.account_reference || "").trim().slice(0, 60);
+    const memo = body.memo ? String(body.memo).trim().slice(0, 140) : "";
     const institution = String(body.institution || "").replace(/\D/g, "");
     const transit = String(body.transit || "").replace(/\D/g, "");
     const accountNumber = String(body.account_number || "").replace(/\D/g, "");
+    const payeeEmail = parseInteracEmail(body.payee_email);
 
-    if (!walletId || !payeeName || !accountReference) {
+    if (!walletId || payeeName.length < 2 || accountReference.length < 3) {
       return jsonResponse({ error: "Payee name, account reference, and wallet are required" }, 400);
     }
     if (!Number.isFinite(amount) || amount < 1) {
@@ -40,20 +46,27 @@ Deno.serve(async (req) => {
     if (amount > 25000) {
       return jsonResponse({ error: "Maximum bill payment is C$25,000 per transaction" }, 400);
     }
-    if (!/^\d{3}$/.test(institution) || !/^\d{5}$/.test(transit) || accountNumber.length < 5) {
+    if (method === "eft" && (!/^\d{3}$/.test(institution) || !/^\d{5}$/.test(transit) || accountNumber.length < 5 || accountNumber.length > 12)) {
       return jsonResponse({
-        error: "Enter valid Canadian bank details: 3-digit institution, 5-digit transit, and account number",
+        error: "Enter valid Canadian bank details: 3-digit institution, 5-digit transit, and 5–12 digit account number",
       }, 400);
+    }
+    if (method === "interac") {
+      if (!payeeEmail) return jsonResponse({ error: "Enter the biller's Interac e-Transfer email" }, 400);
+      if (amount > 10000) return jsonResponse({ error: "Interac e-Transfer bill payments are limited to C$10,000" }, 400);
     }
 
     const { data: wallet } = await admin
       .from("wallets")
-      .select("id, currency_code, user_id")
+      .select("id, currency_code, user_id, status")
       .eq("id", walletId)
       .eq("user_id", user.id)
       .maybeSingle();
     if (!wallet || wallet.currency_code !== "CAD") {
       return jsonResponse({ error: "Select a valid CAD wallet" }, 400);
+    }
+    if (wallet.status && wallet.status !== "active") {
+      return jsonResponse({ error: "This wallet is not active" }, 400);
     }
 
     const { data: balData } = await admin.rpc("get_wallet_balance", { p_wallet_id: walletId });
@@ -69,13 +82,14 @@ Deno.serve(async (req) => {
     if (rl === false) return jsonResponse({ error: "Too many requests — try again shortly" }, 429);
 
     const reference = `efm_cabill_${user.id.slice(0, 8)}_${Date.now()}`;
-    const eftAccount = `${institution}-${transit}-${accountNumber}`;
+    // Billers match payments on the remittance text, so the customer account number leads.
+    const description = `Bill pmt acct ${accountReference}${memo ? ` - ${memo}` : ""}`.slice(0, 120);
 
     const { data: bill, error: billErr } = await admin.from("bill_payments").insert({
       user_id: user.id,
       wallet_id: walletId,
       category: `ca_${category}`,
-      biller_code: "ca_eft",
+      biller_code: method === "interac" ? "ca_interac" : "ca_eft",
       biller_name: payeeName,
       customer_identifier: accountReference,
       amount,
@@ -85,15 +99,25 @@ Deno.serve(async (req) => {
     }).select("id").single();
     if (billErr) throw billErr;
 
+    const destination = method === "interac"
+      ? {
+        recipient_account: payeeEmail,
+        recipient_email: payeeEmail,
+        payout_method: "interac",
+      }
+      : {
+        recipient_account: `${institution}-${transit}-${accountNumber}`,
+        recipient_bank_code: institution,
+        recipient_bank_name: caInstitutionName(institution),
+        payout_method: "eft",
+      };
+
     const { data: transfer, error: transferErr } = await admin.from("transfers").insert({
       sender_id: user.id,
       sender_wallet_id: walletId,
       recipient_name: payeeName,
-      recipient_account: eftAccount,
-      recipient_bank_name: accountReference,
       recipient_country: "CA",
       transfer_type: "bill_payment",
-      payout_method: "eft",
       funding_source: "wallet",
       source_currency: "CAD",
       target_currency: "CAD",
@@ -102,6 +126,8 @@ Deno.serve(async (req) => {
       exchange_rate: 1,
       fee_amount: 0,
       status: "initiated",
+      description,
+      ...destination,
     }).select("id").single();
     if (transferErr) {
       await admin.from("bill_payments").update({ status: "failed", failure_reason: transferErr.message }).eq("id", bill.id);
@@ -135,8 +161,9 @@ Deno.serve(async (req) => {
       }, 400);
     }
 
+    const { data: latest } = await admin.from("transfers").select("status").eq("id", transfer.id).maybeSingle();
     await admin.from("bill_payments").update({
-      status: "processing",
+      status: latest?.status === "completed" ? "completed" : "processing",
       flw_response: execJson,
     }).eq("id", bill.id);
 
@@ -145,6 +172,7 @@ Deno.serve(async (req) => {
       bill_id: bill.id,
       transfer_id: transfer.id,
       reference,
+      method,
       payout: execJson.payout ?? null,
     });
   } catch (err) {

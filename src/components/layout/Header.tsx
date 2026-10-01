@@ -97,7 +97,7 @@ const Header = () => {
     buildNavItem("Contacts", "/contacts"),
     buildNavItem("Foreign Currency Exchange", "/exchange"),
     buildNavItem("Wallets", "/wallets"),
-    ...(productFeatures.cards ? [buildNavItem("Cards", "/cards")] : []),
+    ...(productFeatures.billPay ? [buildNavItem("Pay Bills", "/pay-bills")] : []),
     ...(hasBusiness ? [buildNavItem("Business", "/business")] : []),
   ];
 

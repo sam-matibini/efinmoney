@@ -74,6 +74,8 @@ const PlaidOAuthReturnPage = lazyImport(() => import("./pages/PlaidOAuthReturnPa
 const ReceivePage = lazyImport(() => import("./pages/ReceivePage"));
 const PayBillsPage = lazyImport(() => import("./pages/PayBillsPage"));
 const CanadaBillPayPage = lazyImport(() => import("./pages/CanadaBillPayPage"));
+const PayCraPage = lazyImport(() => import("./pages/PayCraPage"));
+const CraPaymentsAdminPage = lazyImport(() => import("./pages/admin/CraPaymentsAdminPage"));
 const Welcome = lazyImport(() => import("./pages/onboarding/Welcome"));
 const AccountType = lazyImport(() => import("./pages/onboarding/AccountType"));
 const OnboardingIdentity = lazyImport(() => import("./pages/onboarding/Identity"));
@@ -338,7 +340,8 @@ const AppRoutes = () => {
           <Route path="/wallet/receive" element={<ReceivePage />} />
           <Route path="/wallet/topup" element={<TopUpPage />} />
           <Route path="/pay-bills" element={<GatedPage feature="billPay"><PayBillsPage /></GatedPage>} />
-          <Route path="/pay-bills/canada" element={<GatedPage feature="billPay"><CanadaBillPayPage /></GatedPage>} />
+          <Route path="/pay-bills/canada" element={<GatedPage feature="caBillPay"><CanadaBillPayPage /></GatedPage>} />
+          <Route path="/pay-cra" element={<GatedPage feature="craPay"><PayCraPage /></GatedPage>} />
           <Route path="/stripe-connect" element={<GatedPage feature="stripe"><StripeConnectInstantPage /></GatedPage>} />
         </Route>
 
@@ -418,6 +421,7 @@ const AppRoutes = () => {
           <Route path="/admin/regulatory-changes" element={<RegulatoryChangesPage />} />
           <Route path="/admin/settlement-reconciliation" element={<SettlementReconciliationPage />} />
           <Route path="/admin/ops-queue" element={<OpsQueuePage />} />
+          <Route path="/admin/cra-payments" element={<CraPaymentsAdminPage />} />
           <Route path="/admin/nomba-fincra" element={<NombaFincraPage />} />
           <Route path="/admin/verto" element={<VertoClearingPage />} />
           <Route path="/admin/simple" element={<SimpleAdminLayout />}>

@@ -42,6 +42,7 @@ export const navIconTints: Record<string, string> = {
   "Foreign Currency Exchange": "text-indigo-600 dark:text-indigo-400",
   Wallets: "text-teal-600 dark:text-teal-400",
   Cards: "text-blue-600 dark:text-blue-400",
+  "Pay Bills": "text-blue-600 dark:text-blue-400",
   Finance: "text-emerald-600 dark:text-emerald-400",
   Operations: "text-cyan-600 dark:text-cyan-400",
   Admin: "text-rose-600 dark:text-rose-400",
@@ -120,6 +121,12 @@ export const navCellTones: Record<string, NavCellTone> = {
     active: "bg-teal-500/22 ring-1 ring-teal-500/45 shadow-[0_4px_14px_-6px_rgb(20_184_166/0.6)]",
     label: "text-teal-700 dark:text-teal-300",
   },
+  "Pay Bills": {
+    idle: "bg-blue-500/20",
+    hover: "group-hover/nav:bg-blue-500/22",
+    active: "bg-blue-500/22 ring-1 ring-blue-500/45 shadow-[0_4px_14px_-6px_rgb(59_130_246/0.6)]",
+    label: "text-blue-700 dark:text-blue-300",
+  },
   Cards: {
     idle: "bg-blue-500/20",
     hover: "group-hover/nav:bg-blue-500/22",
@@ -183,6 +190,7 @@ export const navShortLabels: Record<string, string> = {
   "Foreign Currency Exchange": "Exchange",
   Wallets: "Wallets",
   Cards: "Cards",
+  "Pay Bills": "Bills",
   Business: "Business",
   Finance: "Finance",
   Operations: "Operations",

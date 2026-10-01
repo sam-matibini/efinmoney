@@ -1,12 +1,12 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { Player } from "@remotion/player";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import LoadingSpinner from "@/components/LoadingSpinner";
-import { CheckCircle2 } from "lucide-react";
+import { CheckCircle2, Send } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { downloadTransferReceipt } from "@/lib/receipt";
 import {
@@ -46,6 +46,12 @@ interface Props {
 
 const TransferSuccess = ({ transferId, amount, currency, recipientName, targetFlag, onSendAnother }: Props) => {
   const [status, setStatus] = useState<string>("processing");
+  const [showDelivery, setShowDelivery] = useState(false);
+
+  useEffect(() => {
+    const t = window.setTimeout(() => setShowDelivery(true), 1100);
+    return () => window.clearTimeout(t);
+  }, []);
 
   useEffect(() => {
     if (!transferId) return;
@@ -86,29 +92,76 @@ const TransferSuccess = ({ transferId, amount, currency, recipientName, targetFl
 
   const s = liveStatus(status);
   const failed = ["failed", "reversed", "expired"].includes(status);
+  const amountLabel = `${currency} ${amount.toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
 
   return (
     <Card className="overflow-hidden">
       <CardContent className="p-0">
-        <Player
-          component={DeliverySequence}
-          inputProps={{
-            amount: amount.toFixed(2),
-            currency,
-            recipientName: recipientName || "your recipient",
-            sourceFlag: CURRENCY_FLAG[currency] || "💸",
-            targetFlag: targetFlag || "🌍",
-          }}
-          durationInFrames={DELIVERY_DURATION}
-          compositionWidth={DELIVERY_W}
-          compositionHeight={DELIVERY_H}
-          fps={30}
-          autoPlay
-          controls={false}
-          clickToPlay={false}
-          doubleClickToFullscreen={false}
-          style={{ width: "100%", aspectRatio: `${DELIVERY_W} / ${DELIVERY_H}` }}
-        />
+        <AnimatePresence mode="wait">
+          {!showDelivery ? (
+            <motion.div
+              key="sending"
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.35 }}
+              className="flex flex-col items-center justify-center gap-4 bg-gradient-to-b from-primary/10 to-transparent px-6 py-16 text-center"
+              style={{ aspectRatio: `${DELIVERY_W} / ${DELIVERY_H}` }}
+            >
+              <motion.div
+                animate={{ y: [0, -10, 0], rotate: [-4, 4, -4] }}
+                transition={{ duration: 1.2, repeat: Infinity, ease: "easeInOut" }}
+                className="flex h-16 w-16 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-lg shadow-primary/30"
+              >
+                <Send className="h-7 w-7" />
+              </motion.div>
+              <div>
+                <p className="font-display text-xl font-bold">Sending your money…</p>
+                <p className="mt-1 text-2xl font-extrabold text-primary">{amountLabel}</p>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  To {recipientName || "your recipient"}
+                </p>
+              </div>
+              <div className="flex gap-1.5">
+                {[0, 1, 2].map((i) => (
+                  <motion.span
+                    key={i}
+                    className="h-2 w-2 rounded-full bg-primary"
+                    animate={{ opacity: [0.35, 1, 0.35], scale: [0.8, 1.15, 0.8] }}
+                    transition={{ duration: 0.9, repeat: Infinity, delay: i * 0.15 }}
+                  />
+                ))}
+              </div>
+            </motion.div>
+          ) : (
+            <motion.div
+              key="delivery"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.4 }}
+            >
+              <Player
+                component={DeliverySequence}
+                inputProps={{
+                  amount: amount.toFixed(2),
+                  currency,
+                  recipientName: recipientName || "your recipient",
+                  sourceFlag: CURRENCY_FLAG[currency] || "💸",
+                  targetFlag: targetFlag || "🌍",
+                }}
+                durationInFrames={DELIVERY_DURATION}
+                compositionWidth={DELIVERY_W}
+                compositionHeight={DELIVERY_H}
+                fps={30}
+                autoPlay
+                controls={false}
+                clickToPlay={false}
+                doubleClickToFullscreen={false}
+                style={{ width: "100%", aspectRatio: `${DELIVERY_W} / ${DELIVERY_H}` }}
+              />
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         <div className="px-6 pb-8 pt-2 text-center">
           <motion.h3
@@ -117,7 +170,7 @@ const TransferSuccess = ({ transferId, amount, currency, recipientName, targetFl
             transition={{ delay: 0.2 }}
             className="font-display text-2xl font-bold"
           >
-            {failed ? "Transfer Failed" : s.done ? "Delivered! 🎉" : "Transfer Sent!"}
+            {failed ? "Transfer Failed" : s.done ? "Delivered! 🎉" : "Money sent"}
           </motion.h3>
 
           <div className="mt-3 flex justify-center">
@@ -132,15 +185,18 @@ const TransferSuccess = ({ transferId, amount, currency, recipientName, targetFl
           </div>
 
           <p className="mt-3 text-sm text-muted-foreground">
-            {currency} {amount.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+            {amountLabel}
             {s.done ? " was delivered to " : " is on its way to "}
             <span className="font-medium text-foreground">{recipientName}</span>
           </p>
 
           <div className="mt-6 flex flex-col justify-center gap-3 sm:flex-row">
+            <Button asChild>
+              <Link to="/dashboard">Done</Link>
+            </Button>
             {transferId && (
-              <Button asChild>
-                <Link to={`/transfers/${transferId}`}>Track your transfer</Link>
+              <Button variant="outline" asChild>
+                <Link to={`/transfers/${transferId}`}>Track transfer</Link>
               </Button>
             )}
             {transferId && (

@@ -3,7 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
   CreditCard, Droplet, Phone, Receipt, Tv, Wifi, Zap,
-  Loader2, CheckCircle2, AlertCircle, ArrowRight, Building2,
+  Loader2, CheckCircle2, AlertCircle, ArrowRight, Building2, Landmark,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -17,7 +17,6 @@ import { toast } from "sonner";
 import { findCountryById } from "@/lib/countries";
 import { BILL_PAYMENT_COUNTRIES, getCountryIso2 } from "@/lib/countryIso";
 import { productFeatures } from "@/lib/productFeatures";
-import SwychrAirtimePanel from "@/components/bills/SwychrAirtimePanel";
 import { useWallets } from "@/hooks/useWallets";
 import type { LucideIcon } from "lucide-react";
 import { CurrencyFlag } from "@/components/ui/FlagImage";
@@ -252,6 +251,7 @@ const PayBillsPage = () => {
           customerIdentifier: customer.trim(),
           amount: amt,
           currency,
+          walletId: walletId || undefined,
         },
       });
       if (error) throw error;
@@ -322,7 +322,30 @@ const PayBillsPage = () => {
               />
             </div>
 
-            {isCanada ? (
+            {isCanada && !productFeatures.caBillPay ? (
+              <div className="space-y-3">
+                {productFeatures.craPay && (
+                  <div className="rounded-xl border border-primary/30 bg-primary/5 p-5 space-y-3">
+                    <div className="flex items-start gap-3">
+                      <Landmark className="w-5 h-5 text-primary shrink-0 mt-0.5" />
+                      <div className="space-y-1">
+                        <p className="font-medium">Pay CRA taxes</p>
+                        <p className="text-sm text-muted-foreground">
+                          Personal and corporate income tax, payroll deductions, and GST/HST — paid from your CAD wallet.
+                        </p>
+                      </div>
+                    </div>
+                    <Button asChild className="w-full sm:w-auto">
+                      <Link to="/pay-cra">Pay CRA <ArrowRight className="w-4 h-4 ml-2" /></Link>
+                    </Button>
+                  </div>
+                )}
+                <div className="flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-sm">
+                  <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                  <p>Other Canadian bills (Rogers, Hydro One and more) are coming soon.</p>
+                </div>
+              </div>
+            ) : isCanada ? (
               <div className="rounded-xl border border-primary/30 bg-primary/5 p-5 space-y-3">
                 <div className="flex items-start gap-3">
                   <Building2 className="w-5 h-5 text-primary shrink-0 mt-0.5" />
@@ -353,7 +376,7 @@ const PayBillsPage = () => {
                   Instant bill catalog is not available for {country?.country || "this country"} yet.
                   {countryId === "United States" || countryId === "United Kingdom"
                     ? " US/UK bill pay is not available."
-                    : " Try Nigeria, Kenya, Ghana, South Africa, Uganda, or Canada (EFT)."}
+                    : ` Try Nigeria, Kenya, Ghana, South Africa${productFeatures.caBillPay ? ", Uganda, or Canada (EFT)." : ", or Uganda."}`}
                 </p>
               </div>
             ) : !categoriesSupported ? (
@@ -482,10 +505,6 @@ const PayBillsPage = () => {
               </Button>
             </CardContent>
           </Card>
-        )}
-
-        {productFeatures.swychr && !isCanada && (
-          <SwychrAirtimePanel countryId={countryId} currency={currency} />
         )}
       </motion.div>
     </main>

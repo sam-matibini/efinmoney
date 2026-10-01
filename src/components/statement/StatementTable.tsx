@@ -158,13 +158,15 @@ export const StatementTable = ({
               return (
                 <motion.div
                   key={r.id}
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ delay: i * 0.01 }}
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: i * 0.02, duration: 0.25 }}
+                  whileHover={{ y: -2 }}
+                  className="transition-shadow"
                 >
                   <Link
                     to={linkTo}
-                    className={`${gridCols(showBalance)} grid grid-cols-[1fr_auto] lg:gap-3 gap-2 px-4 py-3 hover:bg-muted/40 transition-colors items-center`}
+                    className={`${gridCols(showBalance)} grid grid-cols-[1fr_auto] lg:gap-3 gap-2 px-4 py-3 hover:bg-muted/40 hover:shadow-[0_6px_18px_-8px_rgba(84,67,232,0.35)] transition-all duration-200 items-center rounded-lg`}
                   >
                     {/* Date - mobile shows icon, desktop column */}
                     <div className="hidden lg:block text-[12px] text-muted-foreground tabular-nums">

@@ -36,8 +36,15 @@ Deno.serve(async (req) => {
     if (rl === false) return new Response(JSON.stringify({ error: "Too many requests" }), { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
     const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
-    const { data: wallet } = await admin.from("wallets").select("id").eq("user_id", userId).eq("currency_code", currency).maybeSingle();
+    const requestedWalletId = String(body?.walletId || body?.wallet_id || "").trim();
+    let walletQuery = admin.from("wallets").select("id, status")
+      .eq("user_id", userId).eq("currency_code", currency);
+    walletQuery = requestedWalletId
+      ? walletQuery.eq("id", requestedWalletId)
+      : walletQuery.eq("status", "active").order("is_default", { ascending: false }).order("created_at", { ascending: true });
+    const { data: wallet } = await walletQuery.limit(1).maybeSingle();
     if (!wallet) return new Response(JSON.stringify({ error: `No ${currency} wallet found` }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    if (wallet.status !== "active") return new Response(JSON.stringify({ error: "This wallet is not active" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     const { data: balData } = await admin.rpc("get_wallet_balance", { p_wallet_id: wallet.id });
     if (Number(balData || 0) < amount) return new Response(JSON.stringify({ error: "Insufficient balance" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 

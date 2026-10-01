@@ -12,6 +12,7 @@ export const NAV_ICON_FILES: Record<string, string> = {
   "Foreign Currency Exchange": "fx-exchange",
   Wallets: "wallets",
   Cards: "cards",
+  "Pay Bills": "pay-bills.svg",
   Business: "business",
   Finance: "finance",
   Operations: "operations",
@@ -21,7 +22,7 @@ export const NAV_ICON_FILES: Record<string, string> = {
 
 export function navIconSrc(label: string) {
   const file = NAV_ICON_FILES[label] ?? "dashboard";
-  return `/icons/nav/${file}.png`;
+  return `/icons/nav/${file.includes(".") ? file : `${file}.png`}`;
 }
 
 export const navIconImgClass = "w-5 h-5 sm:w-[22px] sm:h-[22px] shrink-0 object-contain drop-shadow-sm";

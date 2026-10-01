@@ -58,6 +58,7 @@ export const ADMIN_SEARCH_CATALOG: AdminSearchHit[] = [
   { id: "rate-card", label: "Rate card", group: "Partners & Pricing", to: "/admin/pricing?tab=rate-card", keywords: "customer fee" },
   { id: "nomba-fincra", label: "Nomba & Fincra", group: "Partners & Pricing", to: "/admin/nomba-fincra", keywords: "primary providers payout collect rates transactions interac" },
   { id: "ops", label: "Ops queue", group: "Partners & Pricing", to: "/admin/ops-queue", keywords: "transfers payout boost refund" },
+  { id: "cra", label: "CRA remittances", group: "Partners & Pricing", to: "/admin/cra-payments", keywords: "cra tax revenue agency bill pay remit sin business number" },
   { id: "api-mgmt", label: "Payment APIs", group: "Partners & Pricing", to: "/admin/api", keywords: "fincra paypal square flovide flutterwave test connection secrets" },
 
   { id: "kyc", label: "KYC Queue", group: "Queue", to: "/admin/kyc", keywords: "identity review" },

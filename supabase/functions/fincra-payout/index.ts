@@ -707,7 +707,8 @@ async function payoutCanadaCadViaFincra(opts: {
         business: cfg.businessId,
         sourceCurrency,
         destinationCurrency: "CAD",
-        description: `eFinMoney CAD ${isEft ? "EFT" : "Interac"} to ${opts.recipient_name}`,
+        description: String(opts.transfer.description || "").trim()
+          || `eFinMoney CAD ${isEft ? "EFT" : "Interac"} to ${opts.recipient_name}`,
         paymentDestination: "bank_account",
         paymentScheme: scheme,
         customerReference,

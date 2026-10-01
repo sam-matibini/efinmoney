@@ -1,6 +1,6 @@
 import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
-import { HandCoins, Send, Download, RefreshCw, Smartphone, Building2 } from "lucide-react";
+import { HandCoins, Send, Download, RefreshCw, Smartphone, Building2, Receipt } from "lucide-react";
 import SendMoneyModal from "@/components/modals/SendMoneyModal";
 import ExchangeModal from "@/components/modals/ExchangeModal";
 import { productFeatures } from "@/lib/productFeatures";
@@ -15,6 +15,7 @@ const allItems: Item[] = [
   { kind: "link", to: "/wallet/topup", icon: Download, label: "Add Money", color: "bg-primary/10 text-primary" },
   { kind: "link", to: "/request-money", icon: HandCoins, label: "Request", color: "bg-sky-500/15 text-sky-600 dark:text-sky-400" },
   { kind: "link", to: "/wallet/receive", icon: Smartphone, label: "Receive", color: "bg-indigo-500/15 text-indigo-600 dark:text-indigo-400" },
+  { kind: "link", to: "/pay-bills", icon: Receipt, label: "Pay Bills", color: "bg-rose-500/15 text-rose-600 dark:text-rose-400" },
   { kind: "modal", Modal: ExchangeModal, icon: RefreshCw, label: "Exchange", color: "bg-violet-500/15 text-violet-600 dark:text-violet-400" },
 ];
 
@@ -36,7 +37,7 @@ const ButtonInner = ({ icon: Icon, label, color }: { icon: any; label: string; c
       className="flex flex-col items-center gap-2 cursor-pointer"
     >
       <div
-        className={`relative w-14 h-14 rounded-2xl flex items-center justify-center ${color} shadow-sm transition-all group-hover:shadow-md group-hover:bg-gradient-to-br group-hover:from-primary/20 group-hover:to-primary/5 overflow-hidden`}
+        className={`relative w-14 h-14 rounded-full flex items-center justify-center ${color} shadow-sm transition-all group-hover:shadow-md group-hover:bg-gradient-to-br group-hover:from-primary/20 group-hover:to-primary/5 overflow-hidden`}
       >
         <motion.span variants={variant} transition={{ type: "spring", stiffness: 400, damping: 14 }} className="inline-flex">
           <Icon className="w-6 h-6" />
@@ -71,7 +72,9 @@ const QuickActions = () => {
           : bizStepPath[business.current_step] ?? "/onboarding/business/details";
 
   const items: Item[] = [
-    ...allItems.filter((item) => item.label !== "Request" || productFeatures.requestMoney),
+    ...allItems.filter((item) =>
+      (item.label !== "Request" || productFeatures.requestMoney)
+      && (item.label !== "Pay Bills" || productFeatures.billPay)),
     {
       kind: "link",
       to: businessTo,
