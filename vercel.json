@@ -4,7 +4,7 @@
   "buildCommand": "NODE_OPTIONS=--max-old-space-size=6144 npm run build && node scripts/verify-build.mjs",
   "outputDirectory": "dist",
   "rewrites": [
-    { "source": "/((?!assets/).*)", "destination": "/index.html" }
+    { "source": "/((?!assets/|api/).*)", "destination": "/index.html" }
   ],
   "headers": [
     {

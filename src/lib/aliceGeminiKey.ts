@@ -1,4 +1,4 @@
-const DEFAULT_MODEL = "gemini-2.5-flash";
+import { geminiKeyCandidates, looksLikeGeminiApiKey, normalizeGeminiApiKey } from "./geminiKeyShape.js";
 
 export type SavedSystemApiRow = {
   key: string;
@@ -6,54 +6,27 @@ export type SavedSystemApiRow = {
   config: unknown;
 };
 
-export function pickSavedGemini(rows: SavedSystemApiRow[]): { apiKey: string; model: string } | null {
-  const ranked = rows
-    .map((row) => {
-      const id = row.key.startsWith("system_api:") ? row.key.slice("system_api:".length) : "";
-      const config = readConfig(row.config);
-      const label = `${id} ${config.label}`.toLowerCase();
-      const gemini = id === "gemini" ? 2 : label.includes("gemini") ? 1 : 0;
-      return { enabled: row.is_enabled !== false, config, gemini };
-    })
-    .filter((row) => row.enabled && row.gemini > 0)
-    .sort((a, b) => b.gemini - a.gemini);
+export { geminiKeyCandidates, looksLikeGeminiApiKey, normalizeGeminiApiKey };
 
-  for (const row of ranked) {
-    const apiKey = firstSecret(row.config.secrets);
-    if (!apiKey) continue;
-    return { apiKey, model: row.config.model || DEFAULT_MODEL };
+export function pickSavedGemini(rows: SavedSystemApiRow[]): { apiKey: string; model: string } | null {
+  return geminiKeyCandidates(rows)[0] || null;
+}
+
+export function savedGeminiProblem(rows: SavedSystemApiRow[]): string | null {
+  const candidates = geminiKeyCandidates(rows);
+  if (candidates.some((item) => looksLikeGeminiApiKey(item.apiKey))) return null;
+  const labeled = rows.some((row) => {
+    const id = row.key.startsWith("system_api:") ? row.key.slice("system_api:".length) : row.key;
+    const config = row.config && typeof row.config === "object" ? row.config as { label?: string } : {};
+    return row.is_enabled !== false && (`${id} ${config.label || ""}`).toLowerCase().includes("gemini");
+  });
+  if (!labeled && candidates.length === 0) {
+    return "Save the Gemini API key on the Gemini card in System API, then try Alice again.";
+  }
+  if (!candidates.length) {
+    return "The value saved on the Gemini card is not a Google API key. In Google AI Studio, copy the key that starts with AIza and save it again.";
   }
   return null;
-}
-
-function readConfig(value: unknown): { label: string; model: string; secrets: Record<string, string> } {
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
-    return { label: "", model: "", secrets: {} };
-  }
-  const record = value as { label?: unknown; public_config?: unknown; secrets?: unknown };
-  const publicConfig = record.public_config && typeof record.public_config === "object"
-    ? record.public_config as { model?: unknown }
-    : {};
-  const secrets: Record<string, string> = {};
-  if (record.secrets && typeof record.secrets === "object" && !Array.isArray(record.secrets)) {
-    for (const [key, item] of Object.entries(record.secrets as Record<string, unknown>)) {
-      if (typeof item === "string") secrets[key] = item;
-    }
-  }
-  return {
-    label: typeof record.label === "string" ? record.label : "",
-    model: typeof publicConfig.model === "string" ? publicConfig.model.trim() : "",
-    secrets,
-  };
-}
-
-function firstSecret(secrets: Record<string, string>): string {
-  const preferred = secrets.api_key || secrets.apiKey || secrets.key || "";
-  if (preferred.trim()) return preferred.trim();
-  for (const value of Object.values(secrets)) {
-    if (value.trim()) return value.trim();
-  }
-  return "";
 }
 
 export function isMissingGeminiError(message: string): boolean {

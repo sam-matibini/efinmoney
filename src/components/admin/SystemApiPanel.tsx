@@ -106,6 +106,12 @@ export function SystemApiPanel({ preview }: { preview?: SystemApiProvider[] }) {
         const value = (draft.secrets[field.key] || "").trim();
         if (value) secrets[field.key] = value;
       }
+      if (
+        (provider.provider === "gemini" || /gemini/i.test(provider.label))
+        && Object.values(secrets).some((value) => value && !/AIza[0-9A-Za-z_-]{20,}/.test(value.replace(/\s+/g, "")))
+      ) {
+        toast.warning("That value does not look like a Gemini API key. Paste the key from Google AI Studio. It starts with AIza.");
+      }
       const providers = await saveSystemApi({
         provider,
         enabled: draft.enabled,

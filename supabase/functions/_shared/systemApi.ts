@@ -124,10 +124,19 @@ export async function geminiCredentials(): Promise<{ apiKey: string; model: stri
     resolveSystemSecret("gemini", "api_key", "GEMINI_API_KEY"),
     resolveSystemPublic("gemini", "model", modelDefault),
   ]);
-  if (apiKey) return { apiKey, model: model || "gemini-2.5-flash" };
+  const cleaned = cleanGeminiKey(apiKey);
+  if (cleaned) return { apiKey: cleaned, model: model || "gemini-2.5-flash" };
   const saved = await findLabeledGeminiKey();
   if (saved) return saved;
   return { apiKey: "", model: model || "gemini-2.5-flash" };
+}
+
+function cleanGeminiKey(raw: string): string {
+  const stripped = raw.replace(/[\u200B-\u200D\uFEFF]/g, "").replace(/\s+/g, "").replace(/^bearer\s+/i, "").replace(/^['"`]+|['"`]+$/g, "");
+  const match = stripped.match(/AIza[0-9A-Za-z_-]{20,}/);
+  if (match) return match[0];
+  if (/^\d+$/.test(stripped)) return "";
+  return stripped;
 }
 
 async function findLabeledGeminiKey(): Promise<{ apiKey: string; model: string } | null> {
@@ -144,19 +153,27 @@ async function findLabeledGeminiKey(): Promise<{ apiKey: string; model: string }
       const label = `${id} ${typeof config.label === "string" ? config.label : ""}`.toLowerCase();
       const rank = id === "gemini" ? 2 : label.includes("gemini") ? 1 : 0;
       const secrets = config.secrets && typeof config.secrets === "object" ? config.secrets as Record<string, unknown> : {};
-      const preferred = [secrets.api_key, secrets.apiKey, secrets.key].find((value) => typeof value === "string" && value.trim());
-      const fallback = Object.values(secrets).find((value) => typeof value === "string" && value.trim());
-      const apiKey = preferred || fallback;
+      const values = [secrets.api_key, secrets.apiKey, secrets.key, ...Object.values(secrets)]
+        .filter((value): value is string => typeof value === "string")
+        .map((value) => cleanGeminiKey(value))
+        .filter(Boolean);
+      const apiKey = values.find((value) => /^AIza/.test(value)) || values[0] || "";
       const publicConfig = config.public_config && typeof config.public_config === "object"
         ? config.public_config as Record<string, unknown>
         : {};
       const model = typeof publicConfig.model === "string" && publicConfig.model.trim()
         ? publicConfig.model.trim()
         : "gemini-2.5-flash";
-      return { enabled: row.is_enabled !== false, rank, apiKey: typeof apiKey === "string" ? apiKey.trim() : "", model };
+      return {
+        enabled: row.is_enabled !== false,
+        rank,
+        shaped: apiKey.startsWith("AIza"),
+        apiKey,
+        model,
+      };
     })
     .filter((row) => row.enabled && row.rank > 0 && row.apiKey)
-    .sort((a, b) => b.rank - a.rank);
+    .sort((a, b) => Number(b.shaped) - Number(a.shaped) || b.rank - a.rank);
   const match = ranked[0];
   return match ? { apiKey: match.apiKey, model: match.model } : null;
 }

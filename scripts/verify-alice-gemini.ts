@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
-import { isMissingGeminiError, pickSavedGemini, shouldUseSavedGemini } from "../src/lib/aliceGeminiKey.ts";
+import { isMissingGeminiError, pickSavedGemini, savedGeminiProblem, shouldUseSavedGemini } from "../src/lib/aliceGeminiKey.ts";
+import { normalizeGeminiApiKey, redactGeminiSecret } from "../src/lib/geminiKeyShape.js";
 
 assert.equal(
   isMissingGeminiError("Alice is not configured yet (missing GEMINI_API_KEY)."),
@@ -72,5 +73,30 @@ const alternateField = pickSavedGemini([
 ]);
 assert.ok(alternateField);
 assert.equal(alternateField.apiKey, "labeled-secret");
+
+const pasted = "AIzaSyPASTEDKEY01234567890123456789012";
+const preferred = pickSavedGemini([
+  {
+    key: "system_api:gemini",
+    is_enabled: true,
+    config: { label: "Gemini", secrets: { api_key: "909681129488", token: `  '${pasted}'  ` } },
+  },
+]);
+assert.ok(preferred);
+assert.equal(preferred.apiKey, pasted);
+assert.equal(normalizeGeminiApiKey(`Bearer \n${pasted}\n`), pasted);
+assert.equal(normalizeGeminiApiKey("909681129488"), "");
+assert.equal(redactGeminiSecret(`key ${pasted} leaked`), "key AIza… leaked");
+
+const projectOnly = [
+  {
+    key: "system_api:gemini",
+    is_enabled: true,
+    config: { label: "Gemini", secrets: { api_key: "909681129488" } },
+  },
+];
+assert.equal(pickSavedGemini(projectOnly), null);
+assert.match(savedGeminiProblem(projectOnly) || "", /starts with AIza/);
+assert.match(savedGeminiProblem([]) || "", /Save the Gemini API key/);
 
 console.log("alice gemini key checks passed");
