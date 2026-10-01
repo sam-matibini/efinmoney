@@ -4,9 +4,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { corsPreflightResponse, jsonResponse } from "../_shared/cors.ts";
 import { EFINMONEY_KNOWLEDGE, EFINMONEY_ADMIN_KNOWLEDGE } from "../_shared/alice-knowledge.ts";
-
-const MODEL = "gemini-3.5-flash";
-const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`;
+import { geminiCredentials } from "../_shared/systemApi.ts";
 const MAX_OUTPUT_TOKENS = 1024;
 const MAX_TOOL_ITERATIONS = 4;
 
@@ -122,8 +120,9 @@ async function runTool(name: string, args: Record<string, unknown>, sb: Any, use
   }
 }
 
-async function callGemini(apiKey: string, systemInstruction: string, contents: Any[], tools: Any[]) {
-  return await fetch(GEMINI_URL, {
+async function callGemini(apiKey: string, model: string, systemInstruction: string, contents: Any[], tools: Any[]) {
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
+  return await fetch(url, {
     method: "POST",
     headers: { "content-type": "application/json", "x-goog-api-key": apiKey },
     body: JSON.stringify({
@@ -151,8 +150,8 @@ Deno.serve(async (req) => {
     const { data: { user } } = await sb.auth.getUser();
     if (!user) return jsonResponse({ error: "Unauthorized" }, 401);
 
-    const apiKey = Deno.env.get("GEMINI_API_KEY");
-    if (!apiKey) return jsonResponse({ error: "Alice is not configured yet (missing GEMINI_API_KEY)." }, 500);
+    const { apiKey, model } = await geminiCredentials();
+    if (!apiKey) return jsonResponse({ error: "Alice is not configured yet (missing Gemini API key)." }, 500);
 
     const body = await req.json().catch(() => ({}));
     const history: { role: string; content: string }[] = Array.isArray(body?.messages) ? body.messages : [];
@@ -185,7 +184,7 @@ Deno.serve(async (req) => {
     const toolsUsed: string[] = [];
 
     for (let i = 0; i < MAX_TOOL_ITERATIONS; i++) {
-      const res = await callGemini(apiKey, systemInstruction, contents, tools);
+      const res = await callGemini(apiKey, model, systemInstruction, contents, tools);
       if (res.status === 429) return jsonResponse({ error: "Alice is busy, please try again in a moment." }, 429);
       if (!res.ok) {
         const errBody = await res.json().catch(() => ({}));
@@ -219,7 +218,7 @@ Deno.serve(async (req) => {
     }
 
     // Ran out of tool iterations (or empty turn) — ask for a final answer with no tools.
-    const finalRes = await callGemini(apiKey, systemInstruction, contents, []);
+    const finalRes = await callGemini(apiKey, model, systemInstruction, contents, []);
     if (!finalRes.ok) return jsonResponse({ error: "AI error (final)" }, 502);
     const finalJson = await finalRes.json();
     const finalParts: Any[] = finalJson?.candidates?.[0]?.content?.parts || [];

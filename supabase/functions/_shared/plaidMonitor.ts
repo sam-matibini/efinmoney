@@ -1,4 +1,4 @@
-import { plaidErrorMessage, plaidFetch } from "./plaid.ts";
+import { ensurePlaid, plaidErrorMessage, plaidFetch, plaidMonitorProgramId } from "./plaid.ts";
 
 function splitName(full: string): { given: string; family: string } {
   const parts = full.trim().split(/\s+/).filter(Boolean);
@@ -23,7 +23,8 @@ export async function upsertPlaidMonitorIndividual(
     dateOfBirth?: string;
   },
 ): Promise<{ ok: true; screening_id: string; status: string } | { ok: false; skipped?: boolean; error: string }> {
-  const programId = (Deno.env.get("PLAID_MONITOR_PROGRAM_ID") || "").trim();
+  await ensurePlaid();
+  const programId = plaidMonitorProgramId();
 
   let given = opts.givenName || "";
   let family = opts.familyName || "";

@@ -1,17 +1,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { corsPreflightResponse, jsonResponse } from "../_shared/cors.ts";
 import { toE164 } from "../_shared/phone-e164.ts";
-
-const ALLOWED_ENVS = new Set(["sandbox", "development", "production"]);
-const RAW_ENV = (Deno.env.get("PLAID_ENV") || "production").trim().toLowerCase();
-const PLAID_ENV = ALLOWED_ENVS.has(RAW_ENV) ? RAW_ENV : "production";
-const PLAID_BASE = `https://${PLAID_ENV}.plaid.com`;
-
-function plaidCredentials() {
-  const clientId = (Deno.env.get("PLAID_CLIENT_ID") || "").trim();
-  const secret = (Deno.env.get("PLAID_SECRET") || "").trim();
-  return { clientId, secret };
-}
+import { ensurePlaid, plaidBaseUrl, plaidCredentials, plaidEnv } from "../_shared/plaid.ts";
 
 /** NANP (+1) mobiles only — what Plaid Returning User accepts for CA/US. */
 function nanpE164(phone: string | null | undefined, countryHint?: string | null): string | undefined {
@@ -37,6 +27,9 @@ Deno.serve(async (req) => {
     const { data: { user }, error: authErr } = await supabase.auth.getUser(auth.replace("Bearer ", ""));
     if (authErr || !user) return jsonResponse({ error: "Unauthorized" }, 401);
 
+    await ensurePlaid();
+    const PLAID_ENV = plaidEnv();
+    const PLAID_BASE = plaidBaseUrl();
     const { clientId, secret } = plaidCredentials();
     if (!clientId || !secret) {
       return jsonResponse({

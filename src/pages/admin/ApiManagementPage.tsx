@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,7 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import {
-  Activity, CheckCircle2, AlertTriangle, Plug, Webhook, Code2,
+  Activity, CheckCircle2, AlertTriangle, Plug, Webhook, Code2, KeyRound,
   Eye, RefreshCw, Lock, Globe, Server, ShieldCheck, ArrowRight,
   XCircle, Zap,
 } from "lucide-react";
@@ -19,6 +20,7 @@ import { formatDistanceToNow } from "date-fns";
 import { cn } from "@/lib/utils";
 import AdminLayout from "@/components/admin-portal/AdminLayout";
 import TopScrollSync from "@/components/admin-portal/TopScrollSync";
+import { SystemApiPanel } from "@/components/admin/SystemApiPanel";
 
 type IntegrationKey = string;
 
@@ -324,6 +326,8 @@ const EDGE_FUNCTIONS: Array<{ name: string; description: string; jwt: boolean; c
 ];
 
 export default function ApiManagementPage() {
+  const [params] = useSearchParams();
+  const initialTab = params.get("tab") === "system-api" ? "system-api" : "integrations";
   const [selectedPayload, setSelectedPayload] = useState<{ provider: string; event: string; payload: unknown } | null>(null);
   const [probeOpen, setProbeOpen] = useState(false);
   const [probeTitle, setProbeTitle] = useState("");
@@ -555,9 +559,10 @@ export default function ApiManagementPage() {
         </div>
       </Link>
 
-      <Tabs defaultValue="integrations" className="w-full">
-        <TabsList className="grid w-full grid-cols-3 max-w-2xl">
+      <Tabs defaultValue={initialTab} className="w-full">
+        <TabsList className="flex h-auto w-full max-w-3xl flex-wrap justify-start">
           <TabsTrigger value="integrations" className="gap-2"><Plug className="h-4 w-4" />Integrations</TabsTrigger>
+          <TabsTrigger value="system-api" className="gap-2"><KeyRound className="h-4 w-4" />System API</TabsTrigger>
           <TabsTrigger value="webhooks" className="gap-2"><Webhook className="h-4 w-4" />Webhook Logs</TabsTrigger>
           <TabsTrigger value="functions" className="gap-2"><Code2 className="h-4 w-4" />Edge Functions</TabsTrigger>
         </TabsList>
@@ -705,6 +710,10 @@ export default function ApiManagementPage() {
               </div>
             );
           })}
+        </TabsContent>
+
+        <TabsContent value="system-api" className="mt-6">
+          <SystemApiPanel />
         </TabsContent>
 
         {/* Webhook logs */}

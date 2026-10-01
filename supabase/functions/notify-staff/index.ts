@@ -4,6 +4,7 @@
 // assignment: an unassigned thread alerts every admin, an assigned one only its
 // assignee. Called client-side after thread/message insert — no JWT required.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { resendCredentials } from "../_shared/systemApi.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -13,7 +14,6 @@ const corsHeaders = {
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
-const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY") || "";
 const FROM = "eFinMoney Support <noreply@efinsuite.com>";
 const SUPPORT_TO = Deno.env.get("SUPPORT_INBOX") || "support@efin.money";
 const ADMIN_SUPPORT_URL = "https://efin.money/admin/support";
@@ -57,6 +57,7 @@ async function adminBccList(threadId: string): Promise<string[]> {
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
+  const { apiKey: RESEND_API_KEY, from: savedFrom } = await resendCredentials();
   if (!RESEND_API_KEY) return json({ error: "Email not configured" }, 500);
 
   try {
@@ -92,7 +93,7 @@ Deno.serve(async (req) => {
       </div>`;
 
     const bcc = await adminBccList(thread_id);
-    const payload: Record<string, unknown> = { from: FROM, to: [SUPPORT_TO], subject: emailSubject, html };
+    const payload: Record<string, unknown> = { from: savedFrom || FROM, to: [SUPPORT_TO], subject: emailSubject, html };
     if (bcc.length) payload.bcc = bcc;
 
     const res = await fetch("https://api.resend.com/emails", {

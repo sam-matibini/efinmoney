@@ -1,4 +1,5 @@
 import { motion } from "framer-motion";
+import { useSearchParams } from "react-router-dom";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PricingSettingsPanel } from "@/components/settings/PricingSettingsPanel";
 import PricingRatesPanel from "@/components/settings/PricingRatesPanel";
@@ -7,12 +8,18 @@ import { SystemSettingsPanel } from "@/components/settings/SystemSettingsPanel";
 import { IntegrationsPanel } from "@/components/settings/IntegrationsPanel";
 import { CurrencyManagementPanel } from "@/components/settings/CurrencyManagementPanel";
 import { CircleCpnConfigPanel } from "@/components/settings/CircleCpnConfigPanel";
+import { SystemApiPanel } from "@/components/admin/SystemApiPanel";
 import PageHeroBanner from "@/components/common/PageHeroBanner";
 import AppPage from "@/components/layout/AppPage";
 import SectionBoundary from "@/components/common/SectionBoundary";
 import { Settings, Plug, SlidersHorizontal } from "lucide-react";
 
+const SETTINGS_TABS = new Set(["pricing", "legacy-fees", "currencies", "modules", "integrations", "system-api", "circle_cpn", "system"]);
+
 const SettingsDashboard = () => {
+  const [params] = useSearchParams();
+  const requested = params.get("tab") || "";
+  const initialTab = SETTINGS_TABS.has(requested) ? requested : "pricing";
   return (
     <AppPage width="wide">
         <motion.div
@@ -36,7 +43,7 @@ const SettingsDashboard = () => {
             variant="accent"
           />
 
-          <Tabs defaultValue="pricing" className="space-y-4">
+          <Tabs defaultValue={initialTab} className="space-y-4">
             <div className="overflow-x-auto pb-2">
               <TabsList className="inline-flex w-auto min-w-full lg:min-w-0">
                 <TabsTrigger value="pricing">Pricing & Fees</TabsTrigger>
@@ -44,6 +51,7 @@ const SettingsDashboard = () => {
                 <TabsTrigger value="currencies">Currencies</TabsTrigger>
                 <TabsTrigger value="modules">Module Access</TabsTrigger>
                 <TabsTrigger value="integrations">Integrations</TabsTrigger>
+                <TabsTrigger value="system-api">System API</TabsTrigger>
                 <TabsTrigger value="circle_cpn">Circle CPN</TabsTrigger>
                 <TabsTrigger value="system">System Settings</TabsTrigger>
               </TabsList>
@@ -67,6 +75,10 @@ const SettingsDashboard = () => {
 
             <TabsContent value="integrations" className="space-y-4">
               <SectionBoundary name="IntegrationsPanel"><IntegrationsPanel /></SectionBoundary>
+            </TabsContent>
+
+            <TabsContent value="system-api" className="space-y-4">
+              <SectionBoundary name="SystemApiPanel"><SystemApiPanel /></SectionBoundary>
             </TabsContent>
 
             <TabsContent value="circle_cpn" className="space-y-4">

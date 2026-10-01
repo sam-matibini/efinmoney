@@ -1,6 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { corsPreflightResponse, jsonResponse } from "../_shared/cors.ts";
-import { plaidConfigured, plaidErrorMessage, plaidFetch } from "../_shared/plaid.ts";
+import { plaidErrorMessage, plaidFetch, plaidReady } from "../_shared/plaid.ts";
 import { applyPlaidIdvToKyc } from "../_shared/plaidIdv.ts";
 import { upsertPlaidMonitorIndividual } from "../_shared/plaidMonitor.ts";
 
@@ -9,7 +9,7 @@ Deno.serve(async (req) => {
   if (req.method !== "POST") return jsonResponse({ error: "Method not allowed" }, 405);
 
   try {
-    if (!plaidConfigured()) return jsonResponse({ error: "Plaid not configured" }, 500);
+    if (!(await plaidReady())) return jsonResponse({ error: "Plaid not configured" }, 500);
 
     const payload = await req.json().catch(() => ({})) as Record<string, unknown>;
     const webhookType = String(payload.webhook_type || "").toUpperCase();

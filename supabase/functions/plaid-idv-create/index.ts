@@ -1,6 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { corsPreflightResponse, jsonResponse } from "../_shared/cors.ts";
-import { plaidConfigured, plaidErrorMessage, plaidFetch, plaidEnv } from "../_shared/plaid.ts";
+import { plaidEnv, plaidErrorMessage, plaidFetch, plaidIdvTemplateId, plaidReady } from "../_shared/plaid.ts";
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return corsPreflightResponse();
   if (req.method !== "POST") return jsonResponse({ error: "Method not allowed" }, 405);
@@ -8,11 +8,11 @@ Deno.serve(async (req) => {
   try {
     const auth = req.headers.get("Authorization");
     if (!auth?.startsWith("Bearer ")) return jsonResponse({ error: "Unauthorized" }, 401);
-    if (!plaidConfigured()) {
+    if (!(await plaidReady())) {
       return jsonResponse({ error: "Plaid is not configured" }, 500);
     }
 
-    const templateId = (Deno.env.get("PLAID_IDV_TEMPLATE_ID") || "").trim();
+    const templateId = plaidIdvTemplateId();
     if (!templateId) {
       return jsonResponse({
         error: "PLAID_IDV_TEMPLATE_ID is not set. Create an Identity Verification template in Plaid Dashboard.",

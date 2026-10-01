@@ -2,6 +2,7 @@
 // Body: { type: 'welcome' | 'transfer_completed' | 'transfer_apology_completed' | 'kyc_update' | 'kyb_update' | 'topup_completed' | 'payment_link' | 'password_reset' | 'signup_confirmation' | 'email_change', to: string, data?: Record<string, any> }
 
 import { brandAuthActionLink, getPublicAppOrigin } from "../_shared/authConfirmLink.ts";
+import { resendCredentials } from "../_shared/systemApi.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -476,7 +477,7 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
+    const { apiKey: RESEND_API_KEY, from: savedFrom } = await resendCredentials();
     if (!RESEND_API_KEY) {
       return new Response(JSON.stringify({ error: "RESEND_API_KEY not configured" }), {
         status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -573,7 +574,7 @@ Deno.serve(async (req) => {
         "Content-Type": "application/json",
         Authorization: `Bearer ${RESEND_API_KEY}`,
       },
-      body: JSON.stringify({ from: FROM, to: [to], cc, subject, html }),
+      body: JSON.stringify({ from: savedFrom || FROM, to: [to], cc, subject, html }),
     });
 
     const body = await res.json();

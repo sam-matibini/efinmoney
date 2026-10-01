@@ -1,3 +1,5 @@
+import { resendCredentials } from "../_shared/systemApi.ts";
+
 // Emails a guest (no-account) customer when support staff reply to their
 // thread. Guest threads come from the public Contact form / live chat and have
 // no in-app bell, so email is how the reply reaches them.
@@ -9,7 +11,6 @@ const corsHeaders = {
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
-const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY") || "";
 const FROM = "eFinMoney Support <noreply@efinsuite.com>";
 const REPLY_TO = Deno.env.get("SUPPORT_INBOX") || "support@efin.money";
 
@@ -19,6 +20,7 @@ const isEmail = (s: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s);
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
+  const { apiKey: RESEND_API_KEY, from: savedFrom } = await resendCredentials();
   if (!RESEND_API_KEY) return json({ error: "Email not configured" }, 500);
 
   try {
@@ -47,7 +49,7 @@ Deno.serve(async (req) => {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${RESEND_API_KEY}` },
       body: JSON.stringify({
-        from: FROM,
+        from: savedFrom || FROM,
         to: [String(guest_email)],
         reply_to: REPLY_TO,
         subject: `Re: ${ticket}`,

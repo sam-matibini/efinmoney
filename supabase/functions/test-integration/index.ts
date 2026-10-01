@@ -1,5 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { ensurePlaid, plaidCredentials, plaidEnv } from "../_shared/plaid.ts";
+import { geminiCredentials, resendCredentials } from "../_shared/systemApi.ts";
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -33,11 +35,15 @@ async function testPaysafe(): Promise<TestResult> {
 }
 
 async function testPlaid(): Promise<TestResult> {
-  const clientId = Deno.env.get("PLAID_CLIENT_ID")!;
-  const secret = Deno.env.get("PLAID_SECRET")!;
-  const host = (Deno.env.get("PLAID_ENV") || "production") === "sandbox"
+  await ensurePlaid();
+  const { clientId, secret } = plaidCredentials();
+  if (!clientId || !secret) return { ok: false, message: "Not configured — missing Plaid client ID or secret" };
+  const env = plaidEnv();
+  const host = env === "sandbox"
     ? "https://sandbox.plaid.com"
-    : "https://production.plaid.com";
+    : env === "development"
+      ? "https://development.plaid.com"
+      : "https://production.plaid.com";
   const r = await fetch(`${host}/institutions/get`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -88,8 +94,20 @@ async function testCircle(): Promise<TestResult> {
   return { ok: false, message: `Circle error ${r.status}`, detail: (await r.text()).slice(0, 200) };
 }
 
+async function testGemini(): Promise<TestResult> {
+  const { apiKey, model } = await geminiCredentials();
+  if (!apiKey) return { ok: false, message: "Not configured — missing Gemini API key" };
+  const r = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}`,
+    { headers: { "x-goog-api-key": apiKey } },
+  );
+  if (r.ok) return { ok: true, message: `Connected — Gemini model ${model} is reachable` };
+  return { ok: false, message: `Gemini error ${r.status}`, detail: (await r.text()).slice(0, 200) };
+}
+
 async function testResend(): Promise<TestResult> {
-  const key = Deno.env.get("RESEND_API_KEY")!;
+  const { apiKey: key } = await resendCredentials();
+  if (!key) return { ok: false, message: "Not configured — missing Resend API key" };
   const r = await fetch("https://api.resend.com/domains", {
     headers: { Authorization: `Bearer ${key}` },
   });
@@ -208,7 +226,8 @@ const PROVIDERS: Record<string, { required: string[]; live?: () => Promise<TestR
   wise:        { required: ["WISE_API_TOKEN"] },
   verto:       { required: ["VERTO_CLIENT_ID", "VERTO_API_KEY"], live: testVerto },
   // Banking
-  plaid:       { required: ["PLAID_CLIENT_ID", "PLAID_SECRET"], live: testPlaid },
+  plaid:       { required: [], live: testPlaid },
+  gemini:      { required: [], live: testGemini },
   interac:     { required: ["INTERAC_CLIENT_ID", "INTERAC_PRIVATE_JWK"] },
   // Crypto & stablecoin
   circle:      { required: ["CIRCLE_API_KEY"], live: testCircle },
@@ -218,7 +237,7 @@ const PROVIDERS: Record<string, { required: string[]; live?: () => Promise<TestR
   persona:     { required: ["PERSONA_API_KEY"], live: testPersona },
   sumsub:      { required: ["SUMSUB_APP_TOKEN", "SUMSUB_SECRET_KEY"] },
   // Messaging
-  resend:      { required: ["RESEND_API_KEY"], live: testResend },
+  resend:      { required: [], live: testResend },
 };
 
 async function testProvider(provider: string): Promise<TestResult> {

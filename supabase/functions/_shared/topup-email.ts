@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { resendCredentials } from "./systemApi.ts";
 
 type Admin = ReturnType<typeof createClient>;
 
@@ -53,7 +54,7 @@ export async function sendTopupEmail(
     const email = profile?.email;
     if (!email) return;
 
-    const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
+    const { apiKey: RESEND_API_KEY, from: savedFrom } = await resendCredentials();
     if (!RESEND_API_KEY) return;
 
     const appUrl = (Deno.env.get("APP_URL") || "https://www.efin.money").replace(/\/+$/, "");
@@ -67,7 +68,7 @@ export async function sendTopupEmail(
         Authorization: `Bearer ${RESEND_API_KEY}`,
       },
       body: JSON.stringify({
-        from: "eFinMoney <noreply@efinsuite.com>",
+        from: savedFrom || "eFinMoney <noreply@efinsuite.com>",
         to: [email],
         cc: ["support@efin.money"],
         subject: `Wallet topped up — ${sym}${amount.toFixed(2)} ${currency}`,

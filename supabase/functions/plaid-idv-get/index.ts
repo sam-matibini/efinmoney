@@ -1,6 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { corsPreflightResponse, jsonResponse } from "../_shared/cors.ts";
-import { plaidConfigured, plaidErrorMessage, plaidFetch } from "../_shared/plaid.ts";
+import { plaidErrorMessage, plaidFetch, plaidReady } from "../_shared/plaid.ts";
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return corsPreflightResponse();
@@ -9,7 +9,7 @@ Deno.serve(async (req) => {
   try {
     const auth = req.headers.get("Authorization");
     if (!auth?.startsWith("Bearer ")) return jsonResponse({ error: "Unauthorized" }, 401);
-    if (!plaidConfigured()) return jsonResponse({ error: "Plaid is not configured" }, 500);
+    if (!(await plaidReady())) return jsonResponse({ error: "Plaid is not configured" }, 500);
 
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,

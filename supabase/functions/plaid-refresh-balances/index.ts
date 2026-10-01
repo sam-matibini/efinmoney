@@ -1,24 +1,16 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { corsPreflightResponse, jsonResponse } from "../_shared/cors.ts";
 import { plaidBalanceFields } from "../_shared/plaidBalances.ts";
+import { ensurePlaid, plaidBaseUrl, plaidCredentials, plaidEnv } from "../_shared/plaid.ts";
 
-const ALLOWED_ENVS = new Set(["sandbox", "development", "production"]);
-const RAW_ENV = (Deno.env.get("PLAID_ENV") || "production").trim().toLowerCase();
-const PLAID_ENV = ALLOWED_ENVS.has(RAW_ENV) ? RAW_ENV : "production";
-const PLAID_BASE = `https://${PLAID_ENV}.plaid.com`;
 const MIN_REFRESH_MS = 60_000;
-
-function plaidCredentials() {
-  const clientId = (Deno.env.get("PLAID_CLIENT_ID") || "").trim();
-  const secret = (Deno.env.get("PLAID_SECRET") || "").trim();
-  return { clientId, secret };
-}
 
 type PlaidError = Error & { code?: string };
 
 async function plaid(path: string, body: Record<string, unknown>) {
+  await ensurePlaid();
   const { clientId, secret } = plaidCredentials();
-  const res = await fetch(`${PLAID_BASE}${path}`, {
+  const res = await fetch(`${plaidBaseUrl()}${path}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ client_id: clientId, secret, ...body }),
@@ -54,6 +46,7 @@ Deno.serve(async (req) => {
     const { data: { user }, error: authErr } = await supabase.auth.getUser(auth.replace("Bearer ", ""));
     if (authErr || !user) return jsonResponse({ error: "Unauthorized" }, 401);
 
+    await ensurePlaid();
     const { clientId, secret } = plaidCredentials();
     if (!clientId || !secret) {
       return jsonResponse({
@@ -167,7 +160,7 @@ Deno.serve(async (req) => {
       skipped,
       accounts: latest || [],
       errors,
-      plaid_env: PLAID_ENV,
+      plaid_env: plaidEnv(),
     });
   } catch (e) {
     console.error("plaid-refresh-balances error", e);

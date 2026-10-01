@@ -1,4 +1,5 @@
 // Send a statement attachment via Resend.
+import { resendCredentials } from "../_shared/systemApi.ts";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
@@ -10,7 +11,7 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   try {
-    const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
+    const { apiKey: RESEND_API_KEY, from: savedFrom } = await resendCredentials();
     if (!RESEND_API_KEY) {
       return new Response(JSON.stringify({ error: "Email service not configured" }), {
         status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -43,7 +44,7 @@ Deno.serve(async (req) => {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        from: FROM,
+        from: savedFrom || FROM,
         to: [to],
         subject: title || "Your eFinMoney statement",
         html,

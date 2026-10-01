@@ -59,7 +59,7 @@ export const ADMIN_SEARCH_CATALOG: AdminSearchHit[] = [
   { id: "nomba-fincra", label: "Nomba & Fincra", group: "Partners & Pricing", to: "/admin/nomba-fincra", keywords: "primary providers payout collect rates transactions interac" },
   { id: "ops", label: "Ops queue", group: "Partners & Pricing", to: "/admin/ops-queue", keywords: "transfers payout boost refund" },
   { id: "cra", label: "CRA remittances", group: "Partners & Pricing", to: "/admin/cra-payments", keywords: "cra tax revenue agency bill pay remit sin business number" },
-  { id: "api-mgmt", label: "Payment APIs", group: "Partners & Pricing", to: "/admin/api", keywords: "fincra paypal square flovide flutterwave test connection secrets" },
+  { id: "api-mgmt", label: "Payment APIs", group: "Partners & Pricing", to: "/admin/api?tab=system-api", keywords: "fincra paypal square flovide flutterwave test connection secrets gemini alice plaid resend system api" },
 
   { id: "kyc", label: "KYC Queue", group: "Queue", to: "/admin/kyc", keywords: "identity review" },
   { id: "kyb", label: "KYB Queue", group: "Queue", to: "/admin/kyb", keywords: "business" },
@@ -110,6 +110,7 @@ export const ADMIN_SEARCH_CATALOG: AdminSearchHit[] = [
   { id: "oprisk", label: "Operational risk", group: "Security", to: "/admin/operational-risks", keywords: "" },
 
   { id: "settings", label: "Settings", group: "System", to: "/admin/settings", keywords: "" },
+  { id: "system-api", label: "System API", group: "System", to: "/admin/settings?tab=system-api", keywords: "gemini alice plaid resend api key" },
   { id: "diag", label: "Diagnostics", group: "System", to: "/admin/diagnostics", keywords: "" },
   { id: "export", label: "Data export", group: "System", to: "/admin/data-export", keywords: "" },
 

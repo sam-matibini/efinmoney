@@ -3,6 +3,7 @@
 // and interaction records (calls, meetings, notes) are stored as "logged"
 // rather than pretending they were delivered.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { resendCredentials } from "../_shared/systemApi.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -150,7 +151,7 @@ Deno.serve(async (req) => {
     };
 
     if (channel === "email") {
-      const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
+      const { apiKey: RESEND_API_KEY, from: savedFrom } = await resendCredentials();
       if (!RESEND_API_KEY) {
         status = "failed";
         errorMessage = "Email provider is not configured";
@@ -162,7 +163,7 @@ Deno.serve(async (req) => {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            from: FROM,
+            from: savedFrom || FROM,
             to: [recipientEmail],
             subject,
             html: emailHtml({ recipientName, subject, content, links }),

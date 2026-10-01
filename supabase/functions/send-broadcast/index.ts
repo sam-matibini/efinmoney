@@ -3,6 +3,7 @@
 //   { mode: "send", broadcast_id }  — admin "Send now" (staff JWT or internal secret)
 //   { mode: "dispatch_due" }        — pg_cron picks up scheduled broadcasts (internal secret)
 import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { resendCredentials } from "../_shared/systemApi.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -15,7 +16,6 @@ const json = (body: unknown, status = 200) =>
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
-const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY") || "";
 const EMAIL_FROM = "eFinMoney <noreply@efinsuite.com>";
 const UNSUB_SECRET = Deno.env.get("UNSUBSCRIBE_SECRET") || SERVICE_KEY;
 
@@ -93,11 +93,12 @@ async function resolveAudience(db: SupabaseClient, audience: Record<string, unkn
 
 async function sendEmails(recipients: Recipient[], title: string, body: string): Promise<Set<string>> {
   const emailed = new Set<string>();
+  const { apiKey: RESEND_API_KEY, from: savedFrom } = await resendCredentials();
   if (!RESEND_API_KEY) return emailed;
   const targets = recipients.filter((r) => r.email && !r.email_opt_out);
   for (const group of chunk(targets, 100)) {
     const payload = await Promise.all(group.map(async (r) => ({
-      from: EMAIL_FROM,
+      from: savedFrom || EMAIL_FROM,
       to: [r.email!],
       subject: title,
       html: await emailHtml(title, body, r.user_id),

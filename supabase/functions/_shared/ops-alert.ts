@@ -2,6 +2,8 @@
  * Ops alert email — plain-English briefs for non-dev admins.
  * Default recipient: ukwenzyb@gmail.com (override via OPS_ALERT_EMAIL).
  */
+import { resendCredentials } from "./systemApi.ts";
+
 const DEFAULT_OPS_EMAIL = "ukwenzyb@gmail.com";
 const FROM = "eFinMoney Ops <noreply@efinsuite.com>";
 const OPS_QUEUE_URL = "https://www.efin.money/admin/ops-queue";
@@ -292,7 +294,7 @@ export function opsAlertEmail(): string {
 }
 
 async function sendOpsEmail(subject: string, html: string): Promise<{ sent: boolean; error?: string }> {
-  const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY") || "";
+  const { apiKey: RESEND_API_KEY, from: savedFrom } = await resendCredentials();
   if (!RESEND_API_KEY) return { sent: false, error: "RESEND_API_KEY missing" };
   const to = opsAlertEmail();
 
@@ -304,7 +306,7 @@ async function sendOpsEmail(subject: string, html: string): Promise<{ sent: bool
         Authorization: `Bearer ${RESEND_API_KEY}`,
       },
       body: JSON.stringify({
-        from: FROM,
+        from: savedFrom || FROM,
         to: [to],
         subject,
         html,

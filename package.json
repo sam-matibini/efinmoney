@@ -24,7 +24,8 @@
     "test:b2b-rails": "node --experimental-strip-types scripts/verify-b2b-bank-rails.ts",
     "test:kyc-stages": "node --experimental-strip-types scripts/verify-kyc-stages.ts",
     "test:kyc-approval-notice": "node --experimental-strip-types scripts/verify-kyc-approval-notice.ts",
-    "test:send-fx-quote": "node --experimental-strip-types scripts/verify-send-fx-quote.ts"
+    "test:send-fx-quote": "node --experimental-strip-types scripts/verify-send-fx-quote.ts",
+    "test:system-api": "node --experimental-strip-types scripts/verify-system-api.ts"
   },
   "dependencies": {
     "@adyen/adyen-web": "^6.39.0",

@@ -1,7 +1,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { corsPreflightResponse, jsonResponse } from "../_shared/cors.ts";
 import { plaidBalanceFields } from "../_shared/plaidBalances.ts";
-import { plaidConfigured, plaidCredentials, plaidErrorMessage, plaidFetch } from "../_shared/plaid.ts";
+import { plaidErrorMessage, plaidFetch, plaidReady } from "../_shared/plaid.ts";
 
 async function plaid(path: string, body: Record<string, unknown>) {
   const res = await plaidFetch(path, body);
@@ -25,8 +25,7 @@ Deno.serve(async (req) => {
     const { data: { user }, error: authErr } = await supabase.auth.getUser(auth.replace("Bearer ", ""));
     if (authErr || !user) return jsonResponse({ error: "Unauthorized" }, 401);
 
-    const { clientId, secret } = plaidCredentials();
-    if (!clientId || !secret || !plaidConfigured()) {
+    if (!(await plaidReady())) {
       return jsonResponse({
         error: "Plaid is not configured. Set PLAID_CLIENT_ID and PLAID_SECRET on the edge function.",
       }, 500);

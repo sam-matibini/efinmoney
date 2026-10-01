@@ -2,6 +2,7 @@
 // /admin/support inbox where staff reply) and emails the support inbox as a
 // best-effort backup.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { resendCredentials } from "../_shared/systemApi.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -11,7 +12,6 @@ const corsHeaders = {
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
-const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY") || "";
 const FROM = "eFinMoney <noreply@efinsuite.com>";
 const SUPPORT_TO = Deno.env.get("SUPPORT_INBOX") || "support@efin.money";
 
@@ -20,6 +20,7 @@ const isEmail = (s: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s);
 
 // Best-effort email to the support inbox; never blocks the request.
 async function emailSupport(name: string, email: string, subject: string, message: string) {
+  const { apiKey: RESEND_API_KEY, from: savedFrom } = await resendCredentials();
   if (!RESEND_API_KEY) return;
   const html = `<div style="font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;font-size:15px;color:#222;">
       <h2 style="margin:0 0 12px;">New contact message</h2>
@@ -35,7 +36,7 @@ async function emailSupport(name: string, email: string, subject: string, messag
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${RESEND_API_KEY}` },
       body: JSON.stringify({
-        from: FROM,
+        from: savedFrom || FROM,
         to: [SUPPORT_TO],
         reply_to: email,
         subject: `[Contact] ${subject || "New contact message"}`,

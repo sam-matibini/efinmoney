@@ -1,6 +1,7 @@
 // Sends a PIN reset email via Resend when an authenticated user taps "Forgot PIN?".
 // Generates a 30-minute token, stores it in profiles, then emails a link to the user.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { resendCredentials } from "../_shared/systemApi.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -10,7 +11,6 @@ const corsHeaders = {
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
-const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY") ?? "";
 const FROM = "eFinMoney <noreply@efinsuite.com>";
 const APP_URL = Deno.env.get("PUBLIC_APP_URL") ?? "https://efin.money";
 
@@ -31,6 +31,7 @@ Deno.serve(async (req) => {
   const email = user.email ?? "";
   if (!email) return json({ error: "No email address on file" }, 400);
 
+  const { apiKey: RESEND_API_KEY, from: savedFrom } = await resendCredentials();
   if (!RESEND_API_KEY) return json({ error: "Email not configured" }, 500);
 
   // Generate a short-lived token and store its hash in profiles
@@ -77,7 +78,7 @@ Deno.serve(async (req) => {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${RESEND_API_KEY}` },
     body: JSON.stringify({
-      from: FROM,
+      from: savedFrom || FROM,
       to: [email],
       subject: "Reset your eFinMoney transaction PIN",
       html,

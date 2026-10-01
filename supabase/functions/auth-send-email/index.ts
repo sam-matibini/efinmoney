@@ -4,8 +4,8 @@
 // /auth/confirm page so we can show a success screen and auto sign the user in.
 import { Webhook } from "https://esm.sh/standardwebhooks@1.0.0";
 import { buildAppAuthConfirmUrl, getPublicAppOrigin } from "../_shared/authConfirmLink.ts";
+import { resendCredentials } from "../_shared/systemApi.ts";
 
-const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY") || "";
 const HOOK_SECRET = (Deno.env.get("SEND_EMAIL_HOOK_SECRET") || "").replace(/^v1,whsec_/, "");
 const FROM = "eFinMoney <noreply@efinsuite.com>";
 const BRAND = "#4f46e5";
@@ -123,6 +123,7 @@ Deno.serve(async (req) => {
     return jsonError(401, "Invalid webhook signature");
   }
 
+  const { apiKey: RESEND_API_KEY, from: savedFrom } = await resendCredentials();
   if (!RESEND_API_KEY) return jsonError(500, "RESEND_API_KEY not configured");
 
   const to = event.user?.email;
@@ -160,7 +161,7 @@ Deno.serve(async (req) => {
       "Content-Type": "application/json",
       Authorization: `Bearer ${RESEND_API_KEY}`,
     },
-    body: JSON.stringify({ from: FROM, to: [to], subject, html }),
+    body: JSON.stringify({ from: savedFrom || FROM, to: [to], subject, html }),
   });
 
   if (!res.ok) {

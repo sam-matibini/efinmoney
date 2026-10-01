@@ -3,6 +3,7 @@
 // Returns: { pdf_base64, filename, reference, email_sent? }
 
 import { createClient } from "npm:@supabase/supabase-js@2.45.0";
+import { resendCredentials } from "../_shared/systemApi.ts";
 import { PDFDocument, StandardFonts, rgb } from "npm:pdf-lib@1.17.1";
 import QRCode from "npm:qrcode@1.5.3";
 
@@ -228,7 +229,7 @@ Deno.serve(async (req) => {
 
     let email_sent = false;
     if (shouldEmail && profile?.email) {
-      const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
+      const { apiKey: RESEND_API_KEY, from: savedFrom } = await resendCredentials();
       if (RESEND_API_KEY) {
         const resp = await fetch("https://api.resend.com/emails", {
           method: "POST",
@@ -237,7 +238,7 @@ Deno.serve(async (req) => {
             Authorization: `Bearer ${RESEND_API_KEY}`,
           },
           body: JSON.stringify({
-            from: "eFinMoney <noreply@efinsuite.com>",
+            from: savedFrom || "eFinMoney <noreply@efinsuite.com>",
             to: [profile.email],
             subject: `Your eFinMoney transfer receipt (${reference})`,
             html: `<div style="font-family:Inter,system-ui,sans-serif;max-width:560px;margin:auto;padding:24px;color:#0f172a">
