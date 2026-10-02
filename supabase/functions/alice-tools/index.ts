@@ -3,7 +3,7 @@
 // The agent forwards the signed-in user's Supabase access token (secret dynamic
 // variable, never shown to the LLM) in `x-alice-token`; every tool runs as that user.
 import { jsonResponse } from "../_shared/cors.ts";
-import { resolveAliceCaller, runAliceTool } from "../_shared/aliceTools.ts";
+import { PUBLIC_ALICE_TOOLS, publicAliceCaller, resolveAliceCaller, runAliceTool } from "../_shared/aliceTools.ts";
 
 Deno.serve(async (req) => {
   try {
@@ -11,7 +11,8 @@ Deno.serve(async (req) => {
     const toolName = url.pathname.split("/").filter(Boolean).pop() || "";
 
     const token = (req.headers.get("x-alice-token") || "").replace(/^Bearer\s+/i, "").trim();
-    const caller = await resolveAliceCaller(token);
+    let caller = await resolveAliceCaller(token);
+    if (!caller && PUBLIC_ALICE_TOOLS.has(toolName)) caller = publicAliceCaller();
     if (!caller) {
       return jsonResponse({ error: "Not signed in. Ask the user to sign in to EfinMoney and try again." }, 401);
     }

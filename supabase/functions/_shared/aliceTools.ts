@@ -23,6 +23,10 @@ You are Alice, the EfinMoney in-app assistant. Rules:
 - Do not give financial, tax, or legal advice.
 - When a question is about the user's own account (balance, transactions, KYC), use
   the available tools to fetch real data before answering.
+- For any exchange-rate question ("what's the rate", "how much NGN for 100 CAD"),
+  call get_live_rates first and answer from customer_rate. You may multiply an amount
+  by that rate, but say it's indicative and that fees and the final rate are shown on
+  the Exchange or Send screen.
 - Personal KYC (levels 1-3) and business verification (KYB) are separate. Never tell a
   personal user that business verification is a KYC level.
 - If you cannot resolve the user's issue after trying (missing info, account action
@@ -45,6 +49,15 @@ export const ALICE_TOOLS: AliceToolDef[] = [
     params: { limit: { type: "number", description: "How many to return (max 20). Default 10." } },
   },
   { name: "get_my_kyc_status", description: "Get the signed-in user's personal KYC level/status, or KYB status for business accounts." },
+  {
+    name: "get_live_rates",
+    description:
+      "Get EfinMoney's current live exchange rates. Pass from and/or to (ISO currency codes like CAD, USD, NGN, KES) to filter; omit both for all pairs. customer_rate is what the user gets; quote it as indicative.",
+    params: {
+      from: { type: "string", description: "Source currency code, e.g. CAD. Optional." },
+      to: { type: "string", description: "Destination currency code, e.g. NGN. Optional." },
+    },
+  },
   { name: "get_pending_kyc_count", description: "Staff only: count KYC verifications awaiting review.", staffOnly: true },
   { name: "get_settlement_summary", description: "Staff only: settlement reconciliation rows by status plus total variance.", staffOnly: true },
   {
@@ -72,6 +85,16 @@ export async function resolveAliceCaller(accessToken: string): Promise<AliceCall
   const roles = new Set((roleRows || []).map((r: Record<string, unknown>) => String(r.role)));
   const isStaff = roles.has("admin") || roles.has("finance") || roles.has("compliance");
   return { sb, userId: user.id, email: user.email ?? null, isStaff };
+}
+
+/** Tools that only read public data and may run for signed-out visitors. */
+export const PUBLIC_ALICE_TOOLS = new Set(["get_live_rates"]);
+
+export function publicAliceCaller(): AliceCaller {
+  const sb = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, {
+    auth: { persistSession: false },
+  });
+  return { sb, userId: "", email: null, isStaff: false };
 }
 
 export async function runAliceTool(name: string, args: Record<string, unknown>, caller: AliceCaller): Promise<unknown> {
@@ -121,6 +144,58 @@ export async function runAliceTool(name: string, args: Record<string, unknown>, 
         };
       }
       return { account_kind: "personal", ...(data || { kyc_status: "unknown", kyc_tier: "unknown" }) };
+    }
+    case "get_live_rates": {
+      const from = String(args.from || "").trim().toUpperCase();
+      const to = String(args.to || "").trim().toUpperCase();
+      const { data, error } = await sb
+        .from("fx_rates")
+        .select("from_currency, to_currency, rate, effective_rate, valid_from")
+        .or(`valid_until.is.null,valid_until.gt.${new Date().toISOString()}`)
+        .order("valid_from", { ascending: false })
+        .limit(500);
+      if (error) return { error: error.message };
+      const seen = new Set<string>();
+      const latest: Record<string, unknown>[] = [];
+      for (const r of data || []) {
+        const key = `${r.from_currency}->${r.to_currency}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        const mid = Number(r.rate);
+        const customer = Number(r.effective_rate) > 0 ? Number(r.effective_rate) : mid;
+        latest.push({
+          pair: `${r.from_currency}/${r.to_currency}`,
+          from: r.from_currency,
+          to: r.to_currency,
+          customer_rate: customer,
+          mid_market_rate: mid,
+          updated_at: r.valid_from,
+        });
+      }
+      const match = (r: Record<string, unknown>, f: string, t: string) =>
+        (!f || r.from === f) && (!t || r.to === t);
+      let rates = latest.filter((r) => match(r, from, to));
+      if (rates.length === 0 && from && to) {
+        const inverse = latest.find((r) => match(r, to, from));
+        if (inverse && Number(inverse.customer_rate) > 0) {
+          rates = [{
+            pair: `${from}/${to}`,
+            from,
+            to,
+            customer_rate: Math.round((1 / Number(inverse.customer_rate)) * 1e6) / 1e6,
+            mid_market_rate: Number(inverse.mid_market_rate) > 0 ? Math.round((1 / Number(inverse.mid_market_rate)) * 1e6) / 1e6 : null,
+            updated_at: inverse.updated_at,
+            derived_from_inverse: true,
+          }];
+        }
+      }
+      if (rates.length === 0) {
+        return { rates: [], note: "No live rate for that pair. Suggest the Exchange page or support." };
+      }
+      return {
+        rates: rates.slice(0, 40),
+        note: "Indicative. The exact rate and fees are locked on the Exchange or Send screen before confirming.",
+      };
     }
     case "get_pending_kyc_count": {
       const { count, error } = await sb.from("kyc_verifications").select("id", { count: "exact", head: true }).eq("verification_status", "pending_review");
