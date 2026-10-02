@@ -28,7 +28,7 @@ export default function AppPage({
   return (
     <main
       className={cn(
-        "container mx-auto px-4 py-6 pb-24 md:pb-6",
+        "w-full mx-auto px-4 pt-2 pb-6 md:px-8 md:pt-4 md:pb-8",
         className,
       )}
     >

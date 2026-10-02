@@ -43,6 +43,7 @@ interface Props {
   onOpenChange: (open: boolean) => void;
   onCreated?: () => void;
   defaultWalletId?: string;
+  defaults?: { amount?: string; payerHint?: string; note?: string };
 }
 
 function minAmount(currency: string): number {
@@ -71,6 +72,7 @@ export default function CreateMoneyRequestModal({
   onOpenChange,
   onCreated,
   defaultWalletId,
+  defaults,
 }: Props) {
   const { data: wallets } = useWallets();
   const liveWallets = useMemo(
@@ -97,9 +99,10 @@ export default function CreateMoneyRequestModal({
   useEffect(() => {
     if (!open) return;
     setResult(null);
-    setPayerHint("");
-    setNote("");
-    setAmount("");
+    setPayerHint(defaults?.payerHint ?? "");
+    setNote(defaults?.note ?? "");
+    setAmount(defaults?.amount ?? "");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
   useEffect(() => {

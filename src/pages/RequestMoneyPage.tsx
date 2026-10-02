@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -48,7 +49,20 @@ const RequestMoneyPage = () => {
   const qc = useQueryClient();
   const [search, setSearch] = useState("");
   const [tab, setTab] = useState<"all" | "open" | "paid" | "closed">("all");
-  const [createOpen, setCreateOpen] = useState(false);
+  const [searchParams] = useSearchParams();
+  const prefill = useMemo(
+    () =>
+      searchParams.get("quick") === "1"
+        ? {
+            amount: searchParams.get("amount") ?? undefined,
+            payerHint: searchParams.get("payer") ?? undefined,
+            note: searchParams.get("note") ?? undefined,
+          }
+        : undefined,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  );
+  const [createOpen, setCreateOpen] = useState(!!prefill);
   const [busyId, setBusyId] = useState<string | null>(null);
 
   const { data: rows = [], isLoading } = useQuery({
@@ -245,6 +259,7 @@ const RequestMoneyPage = () => {
         <CreateMoneyRequestModal
           open={createOpen}
           onOpenChange={setCreateOpen}
+          defaults={prefill}
           onCreated={() => qc.invalidateQueries({ queryKey: ["money-requests", user?.id] })}
         />
       </AppPage>

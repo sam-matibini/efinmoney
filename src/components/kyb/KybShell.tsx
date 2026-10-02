@@ -2,7 +2,7 @@ import { ReactNode } from "react";
 import { motion } from "framer-motion";
 import { Check } from "lucide-react";
 import BackToDashboard from "@/components/layout/BackToDashboard";
-import Header from "@/components/layout/Header";
+import DashboardLayout from "@/components/layout/DashboardLayout";
 import { cn } from "@/lib/utils";
 
 export const KYB_STEPS = ["Business", "Ownership", "Documents", "Review"] as const;
@@ -16,9 +16,8 @@ interface Props {
 }
 
 const KybShell = ({ step, title, subtitle, children, footer }: Props) => (
-  <div className="min-h-screen bg-background">
-    <Header />
-    <div className="container max-w-2xl mx-auto px-4 py-8 md:py-12">
+  <DashboardLayout>
+    <div className="max-w-2xl mx-auto px-4 py-6 md:px-8 md:py-8">
       <motion.div
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
@@ -77,7 +76,7 @@ const KybShell = ({ step, title, subtitle, children, footer }: Props) => (
         {footer && <div className="mt-8">{footer}</div>}
       </motion.div>
     </div>
-  </div>
+  </DashboardLayout>
 );
 
 export default KybShell;

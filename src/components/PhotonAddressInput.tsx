@@ -161,18 +161,18 @@ export function PhotonAddressInput({
         onFocus={() => results.length > 0 && setOpen(true)}
         onKeyDown={onKeyDown}
         className={cn(
-          "flex h-12 w-full rounded-md border border-neutral-200 bg-white px-3 py-2 text-base ring-offset-background placeholder:text-neutral-400 focus-visible:outline-none focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm",
+          "flex h-12 w-full rounded-md border border-input bg-background text-foreground px-3 py-2 text-base ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm",
           className
         )}
       />
       {loading && (
-        <Loader2 className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-neutral-400 animate-spin" />
+        <Loader2 className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground animate-spin" />
       )}
       {open && results.length > 0 && (
         <ul
           id={id ? `${id}-listbox` : undefined}
           role="listbox"
-          className="absolute z-50 mt-1 max-h-60 w-full overflow-auto rounded-md border border-neutral-200 bg-white shadow-lg"
+          className="absolute z-50 mt-1 max-h-60 w-full overflow-auto rounded-md border border-border bg-popover text-popover-foreground shadow-lg"
         >
           {results.map((f, i) => {
             const p = f.properties;
@@ -191,13 +191,13 @@ export function PhotonAddressInput({
                 onMouseEnter={() => setActiveIndex(i)}
                 className={cn(
                   "flex cursor-pointer items-start gap-2 px-3 py-2 text-sm",
-                  i === activeIndex ? "bg-primary/5 text-neutral-900" : "text-neutral-700"
+                  i === activeIndex ? "bg-accent text-accent-foreground" : "text-popover-foreground"
                 )}
               >
-                <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-neutral-400" />
+                <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
                 <span className="min-w-0">
                   <span className="block truncate font-medium">{main}</span>
-                  {sub && <span className="block truncate text-xs text-neutral-500">{sub}</span>}
+                  {sub && <span className="block truncate text-xs text-muted-foreground">{sub}</span>}
                 </span>
               </li>
             );

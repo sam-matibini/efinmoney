@@ -1,0 +1,53 @@
+/* eFinMoney dashboard design tokens (Dashboard Redesign guide v1.0, section 2). */
+:root {
+  /* Colour */
+  --color-bg-primary: #0a1628;
+  --color-bg-sidebar: #0f1f3d;
+  --color-bg-card: #112952;
+  --color-bg-card-hover: #16336a;
+  --color-accent-gold: #f5a623;
+  --color-accent-blue: #38bdf8;
+  --color-accent-emerald: #34d399;
+  --color-accent-purple: #a78bfa;
+  --color-accent-orange: #fb923c;
+  --color-accent-pink: #f472b6;
+  --color-accent-green: #4ade80;
+  --color-accent-yellow: #facc15;
+  --color-accent-lightblue: #7dd3fc;
+  --color-accent-violet: #c084fc;
+  --color-accent-slate: #94a3b8;
+  --color-text-primary: #f0f4ff;
+  --color-text-muted: #8ca7d0;
+  --color-text-label: #cbd5e1;
+  --color-border: rgba(255, 255, 255, 0.08);
+  --color-success: #22c55e;
+  --color-danger: #ef4444;
+
+  /* Typography */
+  --font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-size-xs: 10px;
+  --font-size-sm: 12px;
+  --font-size-base: 14px;
+  --font-size-md: 16px;
+  --font-size-lg: 20px;
+  --font-size-xl: 28px;
+  --font-size-2xl: 36px;
+  --font-weight-medium: 500;
+  --font-weight-bold: 700;
+  --font-weight-black: 800;
+
+  /* Spacing & radius */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-full: 9999px;
+  --spacing-xs: 4px;
+  --spacing-sm: 8px;
+  --spacing-md: 16px;
+  --spacing-lg: 24px;
+  --spacing-xl: 32px;
+
+  /* Layout */
+  --sidebar-width: 220px;
+  --sidebar-width-collapsed: 72px;
+}

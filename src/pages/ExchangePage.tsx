@@ -56,7 +56,9 @@ const parseAmt = (v: string) => {
 };
 
 const FxTradingPanel = () => {
-  const [sendAmount, setSendAmount] = useState("");
+  const [sendAmount, setSendAmount] = useState(
+    () => new URLSearchParams(window.location.search).get("amount") ?? "",
+  );
   const [recvAmount, setRecvAmount] = useState("");
   const [lastEdited, setLastEdited] = useState<"send" | "receive">("send");
   const [fromWalletId, setFromWalletId] = useState("");

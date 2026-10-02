@@ -1,116 +1,63 @@
-import { motion } from "framer-motion";
+import { useState } from "react";
 import { Link } from "react-router-dom";
-import { HandCoins, Send, Download, RefreshCw, Smartphone, Building2, Receipt } from "lucide-react";
-import SendMoneyModal from "@/components/modals/SendMoneyModal";
-import ExchangeModal from "@/components/modals/ExchangeModal";
+import type { LucideIcon } from "lucide-react";
+import { ArrowUpRight, PlusCircle, ArrowDownLeft, RefreshCw, Wallet, Landmark, FileText, Users } from "lucide-react";
 import { productFeatures } from "@/lib/productFeatures";
-import { useKyb, KybStep } from "@/hooks/useKyb";
+import QuickActionDrawer, { type QuickActionType } from "@/components/dashboard/QuickActionDrawer";
 
 type Item =
-  | { kind: "modal"; Modal: any; icon: any; label: string; color: string }
-  | { kind: "link"; to: string; icon: any; label: string; color: string };
+  | { kind: "drawer"; action: QuickActionType; icon: LucideIcon; label: string; color: string }
+  | { kind: "link"; to: string; icon: LucideIcon; label: string; color: string };
 
-const allItems: Item[] = [
-  { kind: "modal", Modal: SendMoneyModal, icon: Send, label: "Send", color: "bg-primary/15 text-primary" },
-  { kind: "link", to: "/wallet/topup", icon: Download, label: "Add Money", color: "bg-primary/10 text-primary" },
-  { kind: "link", to: "/request-money", icon: HandCoins, label: "Request", color: "bg-sky-500/15 text-sky-600 dark:text-sky-400" },
-  { kind: "link", to: "/wallet/receive", icon: Smartphone, label: "Receive", color: "bg-indigo-500/15 text-indigo-600 dark:text-indigo-400" },
-  { kind: "link", to: "/pay-bills", icon: Receipt, label: "Pay Bills", color: "bg-rose-500/15 text-rose-600 dark:text-rose-400" },
-  { kind: "modal", Modal: ExchangeModal, icon: RefreshCw, label: "Exchange", color: "bg-violet-500/15 text-violet-600 dark:text-violet-400" },
+const requestOrFallback: Item = productFeatures.requestMoney
+  ? { kind: "drawer", action: "request", icon: ArrowDownLeft, label: "Request", color: "var(--color-accent-purple)" }
+  : productFeatures.billPay
+    ? { kind: "link", to: "/pay-bills", icon: FileText, label: "Bills", color: "var(--color-accent-yellow)" }
+    : { kind: "link", to: "/contacts", icon: Users, label: "Contacts", color: "var(--color-accent-lightblue)" };
+
+const ITEMS: Item[] = [
+  { kind: "drawer", action: "send", icon: ArrowUpRight, label: "Send Money", color: "var(--color-accent-blue)" },
+  { kind: "drawer", action: "topup", icon: PlusCircle, label: "Top Up", color: "var(--color-accent-emerald)" },
+  requestOrFallback,
+  { kind: "drawer", action: "exchange", icon: RefreshCw, label: "Exchange", color: "var(--color-accent-orange)" },
+  { kind: "link", to: "/wallets", icon: Wallet, label: "Wallets", color: "var(--color-accent-green)" },
+  { kind: "link", to: "/wallet/receive", icon: Landmark, label: "Bank", color: "var(--color-accent-pink)" },
 ];
 
-const ICON_VARIANTS: Record<string, any> = {
-  Send: { rest: { x: 0, rotate: 0 }, hover: { x: 3, rotate: -8 } },
-  Exchange: { rest: { rotate: 0 }, hover: { rotate: 180 } },
-  Deposit: { rest: { y: 0 }, hover: { y: 3 } },
-};
+const tileCls =
+  "flex flex-col items-center justify-center gap-2 rounded-[var(--radius-md)] bg-[var(--color-bg-card)] p-4 min-h-[88px] transition-transform duration-200 hover:scale-[1.04] hover:bg-[var(--color-bg-card-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent-gold)]";
 
-const ButtonInner = ({ icon: Icon, label, color }: { icon: any; label: string; color: string }) => {
-  const variant = ICON_VARIANTS[label] || { rest: { y: 0 }, hover: { y: -2 } };
+function TileInner({ icon: Icon, label, color }: { icon: LucideIcon; label: string; color: string }) {
   return (
-    <motion.div
-      whileHover="hover"
-      initial="rest"
-      animate="rest"
-      whileTap={{ scale: 0.95 }}
-      transition={{ type: "spring", stiffness: 380, damping: 18 }}
-      className="flex flex-col items-center gap-2 cursor-pointer"
-    >
-      <div
-        className={`relative w-14 h-14 rounded-full flex items-center justify-center ${color} shadow-sm transition-all group-hover:shadow-md group-hover:bg-gradient-to-br group-hover:from-primary/20 group-hover:to-primary/5 overflow-hidden`}
-      >
-        <motion.span variants={variant} transition={{ type: "spring", stiffness: 400, damping: 14 }} className="inline-flex">
-          <Icon className="w-6 h-6" />
-        </motion.span>
-        <span className="ripple-host absolute inset-0" />
-      </div>
-      <span className="text-xs font-medium text-foreground whitespace-nowrap">{label}</span>
-    </motion.div>
+    <>
+      <Icon className="h-6 w-6" style={{ color }} aria-hidden />
+      <span className="text-[13px] font-medium text-[var(--color-text-primary)] text-center leading-tight">{label}</span>
+    </>
   );
-};
+}
 
 const QuickActions = () => {
-  const { business, isApproved } = useKyb();
-
-  // Persistent, always-visible dashboard entry into the business flow.
-  // State-aware, mirroring BusinessPromptCard routing.
-  const bizStepPath: Record<KybStep, string> = {
-    details: "/onboarding/business/details",
-    ownership: "/onboarding/business/ownership",
-    documents: "/onboarding/business/documents",
-    review: "/onboarding/business/review",
-    completed: "/onboarding/business/details",
-  };
-  const businessTo = !business
-    ? "/onboarding/business/details"
-    : isApproved
-      ? "/business"
-      : business.kyb_status === "pending_review"
-        ? "/onboarding/business/submitted"
-        : business.kyb_status === "rejected" || business.kyb_status === "suspended"
-          ? "/onboarding/business/rejected"
-          : bizStepPath[business.current_step] ?? "/onboarding/business/details";
-
-  const items: Item[] = [
-    ...allItems.filter((item) =>
-      (item.label !== "Request" || productFeatures.requestMoney)
-      && (item.label !== "Pay Bills" || productFeatures.billPay)),
-    {
-      kind: "link",
-      to: businessTo,
-      icon: Building2,
-      label: "Business",
-      color: "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400",
-    },
-  ];
+  const [action, setAction] = useState<QuickActionType | null>(null);
 
   return (
-    <section className="mb-8">
-      <h2 className="text-lg font-display font-semibold text-foreground mb-4">Quick Actions</h2>
-
-      <div className="flex gap-4 sm:gap-5 overflow-x-auto pb-3 -mx-4 px-4 no-scrollbar">
-        {items.map((item, i) => (
-          <motion.div
-            key={item.label}
-            initial={{ opacity: 0, y: 24 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: i * 0.08, duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
-            className="group shrink-0"
-          >
-            {item.kind === "modal" ? (
-              <item.Modal>
-                <div>
-                  <ButtonInner icon={item.icon} label={item.label} color={item.color} />
-                </div>
-              </item.Modal>
-            ) : (
-              <Link to={item.to}>
-                <ButtonInner icon={item.icon} label={item.label} color={item.color} />
-              </Link>
-            )}
-          </motion.div>
-        ))}
+    <section aria-labelledby="quick-actions-title" className="rounded-[var(--radius-lg)] bg-[var(--color-bg-sidebar)] p-5 h-full">
+      <h2 id="quick-actions-title" className="mb-4 text-[var(--font-size-lg)] font-semibold text-white">
+        Quick Actions
+      </h2>
+      <div className="grid grid-cols-3 gap-3">
+        {ITEMS.map((item) =>
+          item.kind === "drawer" ? (
+            <button key={item.label} type="button" onClick={() => setAction(item.action)} className={tileCls}>
+              <TileInner icon={item.icon} label={item.label} color={item.color} />
+            </button>
+          ) : (
+            <Link key={item.label} to={item.to} className={tileCls}>
+              <TileInner icon={item.icon} label={item.label} color={item.color} />
+            </Link>
+          ),
+        )}
       </div>
+      <QuickActionDrawer actionType={action} onClose={() => setAction(null)} />
     </section>
   );
 };
