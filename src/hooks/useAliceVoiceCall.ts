@@ -20,6 +20,23 @@ function micSupported(): boolean {
   return typeof navigator !== "undefined" && Boolean(navigator.mediaDevices?.getUserMedia);
 }
 
+/** Maps getUserMedia / SDK failures to something a customer can act on. */
+function describeCallError(raw: unknown): { message: string; micProblem: boolean } {
+  const name = (raw as { name?: string })?.name || "";
+  const text = raw instanceof Error ? raw.message : typeof raw === "string" ? raw : "";
+  const probe = `${name} ${text}`;
+  if (/NotFound|device not found|DevicesNotFound/i.test(probe)) {
+    return { message: "No microphone found. Plug in or enable a microphone, or tap Chat to type instead.", micProblem: true };
+  }
+  if (/NotAllowed|permission|denied/i.test(probe)) {
+    return { message: "Microphone access is blocked. Allow it in your browser's site settings, or tap Chat.", micProblem: true };
+  }
+  if (/NotReadable|in use|TrackStart/i.test(probe)) {
+    return { message: "Your microphone is being used by another app. Close it and try again.", micProblem: true };
+  }
+  return { message: text || "Couldn't connect the call.", micProblem: false };
+}
+
 /**
  * Live voice call with the ElevenLabs Alice agent over WebRTC: ringtone → agent
  * greeting → natural back-and-forth (agent handles turn-taking and interruptions).
@@ -109,8 +126,8 @@ export function useAliceVoiceCall(context: AliceContext, enabled: boolean, onTur
             void onTurnRef.current?.("assistant", text);
           }
         },
-        onError: (message) => {
-          setError(message || "Something went wrong on the call.");
+        onError: (message, ctx) => {
+          setError(describeCallError(ctx ?? message).message || "Something went wrong on the call.");
         },
         onDisconnect: () => {
           if (!activeRef.current) return;
@@ -129,10 +146,9 @@ export function useAliceVoiceCall(context: AliceContext, enabled: boolean, onTur
     } catch (e) {
       if (!activeRef.current) return;
       activeRef.current = false;
-      const msg = e instanceof Error ? e.message : "Couldn't connect the call.";
-      const denied = /permission|notallowed|denied/i.test(msg);
-      setError(denied ? "Microphone permission is required to talk to Alice." : msg);
-      setPhase(denied ? "unsupported" : "ended");
+      const { message, micProblem } = describeCallError(e);
+      setError(message);
+      setPhase(micProblem ? "unsupported" : "ended");
     }
   }, [context]);
 
