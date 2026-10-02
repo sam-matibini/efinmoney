@@ -58,9 +58,9 @@ export function AliceAdvisorChrome({
   ];
 
   return (
-    <div className="fixed z-50 right-3 bottom-3 sm:right-5 sm:bottom-5 flex flex-col items-end gap-2.5 pointer-events-none">
+    <div className="fixed z-[110] right-3 bottom-[calc(0.75rem+env(safe-area-inset-bottom))] sm:right-5 sm:bottom-5 flex flex-col items-end gap-2.5 pointer-events-none">
       <div
-        className="pointer-events-auto w-[min(100vw-1.5rem,380px)] h-[min(72vh,640px)] flex flex-col overflow-hidden rounded-[1.35rem] border border-black/5 bg-white shadow-[0_24px_64px_rgba(15,23,42,0.22)] animate-in fade-in zoom-in-95 duration-200"
+        className="pointer-events-auto w-[min(100vw-1.5rem,380px)] h-[min(calc(100dvh-1.5rem-env(safe-area-inset-bottom)),640px)] sm:h-[min(72vh,640px)] flex flex-col overflow-hidden rounded-[1.35rem] border border-black/5 bg-white shadow-[0_24px_64px_rgba(15,23,42,0.22)] animate-in fade-in zoom-in-95 duration-200"
         role="dialog"
         aria-label="Alice AI Advisor"
       >
