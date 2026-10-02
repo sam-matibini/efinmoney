@@ -1,13 +1,13 @@
 // Creates or updates the ElevenLabs Alice agent and its webhook tools from the code in
 // _shared/alice-knowledge.ts and _shared/aliceTools.ts. Re-run after changing either.
 // Auth: service role key only (Authorization: Bearer <service_role_key>).
-// Body (optional): { agent_id?, voice_id?, llm? }. Returns { agent_id, tool_ids }.
+// Body (optional): { agent_id?, create_new?, voice_id?, llm? }. Returns { agent_id, tool_ids }.
 import { jsonResponse } from "../_shared/cors.ts";
 import { EFINMONEY_KNOWLEDGE } from "../_shared/alice-knowledge.ts";
-import { ALICE_GUARDRAILS, ALICE_TOOLS, type AliceToolDef } from "../_shared/aliceTools.ts";
+import { ALICE_AGENT_ID, ALICE_GUARDRAILS, ALICE_TOOLS, type AliceToolDef } from "../_shared/aliceTools.ts";
 
 const API = "https://api.elevenlabs.io/v1/convai";
-const DEFAULT_VOICE_ID = "EXAVITQu4vr4xnSzO2YL";
+const DEFAULT_VOICE_ID = "Xb7hH8MSUJpSbSDYk0k2";
 const DEFAULT_LLM = "gpt-5.4-mini";
 
 // deno-lint-ignore no-explicit-any
@@ -67,7 +67,7 @@ Deno.serve(async (req) => {
 
     const body = await req.json().catch(() => ({}));
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const existingAgentId: string = body?.agent_id || Deno.env.get("ELEVENLABS_AGENT_ID") || "";
+    const existingAgentId: string = body?.agent_id || (body?.create_new ? "" : ALICE_AGENT_ID);
 
     const listed = await eleven("GET", "/tools", apiKey);
     const existingTools: Any[] = listed?.tools || [];

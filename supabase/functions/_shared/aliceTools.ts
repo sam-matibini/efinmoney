@@ -6,6 +6,9 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 // deno-lint-ignore no-explicit-any
 type Any = any;
 
+// Not a secret: the agent requires a server-minted signed URL/token to connect.
+export const ALICE_AGENT_ID = Deno.env.get("ELEVENLABS_AGENT_ID") || "agent_1601m3xzq92zer3tt5w1d1m703h4";
+
 export const ALICE_GUARDRAILS = `
 You are Alice, the EfinMoney in-app assistant. Rules:
 - Only help with EfinMoney. Politely decline unrelated topics.

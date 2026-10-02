@@ -5,6 +5,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { corsPreflightResponse, jsonResponse } from "../_shared/cors.ts";
 import { EFINMONEY_ADMIN_KNOWLEDGE } from "../_shared/alice-knowledge.ts";
+import { ALICE_AGENT_ID } from "../_shared/aliceTools.ts";
 
 const ELEVEN_BASE = "https://api.elevenlabs.io/v1/convai/conversation";
 
@@ -32,9 +33,9 @@ Deno.serve(async (req) => {
     if (!user) return jsonResponse({ error: "Unauthorized" }, 401);
 
     const apiKey = Deno.env.get("ELEVENLABS_API_KEY");
-    const agentId = Deno.env.get("ELEVENLABS_AGENT_ID");
-    if (!apiKey || !agentId) {
-      return jsonResponse({ error: "Alice is not configured yet (missing ELEVENLABS_API_KEY or ELEVENLABS_AGENT_ID)." }, 500);
+    const agentId = ALICE_AGENT_ID;
+    if (!apiKey) {
+      return jsonResponse({ error: "Alice is not configured yet (missing ELEVENLABS_API_KEY)." }, 500);
     }
 
     const body = await req.json().catch(() => ({}));
