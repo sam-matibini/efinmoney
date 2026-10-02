@@ -71,12 +71,14 @@ export default function AliceWidget({ context }: { context: "user" | "admin" }) 
   const [tab, setTab] = useState<AliceTab>("home");
   const [overlay, setOverlay] = useState<"support" | "booking" | null>(null);
   const [liveCall, setLiveCall] = useState(false);
+  const [callCompact, setCallCompact] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [input, setInput] = useState("");
   const clientTools = useMemo(() => {
     const handOff = (mode: "support" | "booking") => {
       window.setTimeout(() => {
         setLiveCall(false);
+        setCallCompact(false);
         setTab("home");
         setOverlay(mode);
       }, 2500);
@@ -86,8 +88,9 @@ export default function AliceWidget({ context }: { context: "user" | "admin" }) 
       onTalkToHuman: context === "user" ? () => handOff("support") : undefined,
       onBookCall: context === "user" ? () => handOff("booking") : undefined,
       onNavigated: () => {
-        // On phones the chat panel covers the page; tuck it away once the page has opened.
-        if (!liveCall && window.innerWidth < 640) window.setTimeout(() => setOpen(false), 1800);
+        // The panel covers the page: shrink the call to a bar, or tuck the chat away on phones.
+        if (liveCall) setCallCompact(true);
+        else if (window.innerWidth < 640) window.setTimeout(() => setOpen(false), 1800);
       },
     });
   }, [navigate, context, liveCall]);
@@ -168,6 +171,7 @@ export default function AliceWidget({ context }: { context: "user" | "admin" }) 
 
   const close = () => {
     setLiveCall(false);
+    setCallCompact(false);
     setOpen(false);
     setOverlay(null);
     setTab("home");
@@ -581,18 +585,29 @@ export default function AliceWidget({ context }: { context: "user" | "admin" }) 
 
       {/* Live voice call */}
       {open && liveCall && !overlay && (
-        <div className="alice-light fixed z-[110] right-3 bottom-[calc(0.75rem+env(safe-area-inset-bottom))] sm:right-5 sm:bottom-5 w-[min(100vw-1.5rem,380px)] h-[min(calc(100dvh-1.5rem-env(safe-area-inset-bottom)),640px)] sm:h-[min(72vh,640px)] flex flex-col overflow-hidden rounded-[1.35rem] border border-black/5 shadow-[0_24px_64px_rgba(15,23,42,0.22)]">
+        <div
+          className={cn(
+            "alice-light fixed z-[110] right-3 w-[min(100vw-1.5rem,380px)] flex flex-col overflow-hidden border border-black/5 shadow-[0_24px_64px_rgba(15,23,42,0.22)] sm:right-5",
+            callCompact
+              ? "bottom-[calc(4.75rem+env(safe-area-inset-bottom))] md:bottom-5 rounded-2xl"
+              : "bottom-[calc(0.75rem+env(safe-area-inset-bottom))] sm:bottom-5 h-[min(calc(100dvh-1.5rem-env(safe-area-inset-bottom)),640px)] sm:h-[min(72vh,640px)] rounded-[1.35rem]",
+          )}
+        >
           <AliceLiveCall
             active={liveCall}
             context={context}
             onTurn={recordTurn}
             clientTools={clientTools}
+            compact={callCompact}
+            onToggleCompact={() => setCallCompact((c) => !c)}
             onEnd={() => {
               setLiveCall(false);
+              setCallCompact(false);
               setTab("home");
             }}
             onOpenMessages={() => {
               setLiveCall(false);
+              setCallCompact(false);
               setTab("messages");
             }}
           />

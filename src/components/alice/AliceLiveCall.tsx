@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { Mic, MicOff, PhoneOff, Loader2 } from "lucide-react";
+import { ChevronDown, ChevronUp, Mic, MicOff, PhoneOff, Loader2 } from "lucide-react";
 import { ALICE_ACCENT, ALICE_BRAND, ALICE_BRAND_MID, ALICE_BRAND_SOFT } from "@/components/alice/aliceAdvisorTheme";
 import { useAliceVoiceCall, type AliceCallPhase, type AliceTurnRecorder } from "@/hooks/useAliceVoiceCall";
 import { cn } from "@/lib/utils";
@@ -12,6 +12,9 @@ type Props = {
   onEnd: () => void;
   onOpenMessages?: () => void;
   clientTools?: AliceClientTools;
+  /** Small bar so the page behind stays visible (e.g. after Alice opens a page). */
+  compact?: boolean;
+  onToggleCompact?: () => void;
 };
 
 function statusLabel(phase: AliceCallPhase, muted: boolean): string {
@@ -39,7 +42,16 @@ function statusLabel(phase: AliceCallPhase, muted: boolean): string {
 }
 
 /** Full-screen-in-panel live voice call with the ElevenLabs Alice agent. */
-export default function AliceLiveCall({ active, context, onTurn, onEnd, onOpenMessages, clientTools }: Props) {
+export default function AliceLiveCall({
+  active,
+  context,
+  onTurn,
+  onEnd,
+  onOpenMessages,
+  clientTools,
+  compact,
+  onToggleCompact,
+}: Props) {
   const { phase, transcript, interim, lastReply, error, muted, startCall, hangUp, toggleMute } =
     useAliceVoiceCall(context, active, onTurn, clientTools);
 
@@ -56,6 +68,62 @@ export default function AliceLiveCall({ active, context, onTurn, onEnd, onOpenMe
 
   const live = ["ringing", "connecting", "greeting", "listening", "thinking", "speaking"].includes(phase);
 
+  if (compact) {
+    return (
+      <div
+        className="flex items-center gap-3 px-3 py-2.5 text-white"
+        style={{ background: `linear-gradient(120deg, ${ALICE_BRAND} 0%, ${ALICE_BRAND_MID} 100%)` }}
+      >
+        <button
+          type="button"
+          onClick={onToggleCompact}
+          aria-label="Expand call"
+          className="flex items-center gap-3 min-w-0 flex-1 text-left"
+        >
+          <span
+            className={cn(
+              "relative h-10 w-10 shrink-0 rounded-full overflow-hidden ring-2 ring-white/30",
+              phase === "listening" && "ring-amber-300/80",
+            )}
+          >
+            <img src="/alice.png" alt="Alice" className="h-full w-full object-cover object-top" />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="flex items-center gap-1.5 text-[11px] text-white/70">
+              {(phase === "thinking" || phase === "ringing") && <Loader2 className="h-3 w-3 animate-spin" />}
+              {statusLabel(phase, muted)}
+            </span>
+            <span className="block text-sm leading-snug line-clamp-2">
+              {lastReply || interim || transcript || "Alice · AI Expert"}
+            </span>
+          </span>
+          <ChevronUp className="h-4 w-4 shrink-0 text-white/70" />
+        </button>
+        <button
+          type="button"
+          onClick={toggleMute}
+          disabled={!live}
+          aria-label={muted ? "Unmute" : "Mute"}
+          className={cn(
+            "h-10 w-10 shrink-0 rounded-full flex items-center justify-center",
+            muted ? "bg-amber-300 text-slate-900" : "bg-white/15 hover:bg-white/25",
+            !live && "opacity-40",
+          )}
+        >
+          {muted ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
+        </button>
+        <button
+          type="button"
+          onClick={end}
+          aria-label="End call"
+          className="h-10 w-10 shrink-0 rounded-full bg-red-500 hover:bg-red-600 flex items-center justify-center"
+        >
+          <PhoneOff className="h-5 w-5" />
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div
       className="flex flex-col flex-1 min-h-0 text-white"
@@ -64,6 +132,16 @@ export default function AliceLiveCall({ active, context, onTurn, onEnd, onOpenMe
       }}
     >
       <div className="flex-1 flex flex-col items-center justify-center px-5 py-6 text-center relative overflow-hidden">
+        {onToggleCompact && (
+          <button
+            type="button"
+            onClick={onToggleCompact}
+            aria-label="Minimise call"
+            className="absolute top-3 right-3 h-9 w-9 rounded-full bg-white/15 hover:bg-white/25 flex items-center justify-center z-10"
+          >
+            <ChevronDown className="h-5 w-5" />
+          </button>
+        )}
         {/* Ambient pulse while live */}
         {live && (
           <span
