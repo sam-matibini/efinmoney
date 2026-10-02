@@ -20,6 +20,7 @@ import { useAliceChat, type AliceMessage } from "@/hooks/useAliceChat";
 import { useProfile } from "@/hooks/useProfile";
 import { useKyb } from "@/hooks/useKyb";
 import { kybResumePath } from "@/lib/kybOnboarding";
+import { buildAliceClientTools } from "@/lib/aliceNavigation";
 import LiveSupportChat from "@/components/support/LiveSupportChat";
 import BookingEmbed from "@/components/booking/BookingEmbed";
 import { ALICE_OPEN_EVENT, modeToTab, type AliceMode } from "@/components/alice/aliceBus";
@@ -72,8 +73,26 @@ export default function AliceWidget({ context }: { context: "user" | "admin" }) 
   const [liveCall, setLiveCall] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [input, setInput] = useState("");
+  const clientTools = useMemo(() => {
+    const handOff = (mode: "support" | "booking") => {
+      window.setTimeout(() => {
+        setLiveCall(false);
+        setTab("home");
+        setOverlay(mode);
+      }, 2500);
+    };
+    return buildAliceClientTools({
+      navigate,
+      onTalkToHuman: context === "user" ? () => handOff("support") : undefined,
+      onBookCall: context === "user" ? () => handOff("booking") : undefined,
+      onNavigated: () => {
+        // On phones the chat panel covers the page; tuck it away once the page has opened.
+        if (!liveCall && window.innerWidth < 640) window.setTimeout(() => setOpen(false), 1800);
+      },
+    });
+  }, [navigate, context, liveCall]);
   const { messages, isSending, conversationId, send, recordTurn, newChat, loadConversation, conversations } =
-    useAliceChat(context);
+    useAliceChat(context, clientTools);
   const bottomRef = useRef<HTMLDivElement>(null);
   const offerHumanSupport = context === "user" && shouldOfferHumanSupport(messages);
   const firstName = firstNameOf(profile?.full_name, profile?.email);
@@ -567,6 +586,7 @@ export default function AliceWidget({ context }: { context: "user" | "admin" }) 
             active={liveCall}
             context={context}
             onTurn={recordTurn}
+            clientTools={clientTools}
             onEnd={() => {
               setLiveCall(false);
               setTab("home");

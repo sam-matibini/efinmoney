@@ -4,7 +4,13 @@
 // Body (optional): { agent_id?, create_new?, voice_id?, llm? }. Returns { agent_id, tool_ids }.
 import { jsonResponse } from "../_shared/cors.ts";
 import { EFINMONEY_KNOWLEDGE } from "../_shared/alice-knowledge.ts";
-import { ALICE_AGENT_ID, ALICE_GUARDRAILS, ALICE_TOOLS, type AliceToolDef } from "../_shared/aliceTools.ts";
+import {
+  ALICE_AGENT_ID,
+  ALICE_GUARDRAILS,
+  ALICE_NAV_CLIENT_TOOL,
+  ALICE_TOOLS,
+  type AliceToolDef,
+} from "../_shared/aliceTools.ts";
 
 const API = "https://api.elevenlabs.io/v1/convai";
 const DEFAULT_VOICE_ID = "Xb7hH8MSUJpSbSDYk0k2";
@@ -72,9 +78,9 @@ Deno.serve(async (req) => {
     const listed = await eleven("GET", "/tools", apiKey);
     const existingTools: Any[] = listed?.tools || [];
     const toolIds: string[] = [];
-    for (const def of ALICE_TOOLS) {
-      const config = toolConfig(def, supabaseUrl);
-      const found = existingTools.find((t) => t?.tool_config?.name === def.name);
+    const configs = [...ALICE_TOOLS.map((def) => toolConfig(def, supabaseUrl)), ALICE_NAV_CLIENT_TOOL];
+    for (const config of configs) {
+      const found = existingTools.find((t) => t?.tool_config?.name === config.name);
       if (found?.id) {
         await eleven("PATCH", `/tools/${found.id}`, apiKey, { tool_config: config });
         toolIds.push(found.id);

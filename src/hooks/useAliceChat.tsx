@@ -4,6 +4,7 @@ import { Conversation, type TextConversation } from "@elevenlabs/client";
 import { supabase } from "@/integrations/supabase/client";
 import { syncAliceTurnToSupport } from "@/lib/syncAliceToSupport";
 import { fetchAliceAgentSession } from "@/lib/aliceAgent";
+import { delegateClientTools, type AliceClientTools } from "@/lib/aliceNavigation";
 
 export type AliceRole = "user" | "assistant";
 export interface AliceMessage {
@@ -26,8 +27,12 @@ const REPLY_TIMEOUT_MS = 45_000;
  * agent session (tools enforce role + RLS server-side via `alice-tools`) and every
  * turn is persisted to the RLS-scoped alice_* tables so history can be revisited.
  */
-export const useAliceChat = (context: Context) => {
+export const useAliceChat = (context: Context, clientTools?: AliceClientTools) => {
   const qc = useQueryClient();
+  const toolsRef = useRef(clientTools);
+  useEffect(() => {
+    toolsRef.current = clientTools;
+  }, [clientTools]);
   const [messages, setMessages] = useState<AliceMessage[]>([]);
   const [isSending, setIsSending] = useState(false);
   const [conversationId, setConversationId] = useState<string | null>(null);
@@ -118,6 +123,7 @@ export const useAliceChat = (context: Context) => {
         userId: creds.userId,
         dynamicVariables: creds.dynamicVariables,
         overrides: { agent: { firstMessage: "" }, conversation: { textOnly: true } },
+        clientTools: delegateClientTools(toolsRef),
         onMessage: ({ message, role }) => {
           if (role !== "agent" || !message?.trim()) return;
           const resolve = pendingReplyRef.current;

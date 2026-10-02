@@ -17,9 +17,18 @@ You are Alice, the EfinMoney in-app assistant. Rules:
 - NEVER invent balances, fees, limits, dates, or transaction details. Only state
   figures that came from a tool result or the knowledge above. If unsure, say so and
   point the user to the relevant page or to support.
-- You are READ-ONLY. You cannot send money, convert currency, change settings, or
-  approve anything. If asked to perform an action, explain you can't do it yet and
-  point to the correct page (or support for account changes).
+- You can NEVER move money yourself: you cannot send, convert, top up, change settings,
+  or approve anything. What you CAN do is open pages for the user with the
+  navigate_to_page tool. When the user wants to send money, exchange, top up, request
+  money, see bank details, transfers, settings, verification, or support, offer to open
+  that page (or just open it if they asked you to take them there). If they mention an
+  amount, pass it so the form is pre-filled, then remind them to review and confirm on
+  the page themselves. Never claim a transfer or exchange was made.
+- If the user wants a real person / live agent, call navigate_to_page with
+  page "talk_to_human" (live chat with the team). If they want to schedule a call,
+  use page "book_call".
+- navigate_to_page only works inside the signed-in app. If it says it is unavailable,
+  just tell the user which page to open.
 - Do not give financial, tax, or legal advice.
 - When a question is about the user's own account (balance, transactions, KYC), use
   the available tools to fetch real data before answering.
@@ -69,6 +78,33 @@ export const ALICE_TOOLS: AliceToolDef[] = [
   },
   { name: "get_open_incidents_count", description: "Staff only: count operational incidents that are not resolved/closed.", staffOnly: true },
 ];
+
+/** Keys must match ALICE_PAGES in src/lib/aliceNavigation.ts. */
+export const ALICE_NAV_PAGES = [
+  "dashboard", "send", "exchange", "top_up", "request_money", "receive_or_bank_details",
+  "wallets", "transactions", "contacts", "pay_bills", "verification", "business",
+  "profile_settings", "security", "support", "talk_to_human", "book_call",
+];
+
+/** Browser-side (ElevenLabs "client") tool: the web app performs the navigation. */
+export const ALICE_NAV_CLIENT_TOOL = {
+  type: "client",
+  name: "navigate_to_page",
+  description:
+    "Open a page in the EfinMoney app for the user. It only navigates; it never sends or converts money. " +
+    "Use talk_to_human to connect the user to a live support agent, book_call to schedule a call with the team. " +
+    "For send, exchange, top_up and request_money you may pass amount to pre-fill the form.",
+  expects_response: true,
+  response_timeout_secs: 5,
+  parameters: {
+    type: "object",
+    properties: {
+      page: { type: "string", description: "Which page to open.", enum: ALICE_NAV_PAGES },
+      amount: { type: "number", description: "Optional amount to pre-fill (send, exchange, top_up, request_money only)." },
+    },
+    required: ["page"],
+  },
+};
 
 export type AliceCaller = { sb: Any; userId: string; email: string | null; isStaff: boolean };
 

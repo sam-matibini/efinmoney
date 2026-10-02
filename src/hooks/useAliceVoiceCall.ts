@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Conversation, type VoiceConversation } from "@elevenlabs/client";
 import { playCallConnected, playCallEnded, playRingtone } from "@/lib/aliceCallAudio";
 import { fetchAliceAgentSession, type AliceContext } from "@/lib/aliceAgent";
+import { delegateClientTools, type AliceClientTools } from "@/lib/aliceNavigation";
 
 export type AliceCallPhase =
   | "idle"
@@ -42,7 +43,12 @@ function describeCallError(raw: unknown): { message: string; micProblem: boolean
  * greeting → natural back-and-forth (agent handles turn-taking and interruptions).
  * Each finished user/agent utterance is passed to `onTurn` so it lands in the chat history.
  */
-export function useAliceVoiceCall(context: AliceContext, enabled: boolean, onTurn?: AliceTurnRecorder) {
+export function useAliceVoiceCall(
+  context: AliceContext,
+  enabled: boolean,
+  onTurn?: AliceTurnRecorder,
+  clientTools?: AliceClientTools,
+) {
   const [phase, setPhase] = useState<AliceCallPhase>("idle");
   const [transcript, setTranscript] = useState("");
   const [interim, setInterim] = useState("");
@@ -54,10 +60,15 @@ export function useAliceVoiceCall(context: AliceContext, enabled: boolean, onTur
   const activeRef = useRef(false);
   const greetedRef = useRef(false);
   const onTurnRef = useRef(onTurn);
+  const toolsRef = useRef(clientTools);
 
   useEffect(() => {
     onTurnRef.current = onTurn;
   }, [onTurn]);
+
+  useEffect(() => {
+    toolsRef.current = clientTools;
+  }, [clientTools]);
 
   const hangUp = useCallback(() => {
     const wasLive = activeRef.current;
@@ -100,6 +111,7 @@ export function useAliceVoiceCall(context: AliceContext, enabled: boolean, onTur
         textOnly: false,
         userId: creds.userId,
         dynamicVariables: creds.dynamicVariables,
+        clientTools: delegateClientTools(toolsRef),
         onConnect: () => {
           playCallConnected();
           setPhase("greeting");
