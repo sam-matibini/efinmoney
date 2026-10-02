@@ -443,6 +443,9 @@ verify_jwt = false
 [functions.unsubscribe]
 verify_jwt = false
 
+[functions.alice-daily-fx]
+verify_jwt = false
+
 [functions.contact-message]
 verify_jwt = false
 

@@ -17,6 +17,7 @@ import {
   useBroadcasts, useCreateBroadcast, useSendBroadcast, useDeleteBroadcast, useAudienceCount, useUserSearch,
   type Audience, type Broadcast, type BroadcastStatus, type UserSearchResult,
 } from "@/hooks/useBroadcasts";
+import DailyFxEmailCard from "@/components/admin/DailyFxEmailCard";
 
 const TIERS = [
   { v: "tier_0", l: "Tier 0" }, { v: "tier_1", l: "Tier 1" },
@@ -90,6 +91,8 @@ export default function CommunicationHubPage() {
           </Button>
         )}
       </div>
+
+      {view === "list" && <DailyFxEmailCard />}
 
       {view === "compose" ? (
         <Compose onDone={() => setView("list")} />
