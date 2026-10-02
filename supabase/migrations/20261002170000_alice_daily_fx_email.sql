@@ -72,6 +72,8 @@ CREATE POLICY daily_fx_runs_staff_read ON public.daily_fx_email_runs
 
 GRANT SELECT, UPDATE ON public.daily_fx_email_settings TO authenticated;
 GRANT SELECT ON public.daily_fx_email_runs TO authenticated;
+GRANT ALL ON public.daily_fx_email_settings TO service_role;
+GRANT ALL ON public.daily_fx_email_runs TO service_role;
 
 -- ── scheduler ─────────────────────────────────────────────────────────────
 CREATE OR REPLACE FUNCTION public.run_daily_fx_email()
