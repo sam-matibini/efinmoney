@@ -4,6 +4,7 @@
 //   { mode: "run" }      pg_cron (x-internal-secret). Sends once per day at 08:00 Toronto.
 //   { mode: "run", force: true }  internal only: skip the 08:00 check (still once per day).
 //   { mode: "preview" }  staff JWT: returns { subject, html } personalised for the caller.
+//                        internal: same, for body.user_id (or a generic recipient). Never sends.
 //   { mode: "test" }     staff JWT: sends today's email to the caller only.
 import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
@@ -193,8 +194,12 @@ function fallbackCopy(keyRates: Rate[]): Copy {
   };
 }
 
+let lastAiError: string | null = null;
+
 async function aliceCopy(keyRates: Rate[], promo: string | null): Promise<Copy> {
   const fallback = fallbackCopy(keyRates);
+  lastAiError = null;
+  if (!ANTHROPIC_API_KEY) lastAiError = "ANTHROPIC_API_KEY not set";
   if (!ANTHROPIC_API_KEY || keyRates.length === 0) return fallback;
   const facts = keyRates.map((r) => ({
     pair: r.pair,
@@ -239,7 +244,8 @@ async function aliceCopy(keyRates: Rate[], promo: string | null): Promise<Copy> 
       tipBody: clean(parsed.tip_body, 220, fallback.tipBody),
     };
   } catch (e) {
-    console.error("alice copy fallback:", e instanceof Error ? e.message : e);
+    lastAiError = e instanceof Error ? e.message : String(e);
+    console.error("alice copy fallback:", lastAiError);
     return fallback;
   }
 }
@@ -409,6 +415,14 @@ Deno.serve(async (req) => {
     if (mode === "run") {
       if (!isInternal) return json({ error: "Forbidden" }, 403);
       return json({ ok: true, ...(await runDaily(db, body?.force === true)) });
+    }
+
+    if (mode === "preview" && isInternal) {
+      const sample = String(body?.user_id || "");
+      const { copy, recipients, build } = await compose(db, sample || undefined);
+      const r = recipients[0] ?? { user_id: "00000000-0000-0000-0000-000000000000", email: "preview@example.com", first_name: "there" };
+      const message = await build(r);
+      return json({ ok: true, subject: copy.subject, intro: copy.intro, tip: `${copy.tipTitle}: ${copy.tipBody}`, ai_error: lastAiError, html: message.html });
     }
 
     const authHeader = req.headers.get("Authorization") || "";
