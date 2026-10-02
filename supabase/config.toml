@@ -1,6 +1,12 @@
 project_id = "dkdnwumllibwdlqbjkwy"
 
-[functions.alice-chat]
+[functions.alice-agent-session]
+verify_jwt = false
+
+[functions.alice-tools]
+verify_jwt = false
+
+[functions.alice-agent-setup]
 verify_jwt = false
 
 [functions.safeguarding-check]

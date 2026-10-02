@@ -312,7 +312,8 @@ const EDGE_FUNCTIONS: Array<{ name: string; description: string; jwt: boolean; c
   { name: "contact-message",           description: "Contact form submission",                 jwt: false, category: "Communication" },
   { name: "unsubscribe",               description: "Email unsubscribe handler",               jwt: false, category: "Communication" },
   // AI
-  { name: "alice-chat",                description: "Alice AI assistant chat",                 jwt: true,  category: "AI" },
+  { name: "alice-agent-session",       description: "Alice (ElevenLabs) conversation session", jwt: true,  category: "AI" },
+  { name: "alice-tools",               description: "Alice (ElevenLabs) agent webhook tools",  jwt: false, category: "AI" },
   { name: "scan-purchase-bill",        description: "AI-powered bill scanner",                 jwt: true,  category: "AI" },
   // Diagnostics
   { name: "test-integration",          description: "Test provider API connectivity",          jwt: false, category: "Diagnostics" },

@@ -1,15 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import {
-  getSpeechRecognitionCtor,
-  playCallConnected,
-  playCallEnded,
-  playRingtone,
-  playSoftTick,
-  speakAlice,
-  stopSpeaking,
-  voiceCallSupported,
-  type SpeechRecognitionLike,
-} from "@/lib/aliceCallAudio";
+import { Conversation, type VoiceConversation } from "@elevenlabs/client";
+import { playCallConnected, playCallEnded, playRingtone } from "@/lib/aliceCallAudio";
+import { fetchAliceAgentSession, type AliceContext } from "@/lib/aliceAgent";
 
 export type AliceCallPhase =
   | "idle"
@@ -22,13 +14,18 @@ export type AliceCallPhase =
   | "ended"
   | "unsupported";
 
-type SendFn = (text: string) => Promise<string | null | void>;
+export type AliceTurnRecorder = (role: "user" | "assistant", text: string) => void | Promise<void>;
+
+function micSupported(): boolean {
+  return typeof navigator !== "undefined" && Boolean(navigator.mediaDevices?.getUserMedia);
+}
 
 /**
- * Interactive voice call with Alice: ringtone → spoken greeting → listen →
- * alice-chat reply spoken aloud → listen again.
+ * Live voice call with the ElevenLabs Alice agent over WebRTC: ringtone → agent
+ * greeting → natural back-and-forth (agent handles turn-taking and interruptions).
+ * Each finished user/agent utterance is passed to `onTurn` so it lands in the chat history.
  */
-export function useAliceVoiceCall(send: SendFn, enabled: boolean) {
+export function useAliceVoiceCall(context: AliceContext, enabled: boolean, onTurn?: AliceTurnRecorder) {
   const [phase, setPhase] = useState<AliceCallPhase>("idle");
   const [transcript, setTranscript] = useState("");
   const [interim, setInterim] = useState("");
@@ -36,217 +33,116 @@ export function useAliceVoiceCall(send: SendFn, enabled: boolean) {
   const [error, setError] = useState<string | null>(null);
   const [muted, setMuted] = useState(false);
 
-  const recogRef = useRef<SpeechRecognitionLike | null>(null);
+  const convRef = useRef<VoiceConversation | null>(null);
   const activeRef = useRef(false);
-  const mutedRef = useRef(false);
-  const phaseRef = useRef<AliceCallPhase>("idle");
-  const sendRef = useRef(send);
-  const listenRef = useRef<() => void>(() => {});
+  const greetedRef = useRef(false);
+  const onTurnRef = useRef(onTurn);
 
   useEffect(() => {
-    sendRef.current = send;
-  }, [send]);
-  useEffect(() => {
-    mutedRef.current = muted;
-  }, [muted]);
-  useEffect(() => {
-    phaseRef.current = phase;
-  }, [phase]);
-
-  const stopRecognition = useCallback(() => {
-    try {
-      recogRef.current?.abort();
-    } catch {
-      /* ignore */
-    }
-    recogRef.current = null;
-  }, []);
+    onTurnRef.current = onTurn;
+  }, [onTurn]);
 
   const hangUp = useCallback(() => {
     const wasLive = activeRef.current;
     activeRef.current = false;
-    stopRecognition();
-    stopSpeaking();
+    const conv = convRef.current;
+    convRef.current = null;
+    if (conv) void conv.endSession().catch(() => {});
     if (wasLive) playCallEnded();
     setPhase("ended");
     setInterim("");
-  }, [stopRecognition]);
-
-  const handleUtterance = useCallback(
-    async (text: string) => {
-      if (!activeRef.current) return;
-      stopRecognition();
-      setPhase("thinking");
-      setError(null);
-      try {
-        const reply = await sendRef.current(text);
-        if (!activeRef.current) return;
-        const spoken =
-          (typeof reply === "string" && reply.trim()) ||
-          "I didn't catch a reply just now. Could you say that again?";
-        const clean = spoken.replace(/^⚠️\s*/, "");
-        setLastReply(clean);
-        setPhase("speaking");
-        speakAlice(clean, () => {
-          if (!activeRef.current) return;
-          listenRef.current();
-        });
-      } catch (e) {
-        if (!activeRef.current) return;
-        const msg = e instanceof Error ? e.message : "Something went wrong on the call.";
-        setError(msg);
-        setPhase("speaking");
-        speakAlice("Sorry, I hit a snag. Please try again.", () => {
-          if (activeRef.current) listenRef.current();
-        });
-      }
-    },
-    [stopRecognition],
-  );
-
-  const listen = useCallback(() => {
-    if (!activeRef.current) return;
-    if (mutedRef.current) {
-      setPhase("listening");
-      return;
-    }
-    const Ctor = getSpeechRecognitionCtor();
-    if (!Ctor) {
-      setPhase("unsupported");
-      setError("Voice input isn't supported in this browser. Try Chrome or Edge.");
-      return;
-    }
-    stopRecognition();
-    const recog = new Ctor();
-    recog.continuous = false;
-    recog.interimResults = true;
-    recog.lang = "en-US";
-    recog.maxAlternatives = 1;
-    recogRef.current = recog;
-    setPhase("listening");
-    setInterim("");
-
-    recog.onresult = (ev) => {
-      let finalText = "";
-      let interimText = "";
-      for (let i = ev.resultIndex; i < ev.results.length; i++) {
-        const piece = ev.results[i][0]?.transcript ?? "";
-        if (ev.results[i].isFinal) finalText += piece;
-        else interimText += piece;
-      }
-      if (interimText) setInterim(interimText);
-      if (finalText.trim()) {
-        setTranscript(finalText.trim());
-        setInterim("");
-        void handleUtterance(finalText.trim());
-      }
-    };
-    recog.onerror = (ev) => {
-      if (!activeRef.current) return;
-      if (ev.error === "aborted") return;
-      if (ev.error === "no-speech") {
-        setTimeout(() => {
-          if (activeRef.current && !mutedRef.current && phaseRef.current === "listening") {
-            listenRef.current();
-          }
-        }, 280);
-        return;
-      }
-      if (ev.error === "not-allowed") {
-        setError("Microphone permission is required to talk to Alice.");
-        setPhase("unsupported");
-        return;
-      }
-      setError(`Mic error: ${ev.error}`);
-    };
-    recog.onend = () => {
-      if (!activeRef.current || mutedRef.current) return;
-      if (phaseRef.current === "listening") {
-        setTimeout(() => {
-          if (activeRef.current && phaseRef.current === "listening" && !mutedRef.current) {
-            listenRef.current();
-          }
-        }, 200);
-      }
-    };
-
-    try {
-      recog.start();
-      playSoftTick();
-    } catch {
-      setTimeout(() => {
-        if (activeRef.current) {
-          try {
-            recog.start();
-          } catch {
-            /* ignore */
-          }
-        }
-      }, 300);
-    }
-  }, [handleUtterance, stopRecognition]);
-
-  useEffect(() => {
-    listenRef.current = listen;
-  }, [listen]);
+  }, []);
 
   const startCall = useCallback(async () => {
-    const support = voiceCallSupported();
-    if (!support.speech && !support.mic) {
+    if (!micSupported()) {
       setPhase("unsupported");
-      setError("This browser can't run a live voice call. Try Chrome or Edge.");
+      setError("This browser can't access a microphone. Try Chrome, Edge, or Safari.");
       return;
     }
     activeRef.current = true;
+    greetedRef.current = false;
     setError(null);
     setTranscript("");
     setInterim("");
     setLastReply("");
     setMuted(false);
-    mutedRef.current = false;
     setPhase("ringing");
+
     try {
-      await playRingtone(2);
-    } catch {
-      /* autoplay may block until gesture — started from a click */
-    }
-    if (!activeRef.current) return;
-    setPhase("connecting");
-    playCallConnected();
-    if (!activeRef.current) return;
-    setPhase("greeting");
-    const greeting =
-      "Hi, this is Alice, your eFinMoney AI expert. I'm on the line — how can I help you today?";
-    setLastReply(greeting);
-    speakAlice(greeting, () => {
+      const [creds] = await Promise.all([
+        fetchAliceAgentSession(context, "voice"),
+        playRingtone(1).catch(() => {}),
+      ]);
       if (!activeRef.current) return;
-      if (!support.mic) {
-        setError("I can speak, but this browser can't hear you. Type in Messages instead.");
-        setPhase("unsupported");
+      if (!creds.conversationToken) throw new Error("Alice is unavailable right now.");
+      setPhase("connecting");
+
+      const conv = await Conversation.startSession({
+        conversationToken: creds.conversationToken,
+        connectionType: "webrtc",
+        textOnly: false,
+        userId: creds.userId,
+        dynamicVariables: creds.dynamicVariables,
+        onConnect: () => {
+          playCallConnected();
+          setPhase("greeting");
+        },
+        onModeChange: ({ mode }) => {
+          if (!activeRef.current) return;
+          if (mode === "speaking") {
+            setPhase(greetedRef.current ? "speaking" : "greeting");
+          } else {
+            greetedRef.current = true;
+            setPhase("listening");
+          }
+        },
+        onMessage: ({ message, role }) => {
+          const text = message?.trim();
+          if (!text || !activeRef.current) return;
+          if (role === "user") {
+            setTranscript(text);
+            setInterim("");
+            setPhase("thinking");
+            void onTurnRef.current?.("user", text);
+          } else {
+            setLastReply(text);
+            void onTurnRef.current?.("assistant", text);
+          }
+        },
+        onError: (message) => {
+          setError(message || "Something went wrong on the call.");
+        },
+        onDisconnect: () => {
+          if (!activeRef.current) return;
+          activeRef.current = false;
+          convRef.current = null;
+          playCallEnded();
+          setPhase("ended");
+        },
+      });
+
+      if (!activeRef.current) {
+        void conv.endSession().catch(() => {});
         return;
       }
-      listenRef.current();
-    });
-  }, []);
+      convRef.current = conv;
+    } catch (e) {
+      if (!activeRef.current) return;
+      activeRef.current = false;
+      const msg = e instanceof Error ? e.message : "Couldn't connect the call.";
+      const denied = /permission|notallowed|denied/i.test(msg);
+      setError(denied ? "Microphone permission is required to talk to Alice." : msg);
+      setPhase(denied ? "unsupported" : "ended");
+    }
+  }, [context]);
 
   const toggleMute = useCallback(() => {
     setMuted((m) => {
       const next = !m;
-      mutedRef.current = next;
-      if (next) {
-        stopRecognition();
-      } else if (
-        activeRef.current &&
-        phaseRef.current !== "speaking" &&
-        phaseRef.current !== "thinking" &&
-        phaseRef.current !== "ringing" &&
-        phaseRef.current !== "greeting"
-      ) {
-        setTimeout(() => listenRef.current(), 50);
-      }
+      convRef.current?.setMicMuted(next);
       return next;
     });
-  }, [stopRecognition]);
+  }, []);
 
   useEffect(() => {
     if (!enabled && activeRef.current) {
@@ -264,17 +160,10 @@ export function useAliceVoiceCall(send: SendFn, enabled: boolean) {
   useEffect(() => {
     return () => {
       activeRef.current = false;
-      stopRecognition();
-      stopSpeaking();
+      const conv = convRef.current;
+      convRef.current = null;
+      if (conv) void conv.endSession().catch(() => {});
     };
-  }, [stopRecognition]);
-
-  useEffect(() => {
-    if (typeof window === "undefined" || !window.speechSynthesis) return;
-    window.speechSynthesis.getVoices();
-    const onVoices = () => window.speechSynthesis.getVoices();
-    window.speechSynthesis.addEventListener?.("voiceschanged", onVoices);
-    return () => window.speechSynthesis.removeEventListener?.("voiceschanged", onVoices);
   }, []);
 
   return {
@@ -287,6 +176,6 @@ export function useAliceVoiceCall(send: SendFn, enabled: boolean) {
     startCall,
     hangUp,
     toggleMute,
-    supported: voiceCallSupported(),
+    supported: { speech: true, mic: micSupported() },
   };
 }

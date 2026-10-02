@@ -1,12 +1,13 @@
 import { useEffect } from "react";
 import { Mic, MicOff, PhoneOff, Loader2 } from "lucide-react";
 import { ALICE_ACCENT, ALICE_BRAND, ALICE_BRAND_MID, ALICE_BRAND_SOFT } from "@/components/alice/aliceAdvisorTheme";
-import { useAliceVoiceCall, type AliceCallPhase } from "@/hooks/useAliceVoiceCall";
+import { useAliceVoiceCall, type AliceCallPhase, type AliceTurnRecorder } from "@/hooks/useAliceVoiceCall";
 import { cn } from "@/lib/utils";
 
 type Props = {
   active: boolean;
-  send: (text: string) => Promise<string | null | void>;
+  context: "user" | "admin";
+  onTurn?: AliceTurnRecorder;
   onEnd: () => void;
   onOpenMessages?: () => void;
 };
@@ -35,10 +36,10 @@ function statusLabel(phase: AliceCallPhase, muted: boolean): string {
   }
 }
 
-/** Full-screen-in-panel live voice call with ringtone, mic, and spoken replies. */
-export default function AliceLiveCall({ active, send, onEnd, onOpenMessages }: Props) {
+/** Full-screen-in-panel live voice call with the ElevenLabs Alice agent. */
+export default function AliceLiveCall({ active, context, onTurn, onEnd, onOpenMessages }: Props) {
   const { phase, transcript, interim, lastReply, error, muted, startCall, hangUp, toggleMute } =
-    useAliceVoiceCall(send, active);
+    useAliceVoiceCall(context, active, onTurn);
 
   useEffect(() => {
     if (active && phase === "idle") {

@@ -72,7 +72,7 @@ export default function AliceWidget({ context }: { context: "user" | "admin" }) 
   const [liveCall, setLiveCall] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [input, setInput] = useState("");
-  const { messages, isSending, conversationId, send, newChat, loadConversation, conversations } =
+  const { messages, isSending, conversationId, send, recordTurn, newChat, loadConversation, conversations } =
     useAliceChat(context);
   const bottomRef = useRef<HTMLDivElement>(null);
   const offerHumanSupport = context === "user" && shouldOfferHumanSupport(messages);
@@ -565,7 +565,8 @@ export default function AliceWidget({ context }: { context: "user" | "admin" }) 
         <div className="fixed z-50 right-3 bottom-3 sm:right-5 sm:bottom-5 w-[min(100vw-1.5rem,380px)] h-[min(72vh,640px)] flex flex-col overflow-hidden rounded-[1.35rem] border border-black/5 shadow-[0_24px_64px_rgba(15,23,42,0.22)]">
           <AliceLiveCall
             active={liveCall}
-            send={send}
+            context={context}
+            onTurn={recordTurn}
             onEnd={() => {
               setLiveCall(false);
               setTab("home");
