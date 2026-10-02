@@ -8,6 +8,10 @@
 //   { mode: "test" }     staff JWT: sends today's email to the caller only.
 //                        internal: { to } sends one test copy to that address only.
 import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { ALICE_AGENT_ID } from "../_shared/aliceTools.ts";
+
+// deno-lint-ignore no-explicit-any
+type Any = any;
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -21,11 +25,10 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY") || "";
-const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY") || "";
+const ELEVENLABS_API_KEY = Deno.env.get("ELEVENLABS_API_KEY") || "";
 const UNSUB_SECRET = Deno.env.get("UNSUBSCRIBE_SECRET") || SERVICE_KEY;
 const APP_URL = (Deno.env.get("APP_URL") || "https://www.efin.money").replace(/\/+$/, "");
 const EMAIL_FROM = "Alice at eFinMoney <noreply@efinsuite.com>";
-const MODEL = "claude-sonnet-5";
 const TZ = "America/Toronto";
 const SEND_HOUR = 8;
 
@@ -197,11 +200,77 @@ function fallbackCopy(keyRates: Rate[]): Copy {
 
 let lastAiError: string | null = null;
 
+/**
+ * Asks the real Alice agent (ElevenLabs, text-only session) for one reply. The session uses
+ * no user token, so only Alice's public tools are available to her.
+ */
+async function askAlice(message: string, timeoutMs = 60_000): Promise<string> {
+  if (!ELEVENLABS_API_KEY) throw new Error("ELEVENLABS_API_KEY not set");
+  const res = await fetch(
+    `https://api.elevenlabs.io/v1/convai/conversation/get-signed-url?agent_id=${encodeURIComponent(ALICE_AGENT_ID)}`,
+    { headers: { "xi-api-key": ELEVENLABS_API_KEY } },
+  );
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok || !body?.signed_url) throw new Error(`elevenlabs signed url ${res.status}: ${JSON.stringify(body?.detail ?? body).slice(0, 200)}`);
+
+  return await new Promise<string>((resolve, reject) => {
+    const ws = new WebSocket(body.signed_url);
+    let asked = false;
+    let done = false;
+    const finish = (err: Error | null, text?: string) => {
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      try { ws.close(); } catch { /* already closed */ }
+      if (err) reject(err);
+      else resolve(text ?? "");
+    };
+    const timer = setTimeout(() => finish(new Error("Alice did not reply in time")), timeoutMs);
+    const ask = () => {
+      if (asked) return;
+      asked = true;
+      ws.send(JSON.stringify({ type: "user_message", text: message }));
+    };
+
+    ws.onopen = () => {
+      ws.send(JSON.stringify({
+        type: "conversation_initiation_client_data",
+        conversation_config_override: { agent: { first_message: "" }, conversation: { text_only: true } },
+        dynamic_variables: {
+          user_name: "the eFinMoney team",
+          alice_context: "user",
+          staff_notes: "",
+          today: new Date().toISOString().slice(0, 10),
+          secret__alice_token: "",
+        },
+      }));
+    };
+    ws.onmessage = (ev) => {
+      let msg: Record<string, Any>;
+      try { msg = JSON.parse(String(ev.data)); } catch { return; }
+      switch (msg.type) {
+        case "conversation_initiation_metadata":
+          ask();
+          break;
+        case "ping":
+          ws.send(JSON.stringify({ type: "pong", event_id: msg.ping_event?.event_id }));
+          break;
+        case "agent_response": {
+          const text = String(msg.agent_response_event?.agent_response ?? "");
+          if (asked && text.includes("{")) finish(null, text);
+          break;
+        }
+      }
+    };
+    ws.onerror = () => finish(new Error("Alice session error"));
+    ws.onclose = (ev) => finish(new Error(`Alice session closed (${ev.code}${ev.reason ? `: ${ev.reason}` : ""})`));
+  });
+}
+
 async function aliceCopy(keyRates: Rate[], promo: string | null): Promise<Copy> {
   const fallback = fallbackCopy(keyRates);
   lastAiError = null;
-  if (!ANTHROPIC_API_KEY) lastAiError = "ANTHROPIC_API_KEY not set";
-  if (!ANTHROPIC_API_KEY || keyRates.length === 0) return fallback;
+  if (keyRates.length === 0) return fallback;
   const facts = keyRates.map((r) => ({
     pair: r.pair,
     rate: fmtRate(r.current),
@@ -209,28 +278,20 @@ async function aliceCopy(keyRates: Rate[], promo: string | null): Promise<Copy> 
     best_this_week: isWeekBest(r),
   }));
   const prompt = [
-    "You are Alice, the friendly assistant at eFinMoney, a Canadian money transfer app (CAD, USD and African corridors).",
-    "Write today's short daily rates email for all clients. Today is " + prettyDate() + ".",
-    "Live rates (customer rate = units of the second currency per 1 of the first):",
+    "Internal request from the eFinMoney team: please write the copy for today's daily rates email that goes to all our clients.",
+    "Today is " + prettyDate() + ". Do not call any tools; use only these live customer rates (units of the second currency per 1 of the first):",
     JSON.stringify(facts),
-    promo ? `Staff promo to weave in lightly if natural (do not invent offers): ${promo}` : "",
-    "Rules: warm, upbeat, plain English. Only use the numbers given above; never invent rates, fees or offers.",
+    promo ? `Staff promo to mention lightly if it fits (do not invent offers): ${promo}` : "",
+    "Rules: warm, upbeat, plain English, written as you (Alice). Only use the numbers above; never invent rates, fees or offers.",
     "No financial advice, no predictions, no urgency pressure. Rates are indicative.",
-    "Reply with ONLY a JSON object: {\"subject\": string (max 60 chars, may include one pair and its rate),",
+    "Reply with ONLY a JSON object and nothing else: {\"subject\": string (max 60 chars, may include one pair and its rate),",
     "\"intro\": string (2 sentences, max 45 words, mention the biggest mover),",
     "\"tip_title\": string (max 6 words), \"tip_body\": string (1 sentence, max 25 words, a genuinely useful eFinMoney feature tip:",
-    "contacts, wallet exchange, payment links, transfer tracking, hide balances, monthly budget, or asking Alice)}.",
+    "contacts, wallet exchange, payment links, transfer tracking, hide balances, monthly budget, or asking Alice in the app)}.",
   ].filter(Boolean).join("\n");
 
   try {
-    const res = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: { "content-type": "application/json", "x-api-key": ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01" },
-      body: JSON.stringify({ model: MODEL, max_tokens: 400, messages: [{ role: "user", content: prompt }] }),
-    });
-    if (!res.ok) throw new Error(`anthropic ${res.status}: ${(await res.text()).slice(0, 200)}`);
-    const data = await res.json();
-    const text: string = (data?.content ?? []).map((c: { text?: string }) => c.text ?? "").join("");
+    const text = await askAlice(prompt);
     const match = text.match(/\{[\s\S]*\}/);
     if (!match) throw new Error("no JSON in reply");
     const parsed = JSON.parse(match[0]);
