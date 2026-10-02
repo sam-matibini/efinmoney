@@ -560,7 +560,7 @@ export default function AliceWidget({ context }: { context: "user" | "admin" }) 
                   onChange={(e) => setInput(e.target.value)}
                   placeholder="Message Alice…"
                   disabled={isSending}
-                  className="flex-1 rounded-full bg-slate-50 border-black/5"
+                  className="flex-1 rounded-full bg-slate-50 border-black/5 text-slate-900 placeholder:text-slate-400"
                   autoFocus
                 />
                 <Button
