@@ -180,7 +180,7 @@ export default function PublicAliceLauncher() {
       </AliceAdvisorChrome>
 
       {open && booking && (
-        <div className="fixed z-[110] right-3 bottom-[calc(0.75rem+env(safe-area-inset-bottom))] sm:right-5 sm:bottom-5 w-[min(100vw-1.5rem,380px)] h-[min(calc(100dvh-1.5rem-env(safe-area-inset-bottom)),640px)] sm:h-[min(72vh,640px)] flex flex-col overflow-hidden rounded-[1.35rem] border border-black/5 bg-white shadow-[0_24px_64px_rgba(15,23,42,0.22)]">
+        <div className="alice-light fixed z-[110] right-3 bottom-[calc(0.75rem+env(safe-area-inset-bottom))] sm:right-5 sm:bottom-5 w-[min(100vw-1.5rem,380px)] h-[min(calc(100dvh-1.5rem-env(safe-area-inset-bottom)),640px)] sm:h-[min(72vh,640px)] flex flex-col overflow-hidden rounded-[1.35rem] border border-black/5 bg-white shadow-[0_24px_64px_rgba(15,23,42,0.22)]">
           <div className="flex items-center gap-2 px-4 h-14 border-b shrink-0">
             <Button
               size="icon"

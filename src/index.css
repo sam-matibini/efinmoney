@@ -103,6 +103,29 @@
     --sidebar-ring: 244 75% 57%;
   }
 
+  /* Alice panels are always light-skinned, even when the app is in dark mode. */
+  .alice-light {
+    color-scheme: light;
+    color: hsl(230 35% 12%);
+    --background: 220 33% 98%;
+    --foreground: 230 35% 12%;
+    --card: 0 0% 100%;
+    --card-foreground: 230 35% 12%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 230 35% 12%;
+    --primary: 244 75% 57%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 230 30% 96%;
+    --secondary-foreground: 230 35% 12%;
+    --muted: 230 25% 95%;
+    --muted-foreground: 230 12% 45%;
+    --accent: 258 80% 96%;
+    --accent-foreground: 258 70% 30%;
+    --border: 230 25% 91%;
+    --input: 230 25% 91%;
+    --ring: 244 75% 57%;
+  }
+
   /* Dark = eFinMoney navy (Dashboard Redesign guide v1.0). Values mirror src/styles/tokens.css. */
   .dark {
     --background: 216 60% 10%;
