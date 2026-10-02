@@ -58,7 +58,7 @@ interface QuickActionDrawerProps {
 }
 
 const fieldCls =
-  "h-12 w-full rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-bg-primary)] px-4 text-[var(--font-size-base)] text-white outline-none placeholder:text-[var(--color-text-muted)] focus:ring-2 focus:ring-[var(--color-accent-gold)]";
+  "h-12 w-full rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-bg-primary)] px-4 text-[var(--font-size-base)] text-[var(--color-text-primary)] outline-none placeholder:text-[var(--color-text-muted)] focus:ring-2 focus:ring-[var(--color-accent-gold)]";
 
 function DrawerBody({ actionType, onClose }: { actionType: QuickActionType; onClose: () => void }) {
   const navigate = useNavigate();
@@ -99,7 +99,7 @@ function DrawerBody({ actionType, onClose }: { actionType: QuickActionType; onCl
           {rows.map(([k, v]) => (
             <div key={k} className="flex items-start justify-between gap-4 px-4 py-3 text-sm">
               <dt className="text-[var(--color-text-muted)]">{k}</dt>
-              <dd className="text-right font-semibold text-white break-all">{v}</dd>
+              <dd className="text-right font-semibold text-[var(--color-text-primary)] break-all">{v}</dd>
             </div>
           ))}
         </dl>
@@ -110,14 +110,14 @@ function DrawerBody({ actionType, onClose }: { actionType: QuickActionType; onCl
           <button
             type="button"
             onClick={() => setStep("form")}
-            className="flex h-11 flex-1 items-center justify-center gap-2 rounded-[var(--radius-md)] border border-[var(--color-border)] text-sm font-semibold text-[var(--color-text-label)] hover:bg-white/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent-gold)]"
+            className="flex h-11 flex-1 items-center justify-center gap-2 rounded-[var(--radius-md)] border border-[var(--color-border)] text-sm font-semibold text-[var(--color-text-label)] hover:bg-[var(--color-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent-gold)]"
           >
             <ArrowLeft className="h-4 w-4" /> Back
           </button>
           <button
             type="button"
             onClick={confirm}
-            className="h-11 flex-1 rounded-[var(--radius-md)] bg-[var(--color-accent-gold)] text-sm font-bold text-[var(--color-bg-primary)] hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+            className="h-11 flex-1 rounded-[var(--radius-md)] bg-[var(--color-accent-gold)] text-sm font-bold text-[var(--color-on-gold)] hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-text-primary)]"
           >
             {cfg.cta}
           </button>
@@ -183,7 +183,7 @@ function DrawerBody({ actionType, onClose }: { actionType: QuickActionType; onCl
 
       <button
         type="submit"
-        className="h-11 w-full rounded-[var(--radius-md)] bg-[var(--color-accent-gold)] text-sm font-bold text-[var(--color-bg-primary)] hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+        className="h-11 w-full rounded-[var(--radius-md)] bg-[var(--color-accent-gold)] text-sm font-bold text-[var(--color-on-gold)] hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-text-primary)]"
       >
         Continue
       </button>
@@ -208,10 +208,10 @@ export default function QuickActionDrawer({ actionType, onClose }: QuickActionDr
   if (isMobile) {
     return (
       <Drawer open={open} onOpenChange={onOpenChange}>
-        <DrawerContent className="border-[var(--color-border)] bg-[var(--color-bg-card)] text-[var(--color-text-primary)]">
+        <DrawerContent className="border-[var(--color-border)] bg-[var(--color-bg-raised)] text-[var(--color-text-primary)]">
           <div className="mx-auto w-full max-w-md px-6 pb-8">
             <DrawerHeader className="px-0 text-left">
-              <DrawerTitle className="text-white">{cfg?.title}</DrawerTitle>
+              <DrawerTitle className="text-[var(--color-text-primary)]">{cfg?.title}</DrawerTitle>
               <DrawerDescription className="text-[var(--color-text-muted)]">{cfg?.description}</DrawerDescription>
             </DrawerHeader>
             {body}
@@ -225,10 +225,10 @@ export default function QuickActionDrawer({ actionType, onClose }: QuickActionDr
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
         side="right"
-        className="w-full border-[var(--color-border)] bg-[var(--color-bg-card)] p-8 text-[var(--color-text-primary)] sm:max-w-[420px]"
+        className="w-full border-[var(--color-border)] bg-[var(--color-bg-raised)] p-8 text-[var(--color-text-primary)] sm:max-w-[420px]"
       >
         <SheetHeader className="mb-6 text-left">
-          <SheetTitle className="text-white">{cfg?.title}</SheetTitle>
+          <SheetTitle className="text-[var(--color-text-primary)]">{cfg?.title}</SheetTitle>
           <SheetDescription className="text-[var(--color-text-muted)]">{cfg?.description}</SheetDescription>
         </SheetHeader>
         {body}

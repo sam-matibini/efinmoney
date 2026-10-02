@@ -5,6 +5,7 @@
   --color-bg-sidebar: #0f1f3d;
   --color-bg-card: #112952;
   --color-bg-card-hover: #16336a;
+  --color-bg-raised: #112952;
   --color-accent-gold: #f5a623;
   --color-accent-blue: #38bdf8;
   --color-accent-emerald: #34d399;
@@ -22,6 +23,10 @@
   --color-border: rgba(255, 255, 255, 0.08);
   --color-success: #22c55e;
   --color-danger: #ef4444;
+  --color-hover: rgba(255, 255, 255, 0.06);
+  --color-on-gold: #0a1628;
+  --color-track: rgba(255, 255, 255, 0.08);
+  --color-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
 
   /* Typography */
   --font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
@@ -50,4 +55,33 @@
   /* Layout */
   --sidebar-width: 220px;
   --sidebar-width-collapsed: 72px;
+}
+
+/* Light variant: same structure, darker accents so text keeps contrast on white. */
+html.light {
+  --color-bg-primary: #eef2f8;
+  --color-bg-sidebar: #ffffff;
+  --color-bg-card: #f4f7fc;
+  --color-bg-card-hover: #e8eef8;
+  --color-bg-raised: #ffffff;
+  --color-accent-gold: #e8970f;
+  --color-accent-blue: #0284c7;
+  --color-accent-emerald: #059669;
+  --color-accent-purple: #7c3aed;
+  --color-accent-orange: #ea580c;
+  --color-accent-pink: #db2777;
+  --color-accent-green: #16a34a;
+  --color-accent-yellow: #ca8a04;
+  --color-accent-lightblue: #0ea5e9;
+  --color-accent-violet: #9333ea;
+  --color-accent-slate: #64748b;
+  --color-text-primary: #0a1628;
+  --color-text-muted: #5b6b85;
+  --color-text-label: #334155;
+  --color-border: rgba(10, 22, 40, 0.1);
+  --color-success: #16a34a;
+  --color-danger: #dc2626;
+  --color-hover: rgba(10, 22, 40, 0.05);
+  --color-track: rgba(10, 22, 40, 0.08);
+  --color-shadow: 0 4px 16px rgba(15, 31, 61, 0.08);
 }

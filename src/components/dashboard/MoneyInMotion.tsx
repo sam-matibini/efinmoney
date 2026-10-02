@@ -47,7 +47,7 @@ export default function MoneyInMotion() {
   return (
     <section aria-labelledby="money-motion-title" className="rounded-[var(--radius-lg)] bg-[var(--color-bg-sidebar)] p-5 h-full">
       <div className="mb-4 flex items-center justify-between">
-        <h2 id="money-motion-title" className="text-[var(--font-size-lg)] font-semibold text-white">
+        <h2 id="money-motion-title" className="text-[var(--font-size-lg)] font-semibold text-[var(--color-text-primary)]">
           Money in Motion
         </h2>
         <span className="text-xs text-[var(--color-text-muted)]">This month</span>
@@ -59,7 +59,7 @@ export default function MoneyInMotion() {
         <div className="flex flex-col items-center gap-5 sm:flex-row lg:flex-col xl:flex-row">
           <div className="relative h-36 w-36 shrink-0">
             <svg viewBox="0 0 100 100" className="h-full w-full -rotate-90" role="img" aria-label={`${total} transfers this month`}>
-              <circle cx="50" cy="50" r={R} fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="10" />
+              <circle cx="50" cy="50" r={R} fill="none" stroke="var(--color-track)" strokeWidth="10" />
               {total > 0 &&
                 SEGMENTS.map((s) => {
                   const len = (counts[s.key] / total) * C;
@@ -82,7 +82,7 @@ export default function MoneyInMotion() {
                 })}
             </svg>
             <div className="absolute inset-0 flex flex-col items-center justify-center">
-              <span className="text-3xl font-black text-white tabular-nums">{total}</span>
+              <span className="text-3xl font-black text-[var(--color-text-primary)] tabular-nums">{total}</span>
               <span className="text-[11px] text-[var(--color-text-muted)]">transfers</span>
             </div>
           </div>
@@ -95,7 +95,7 @@ export default function MoneyInMotion() {
                     <span className="h-2.5 w-2.5 rounded-full" style={{ background: s.color }} aria-hidden />
                     {s.label}
                   </span>
-                  <span className="font-semibold tabular-nums text-white">{counts[s.key]}</span>
+                  <span className="font-semibold tabular-nums text-[var(--color-text-primary)]">{counts[s.key]}</span>
                 </li>
               ))}
             </ul>
@@ -109,7 +109,7 @@ export default function MoneyInMotion() {
                   {corridors.map(([cc, n]) => (
                     <span
                       key={cc}
-                      className="flex items-center gap-1.5 rounded-full bg-[var(--color-bg-card)] px-2.5 py-1 text-xs text-white"
+                      className="flex items-center gap-1.5 rounded-full bg-[var(--color-bg-card)] px-2.5 py-1 text-xs text-[var(--color-text-primary)]"
                     >
                       <CountryFlag country={cc} size="sm" />
                       {cc} · {n}

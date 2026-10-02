@@ -6,6 +6,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
 import { avatarInitials } from "@/lib/avatar";
 import { cn } from "@/lib/utils";
+import { Logo } from "@/components/Logo";
 import { useNavModel, type NavLinkItem } from "@/components/layout/useNavModel";
 
 const itemBase =
@@ -35,8 +36,8 @@ function SidebarLink({
           className={cn(
             itemBase,
             active
-              ? "bg-[rgba(245,166,35,0.12)] text-white font-semibold before:absolute before:left-0 before:top-1.5 before:bottom-1.5 before:w-[3px] before:rounded-full before:bg-[var(--color-accent-gold)]"
-              : "text-[var(--color-text-label)] hover:bg-white/[0.06] hover:text-white",
+              ? "bg-[rgba(245,166,35,0.12)] text-[var(--color-text-primary)] font-semibold before:absolute before:left-0 before:top-1.5 before:bottom-1.5 before:w-[3px] before:rounded-full before:bg-[var(--color-accent-gold)]"
+              : "text-[var(--color-text-label)] hover:bg-[var(--color-hover)] hover:text-[var(--color-text-primary)]",
           )}
         >
           <Icon
@@ -55,7 +56,7 @@ function SidebarLink({
   );
 }
 
-const Separator = () => <div className="h-px bg-white/[0.06] mx-4 my-2" aria-hidden />;
+const Separator = () => <div className="h-px bg-[var(--color-hover)] mx-4 my-2" aria-hidden />;
 
 /** Fixed, colour-grouped navigation: 220px on desktop, 72px icon rail on tablet, hidden on mobile. */
 export default function Sidebar() {
@@ -69,7 +70,7 @@ export default function Sidebar() {
   return (
     <TooltipProvider delayDuration={150}>
       <aside
-        className="hidden md:flex fixed inset-y-0 left-0 z-[100] flex-col w-[var(--sidebar-width-collapsed)] lg:w-[var(--sidebar-width)] h-screen overflow-hidden border-r border-white/[0.06] text-[var(--color-text-primary)]"
+        className="hidden md:flex fixed inset-y-0 left-0 z-[100] flex-col w-[var(--sidebar-width-collapsed)] lg:w-[var(--sidebar-width)] h-screen overflow-hidden border-r border-[var(--color-border)] text-[var(--color-text-primary)]"
         style={{
           backgroundColor: "var(--color-bg-sidebar)",
           backgroundImage: "linear-gradient(90deg, rgba(255,255,255,0.025) 0%, rgba(255,255,255,0) 100%)",
@@ -81,11 +82,9 @@ export default function Sidebar() {
           className="flex items-center gap-3 h-[72px] shrink-0 px-4 py-5 border-b border-[rgba(245,166,35,0.3)] md:max-lg:justify-center md:max-lg:px-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--color-accent-gold)]"
           aria-label="eFinMoney dashboard"
         >
-          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--color-accent-gold)] text-[var(--color-bg-primary)] text-sm font-extrabold">
-            eF
-          </span>
+          <Logo static className="h-9 w-9" />
           <span className="min-w-0 leading-tight md:max-lg:hidden">
-            <span className="block font-bold text-white">eFinMoney</span>
+            <span className="block font-bold text-[var(--color-text-primary)]">eFinMoney</span>
             <span className="block text-[11px] text-[var(--color-text-muted)]">
               {businessPrimary ? "Business Platform" : "Personal Account"}
             </span>
@@ -125,14 +124,14 @@ export default function Sidebar() {
           />
           <Link
             to="/profile"
-            className="mt-2 mx-2 flex items-center gap-3 rounded-[10px] px-3 py-2 hover:bg-white/[0.06] transition-colors duration-150 md:max-lg:justify-center md:max-lg:px-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent-gold)]"
+            className="mt-2 mx-2 flex items-center gap-3 rounded-[10px] px-3 py-2 hover:bg-[var(--color-hover)] transition-colors duration-150 md:max-lg:justify-center md:max-lg:px-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent-gold)]"
             aria-label={`Profile: ${fullName}`}
           >
-            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--color-accent-gold)] text-sm font-bold text-white">
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--color-accent-gold)] text-sm font-bold text-[var(--color-text-primary)]">
               {initial}
             </span>
             <span className="min-w-0 leading-tight md:max-lg:hidden">
-              <span className="block truncate text-sm font-semibold text-white">{fullName}</span>
+              <span className="block truncate text-sm font-semibold text-[var(--color-text-primary)]">{fullName}</span>
               <span className="block text-[11px] text-[var(--color-text-muted)]">eFinMoney</span>
             </span>
           </Link>

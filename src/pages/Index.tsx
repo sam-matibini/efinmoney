@@ -26,7 +26,7 @@ const Index = () => {
       <div className="space-y-6">
         {/* Row 1: greeting + account status */}
         <header>
-          <h1 className="text-[var(--font-size-xl)] font-bold text-white">
+          <h1 className="text-[var(--font-size-xl)] font-bold text-[var(--color-text-primary)]">
             {greeting}, {firstName}
           </h1>
           <p className="mt-1 text-sm text-[var(--color-text-muted)]">{format(new Date(), "EEEE, MMMM d")}</p>

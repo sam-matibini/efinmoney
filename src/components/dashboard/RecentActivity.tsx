@@ -17,13 +17,13 @@ export default function RecentActivity() {
   return (
     <section aria-labelledby="recent-activity-title" className="rounded-[var(--radius-lg)] bg-[var(--color-bg-sidebar)] p-5 h-full">
       <div className="mb-4 flex items-center justify-between gap-2">
-        <h2 id="recent-activity-title" className="text-[var(--font-size-lg)] font-semibold text-white">
+        <h2 id="recent-activity-title" className="text-[var(--font-size-lg)] font-semibold text-[var(--color-text-primary)]">
           Recent Activity
         </h2>
         {rows.length > 0 && (
           <Link
             to="/transfers"
-            className="flex items-center gap-0.5 rounded-[var(--radius-sm)] px-1.5 py-1 text-xs font-medium text-[var(--color-accent-gold)] hover:bg-white/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent-gold)]"
+            className="flex items-center gap-0.5 rounded-[var(--radius-sm)] px-1.5 py-1 text-xs font-medium text-[var(--color-accent-gold)] hover:bg-[var(--color-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent-gold)]"
           >
             View all <ChevronRight className="h-3.5 w-3.5" />
           </Link>
@@ -53,7 +53,7 @@ export default function RecentActivity() {
               <li key={r.id}>
                 <Link
                   to={to}
-                  className="flex items-center gap-3 rounded-[var(--radius-sm)] px-2 py-2 hover:bg-white/[0.04] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent-gold)]"
+                  className="flex items-center gap-3 rounded-[var(--radius-sm)] px-2 py-2 hover:bg-[var(--color-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent-gold)]"
                 >
                   <span
                     className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full"
@@ -66,7 +66,7 @@ export default function RecentActivity() {
                     />
                   </span>
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate text-sm font-medium text-white">{r.payee || r.description}</span>
+                    <span className="block truncate text-sm font-medium text-[var(--color-text-primary)]">{r.payee || r.description}</span>
                     <span className="block text-[11px] text-[var(--color-text-muted)]">
                       {format(new Date(r.date), "MMM d")}
                       {r.status !== "completed" && ` · ${r.status.replace(/_/g, " ")}`}

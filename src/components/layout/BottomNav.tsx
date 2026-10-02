@@ -25,8 +25,8 @@ export default function BottomNav() {
 
   return (
     <nav
-      className="fixed bottom-0 left-0 right-0 z-50 md:hidden border-t border-white/[0.06] backdrop-blur-xl"
-      style={{ backgroundColor: "rgba(15, 31, 61, 0.96)", paddingBottom: "env(safe-area-inset-bottom)" }}
+      className="fixed bottom-0 left-0 right-0 z-50 md:hidden border-t border-[var(--color-border)] backdrop-blur-xl"
+      style={{ backgroundColor: "var(--color-bg-sidebar)", paddingBottom: "env(safe-area-inset-bottom)" }}
       aria-label="Primary"
     >
       <div className="flex items-center justify-around px-2 py-2">
@@ -54,7 +54,7 @@ export default function BottomNav() {
               <span
                 className={cn(
                   "text-[11px] font-semibold",
-                  active ? "text-white" : "text-[var(--color-text-muted)]",
+                  active ? "text-[var(--color-text-primary)]" : "text-[var(--color-text-muted)]",
                 )}
               >
                 {item.label}

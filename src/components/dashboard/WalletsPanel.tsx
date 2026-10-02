@@ -26,7 +26,7 @@ export default function WalletsPanel() {
   return (
     <section aria-labelledby="wallets-panel-title" className="rounded-[var(--radius-lg)] bg-[var(--color-bg-sidebar)] p-5 h-full">
       <div className="mb-4 flex items-center justify-between gap-2">
-        <h2 id="wallets-panel-title" className="text-[var(--font-size-lg)] font-semibold text-white">
+        <h2 id="wallets-panel-title" className="text-[var(--font-size-lg)] font-semibold text-[var(--color-text-primary)]">
           Wallets
         </h2>
         <div className="flex items-center gap-1">
@@ -34,13 +34,13 @@ export default function WalletsPanel() {
             type="button"
             onClick={() => setHidden(!hidden)}
             aria-label={hidden ? "Show balances" : "Hide balances"}
-            className="rounded-[var(--radius-sm)] p-2 text-[var(--color-text-muted)] hover:bg-white/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent-gold)]"
+            className="rounded-[var(--radius-sm)] p-2 text-[var(--color-text-muted)] hover:bg-[var(--color-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent-gold)]"
           >
             {hidden ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
           </button>
           <Link
             to="/wallets"
-            className="flex items-center gap-1 rounded-[var(--radius-sm)] px-2 py-1 text-sm font-medium text-[var(--color-accent-gold)] hover:bg-white/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent-gold)]"
+            className="flex items-center gap-1 rounded-[var(--radius-sm)] px-2 py-1 text-sm font-medium text-[var(--color-accent-gold)] hover:bg-[var(--color-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent-gold)]"
           >
             View all <ChevronRight className="h-4 w-4" />
           </Link>
@@ -56,7 +56,7 @@ export default function WalletsPanel() {
       ) : shown.length === 0 ? (
         <Link
           to="/wallets"
-          className="flex flex-col items-center justify-center gap-2 rounded-[var(--radius-md)] border border-dashed border-[var(--color-border)] py-10 text-sm text-[var(--color-text-muted)] hover:bg-white/[0.04]"
+          className="flex flex-col items-center justify-center gap-2 rounded-[var(--radius-md)] border border-dashed border-[var(--color-border)] py-10 text-sm text-[var(--color-text-muted)] hover:bg-[var(--color-hover)]"
         >
           <Plus className="h-5 w-5" /> Open your first wallet
         </Link>
@@ -72,7 +72,7 @@ export default function WalletsPanel() {
               <div className="flex items-center justify-between gap-2">
                 <span className="flex items-center gap-2">
                   <CurrencyFlag code={w.currency_code} size="sm" />
-                  <span className="text-sm font-semibold text-white">{w.currency_code}</span>
+                  <span className="text-sm font-semibold text-[var(--color-text-primary)]">{w.currency_code}</span>
                 </span>
                 {w.is_default && (
                   <span className="rounded-full bg-[rgba(245,166,35,0.15)] px-2 py-0.5 text-[10px] font-bold uppercase text-[var(--color-accent-gold)]">
@@ -81,7 +81,7 @@ export default function WalletsPanel() {
                 )}
               </div>
               <div>
-                <p className="text-xl font-bold tabular-nums text-white">
+                <p className="text-xl font-bold tabular-nums text-[var(--color-text-primary)]">
                   {hidden ? "••••••" : `${w.symbol ?? ""}${fmt(Number(w.balance))}`}
                 </p>
                 <p className="truncate text-xs text-[var(--color-text-muted)]">{w.currency_name}</p>

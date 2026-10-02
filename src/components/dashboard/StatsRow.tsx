@@ -108,7 +108,7 @@ export default function StatsRow() {
             budget ? (
               <div className="space-y-1.5">
                 <div
-                  className="h-1.5 w-full overflow-hidden rounded-full bg-white/10"
+                  className="h-1.5 w-full overflow-hidden rounded-full bg-[var(--color-track)]"
                   role="progressbar"
                   aria-valuenow={Math.round(budgetPct)}
                   aria-valuemin={0}

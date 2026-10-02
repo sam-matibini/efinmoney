@@ -46,7 +46,7 @@ export default function SetBudgetModal({ open, onOpenChange, initialAmount, onSa
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         overlayClassName="bg-black/60 backdrop-blur-[8px]"
-        className="max-w-[400px] rounded-[var(--radius-lg)] border-[var(--color-border)] bg-[var(--color-bg-card)] p-8 text-[var(--color-text-primary)]"
+        className="max-w-[400px] rounded-[var(--radius-lg)] border-[var(--color-border)] bg-[var(--color-bg-raised)] p-8 text-[var(--color-text-primary)]"
       >
         <DialogHeader>
           <DialogTitle className="text-[var(--font-size-lg)] font-bold">Set monthly budget</DialogTitle>
@@ -74,7 +74,7 @@ export default function SetBudgetModal({ open, onOpenChange, initialAmount, onSa
                 placeholder="0.00"
                 aria-invalid={!!error}
                 aria-describedby={error ? "budget-error" : undefined}
-                className="h-12 w-full bg-transparent pr-4 text-lg font-semibold text-white outline-none placeholder:text-[var(--color-text-muted)]"
+                className="h-12 w-full bg-transparent pr-4 text-lg font-semibold text-[var(--color-text-primary)] outline-none placeholder:text-[var(--color-text-muted)]"
               />
             </div>
             {error && (
@@ -88,14 +88,14 @@ export default function SetBudgetModal({ open, onOpenChange, initialAmount, onSa
             <button
               type="button"
               onClick={() => onOpenChange(false)}
-              className="flex-1 h-11 rounded-[var(--radius-md)] border border-[var(--color-border)] text-sm font-semibold text-[var(--color-text-label)] hover:bg-white/[0.06] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent-gold)]"
+              className="flex-1 h-11 rounded-[var(--radius-md)] border border-[var(--color-border)] text-sm font-semibold text-[var(--color-text-label)] hover:bg-[var(--color-hover)] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent-gold)]"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={saving}
-              className="flex-1 h-11 rounded-[var(--radius-md)] bg-[var(--color-accent-gold)] text-sm font-bold text-[var(--color-bg-primary)] hover:brightness-110 disabled:opacity-60 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white flex items-center justify-center gap-2"
+              className="flex-1 h-11 rounded-[var(--radius-md)] bg-[var(--color-accent-gold)] text-sm font-bold text-[var(--color-on-gold)] hover:brightness-110 disabled:opacity-60 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-text-primary)] flex items-center justify-center gap-2"
             >
               {saving && <Loader2 className="h-4 w-4 animate-spin" />}
               Save

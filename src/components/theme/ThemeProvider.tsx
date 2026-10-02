@@ -5,6 +5,8 @@ type Theme = "light" | "dark";
 interface ThemeContextValue {
   /** Effective theme (forced theme wins over the stored preference). */
   theme: Theme;
+  /** Logged-in app preference (defaults to the navy design). */
+  appTheme: Theme;
   toggleTheme: () => void;
   setTheme: (t: Theme) => void;
   setForcedTheme: (t: Theme | null) => void;
@@ -13,16 +15,17 @@ interface ThemeContextValue {
 const ThemeContext = createContext<ThemeContextValue | undefined>(undefined);
 
 const STORAGE_KEY = "efinmoney-theme";
+const APP_STORAGE_KEY = "efinmoney-app-theme";
 
-const getInitialTheme = (): Theme => {
-  if (typeof window === "undefined") return "light";
-  const stored = localStorage.getItem(STORAGE_KEY) as Theme | null;
-  if (stored === "light" || stored === "dark") return stored;
-  return "light";
+const readStored = (key: string, fallback: Theme): Theme => {
+  if (typeof window === "undefined") return fallback;
+  const stored = localStorage.getItem(key);
+  return stored === "light" || stored === "dark" ? stored : fallback;
 };
 
 export const ThemeProvider = ({ children }: { children: ReactNode }) => {
-  const [theme, setThemeState] = useState<Theme>(getInitialTheme);
+  const [theme, setThemeState] = useState<Theme>(() => readStored(STORAGE_KEY, "light"));
+  const [appTheme, setAppTheme] = useState<Theme>(() => readStored(APP_STORAGE_KEY, "dark"));
   const [forced, setForcedTheme] = useState<Theme | null>(null);
   const effective = forced ?? theme;
 
@@ -37,11 +40,15 @@ export const ThemeProvider = ({ children }: { children: ReactNode }) => {
     localStorage.setItem(STORAGE_KEY, theme);
   }, [theme]);
 
+  useEffect(() => {
+    localStorage.setItem(APP_STORAGE_KEY, appTheme);
+  }, [appTheme]);
+
   const setTheme = (t: Theme) => setThemeState(t);
-  const toggleTheme = () => setThemeState((p) => (p === "light" ? "dark" : "light"));
+  const toggleTheme = () => setAppTheme((p) => (p === "light" ? "dark" : "light"));
 
   return (
-    <ThemeContext.Provider value={{ theme: effective, toggleTheme, setTheme, setForcedTheme }}>
+    <ThemeContext.Provider value={{ theme: effective, appTheme, toggleTheme, setTheme, setForcedTheme }}>
       {children}
     </ThemeContext.Provider>
   );
@@ -53,7 +60,7 @@ export const useTheme = () => {
   return ctx;
 };
 
-/** Pins the theme while the calling component is mounted (the logged-in app is always navy). */
+/** Pins the theme while the calling component is mounted. */
 export const useForcedTheme = (t: Theme) => {
   const { setForcedTheme } = useTheme();
   useEffect(() => {

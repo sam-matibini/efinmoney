@@ -41,7 +41,7 @@ const QuickActions = () => {
 
   return (
     <section aria-labelledby="quick-actions-title" className="rounded-[var(--radius-lg)] bg-[var(--color-bg-sidebar)] p-5 h-full">
-      <h2 id="quick-actions-title" className="mb-4 text-[var(--font-size-lg)] font-semibold text-white">
+      <h2 id="quick-actions-title" className="mb-4 text-[var(--font-size-lg)] font-semibold text-[var(--color-text-primary)]">
         Quick Actions
       </h2>
       <div className="grid grid-cols-3 gap-3">

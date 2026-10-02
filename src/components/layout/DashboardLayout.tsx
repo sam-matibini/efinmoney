@@ -2,14 +2,15 @@ import type { ReactNode } from "react";
 import Sidebar from "@/components/layout/Sidebar";
 import BottomNav from "@/components/layout/BottomNav";
 import AppUtilityBar from "@/components/layout/AppUtilityBar";
-import { useForcedTheme } from "@/components/theme/ThemeProvider";
+import { useForcedTheme, useTheme } from "@/components/theme/ThemeProvider";
 
 /**
  * App shell: fixed sidebar (220px desktop, 72px tablet, hidden on mobile) and a
  * scrollable content column offset by the sidebar width. No top navigation bar.
  */
 export default function DashboardLayout({ children }: { children: ReactNode }) {
-  useForcedTheme("dark");
+  const { appTheme } = useTheme();
+  useForcedTheme(appTheme);
 
   return (
     <div className="efin-app min-h-screen overflow-x-hidden bg-[var(--color-bg-primary)] text-[var(--color-text-primary)]">

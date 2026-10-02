@@ -67,7 +67,7 @@ export default function ExchangeTicker() {
     <section aria-labelledby="fx-ticker-title" className={panelCls}>
       <div className="mb-4 flex items-center justify-between gap-2">
         <div>
-          <h2 id="fx-ticker-title" className="text-[var(--font-size-lg)] font-semibold text-white">
+          <h2 id="fx-ticker-title" className="text-[var(--font-size-lg)] font-semibold text-[var(--color-text-primary)]">
             Live Exchange Rates
           </h2>
           <p className="text-xs text-[var(--color-text-muted)]">Indicative · updates every 3s</p>
@@ -76,7 +76,7 @@ export default function ExchangeTicker() {
           type="button"
           onClick={() => refetch()}
           aria-label="Refresh exchange rates"
-          className="rounded-[var(--radius-sm)] p-2 text-[var(--color-text-muted)] hover:bg-white/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent-gold)]"
+          className="rounded-[var(--radius-sm)] p-2 text-[var(--color-text-muted)] hover:bg-[var(--color-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent-gold)]"
         >
           <RefreshCw className={`h-4 w-4 ${isFetching ? "animate-spin" : ""}`} />
         </button>
@@ -108,7 +108,7 @@ export default function ExchangeTicker() {
                       <CurrencyFlag code={p.from} size="sm" />
                       <CurrencyFlag code={p.to} size="sm" />
                     </span>
-                    <span className="text-sm font-semibold text-white">
+                    <span className="text-sm font-semibold text-[var(--color-text-primary)]">
                       {p.from}/{p.to}
                     </span>
                   </span>

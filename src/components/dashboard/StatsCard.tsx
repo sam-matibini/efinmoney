@@ -18,7 +18,7 @@ export default function StatsCard({ title, accent, icon: Icon, value, subtitle, 
   return (
     <section
       className={cn(
-        "relative flex flex-col gap-2 rounded-[var(--radius-lg)] p-5 bg-[var(--color-bg-card)] border border-[var(--color-border)] shadow-[0_4px_24px_rgba(0,0,0,0.3)] transition-transform duration-200 ease-in-out hover:scale-[1.02] motion-reduce:hover:scale-100",
+        "relative flex flex-col gap-2 rounded-[var(--radius-lg)] p-5 bg-[var(--color-bg-raised)] border border-[var(--color-border)] [box-shadow:var(--color-shadow)] transition-transform duration-200 ease-in-out hover:scale-[1.02] motion-reduce:hover:scale-100",
         className,
       )}
       style={{ borderTop: `3px solid ${accent}` }}

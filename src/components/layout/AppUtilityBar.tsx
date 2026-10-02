@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Building2, LogOut, Search } from "lucide-react";
+import { Building2, LogOut, Moon, Search, Sun } from "lucide-react";
+import { Logo } from "@/components/Logo";
+import { useTheme } from "@/components/theme/ThemeProvider";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -28,6 +30,7 @@ export default function AppUtilityBar() {
   const { signOut, user } = useAuth();
   const { data: profile } = useProfile();
   const { businessLabel, businessHref, businessPrimary } = useNavModel();
+  const { theme, toggleTheme } = useTheme();
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -42,16 +45,14 @@ export default function AppUtilityBar() {
           className="md:hidden flex items-center gap-2 mr-auto rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent-gold)]"
           aria-label="eFinMoney dashboard"
         >
-          <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--color-accent-gold)] text-[var(--color-bg-primary)] text-sm font-extrabold">
-            eF
-          </span>
-          <span className="font-bold text-white">eFinMoney</span>
+          <Logo static className="h-8 w-8" />
+          <span className="font-bold text-[var(--color-text-primary)]">eFinMoney</span>
         </Link>
 
         <button
           type="button"
           onClick={() => setSearchOpen(true)}
-          className="hidden md:flex items-center gap-2 h-9 w-56 mr-auto rounded-[var(--radius-full)] border border-[var(--color-border)] bg-white/[0.04] px-3 text-sm text-[var(--color-text-muted)] hover:bg-white/[0.07] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent-gold)]"
+          className="hidden md:flex items-center gap-2 h-9 w-56 mr-auto rounded-[var(--radius-full)] border border-[var(--color-border)] bg-[var(--color-hover)] px-3 text-sm text-[var(--color-text-muted)] hover:bg-[var(--color-hover)] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent-gold)]"
           aria-label="Search transfers, contacts, wallets"
         >
           <Search size={16} aria-hidden />
@@ -60,12 +61,21 @@ export default function AppUtilityBar() {
         <button
           type="button"
           onClick={() => setSearchOpen(true)}
-          className="md:hidden h-9 w-9 flex items-center justify-center rounded-full text-[var(--color-text-label)] hover:bg-white/[0.06]"
+          className="md:hidden h-9 w-9 flex items-center justify-center rounded-full text-[var(--color-text-label)] hover:bg-[var(--color-hover)]"
           aria-label="Search"
         >
           <Search size={20} aria-hidden />
         </button>
 
+        <button
+          type="button"
+          onClick={toggleTheme}
+          className="h-9 w-9 flex items-center justify-center rounded-full text-[var(--color-text-label)] hover:bg-[var(--color-hover)] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent-gold)]"
+          aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+          title={theme === "dark" ? "Light mode" : "Dark mode"}
+        >
+          {theme === "dark" ? <Sun size={18} aria-hidden /> : <Moon size={18} aria-hidden />}
+        </button>
         <SupportLink />
         <PendingTransfersButton />
         <NotificationsPanel />
@@ -79,7 +89,7 @@ export default function AppUtilityBar() {
             >
               <Avatar className="h-8 w-8">
                 <AvatarImage src={avatarUrl ?? undefined} alt="" />
-                <AvatarFallback className="bg-[var(--color-accent-gold)] text-[var(--color-bg-primary)] text-xs font-bold">
+                <AvatarFallback className="bg-[var(--color-accent-gold)] text-[var(--color-on-gold)] text-xs font-bold">
                   {initial}
                 </AvatarFallback>
               </Avatar>
