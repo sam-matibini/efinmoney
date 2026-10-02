@@ -6,6 +6,7 @@
 //   { mode: "preview" }  staff JWT: returns { subject, html } personalised for the caller.
 //                        internal: same, for body.user_id (or a generic recipient). Never sends.
 //   { mode: "test" }     staff JWT: sends today's email to the caller only.
+//                        internal: { to } sends one test copy to that address only.
 import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
 const corsHeaders = {
@@ -415,6 +416,22 @@ Deno.serve(async (req) => {
     if (mode === "run") {
       if (!isInternal) return json({ error: "Forbidden" }, 403);
       return json({ ok: true, ...(await runDaily(db, body?.force === true)) });
+    }
+
+    if (mode === "test" && isInternal) {
+      const to = String(body?.to || "").trim();
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) return json({ error: "valid 'to' email required" }, 400);
+      const { data: match } = await db.from("profiles").select("user_id").ilike("email", to).limit(1).maybeSingle();
+      const { copy, recipients, build } = await compose(db, match?.user_id ?? "00000000-0000-0000-0000-000000000000");
+      const r = recipients[0] ?? { user_id: "00000000-0000-0000-0000-000000000000", email: to, first_name: "there" };
+      const message = await build({ ...r, email: to });
+      const sent = await sendBatch([{ ...message, subject: `[Test] ${message.subject}` }]);
+      await db.from("daily_fx_email_runs").insert({
+        send_date: torontoParts().date, kind: "test", status: sent ? "sent" : "failed",
+        subject: copy.subject, intro: copy.intro, tip: `${copy.tipTitle}: ${copy.tipBody}`,
+        recipient_count: 1, email_count: sent, finished_at: new Date().toISOString(),
+      });
+      return json({ ok: sent > 0, sent_to: to, subject: copy.subject, ai_error: lastAiError });
     }
 
     if (mode === "preview" && isInternal) {
